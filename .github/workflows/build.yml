@@ -1,0 +1,64 @@
+name: Test/Build
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+jobs:
+  build:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macOS-latest, windows-latest]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v5
+        with:
+          distribution: 'zulu'
+          java-version: 21
+
+      - name: Cached Konan
+        uses: actions/cache@v6
+        with:
+          path: ~/.konan
+          key: ${{ runner.os }}-konan-${{ hashFiles('**/*.gradle*') }}-${{ hashFiles('**/gradle/wrapper/gradle-wrapper.properties') }}
+          restore-keys: ${{ runner.os }}-konan-
+
+      - name: Cache gradle
+        uses: actions/cache@v6
+        with:
+          path: ~/.gradle/caches
+          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*') }}
+          restore-keys: |
+            ${{ runner.os }}-gradle-
+
+      - name: Linter (gradle)
+        run: ./gradlew spotlessCheck
+
+      - name: Check JVM
+        run: ./gradlew jvmTest
+
+      - name: Check Android (host)
+        if: matrix.os == 'ubuntu-latest'
+        run: ./gradlew testAndroidHostTest
+
+      - name: Check Linux
+        if: matrix.os == 'ubuntu-latest'
+        run: ./gradlew linuxX64Test
+
+      - name: Check iOS
+        if: matrix.os == 'macOS-latest'
+        run: ./gradlew iosSimulatorArm64Test
+
+      - name: Check macOS
+        if: matrix.os == 'macOS-latest'
+        run: ./gradlew macosArm64Test
+
+      - name: Build (gradle)
+        run: ./gradlew assemble --no-daemon
