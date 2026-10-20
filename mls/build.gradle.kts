@@ -68,11 +68,6 @@ kotlin {
     }
 
     sourceSets {
-        commonMain.dependencies {
-            // SHA-512 for Ed25519 on every platform.
-            implementation(libs.andreypfau.kotlinx.crypto.sha2)
-        }
-
         commonTest.dependencies {
             implementation(libs.kotlin.test)
             implementation(libs.kotlinx.serialization.json)
@@ -93,13 +88,6 @@ kotlin {
         androidMain { dependsOn(jvmAndroid) }
         jvmTest { dependsOn(jvmAndroidTest) }
         getByName("androidHostTest") { dependsOn(jvmAndroidTest) }
-
-        nativeMain.dependencies {
-            // HMAC + SHA-256 in pure Kotlin, AES-GCM and the CSPRNG from the platform.
-            implementation(libs.andreypfau.kotlinx.crypto.hmac)
-            implementation(libs.dev.whyoleg.cryptography.provider.optimal)
-            implementation(libs.dev.whyoleg.cryptography.random)
-        }
     }
 }
 

@@ -20,56 +20,28 @@
  */
 package com.vitorpamplona.mls.platform
 
-import dev.whyoleg.cryptography.CryptographyProvider
-import dev.whyoleg.cryptography.DelicateCryptographyApi
-import dev.whyoleg.cryptography.algorithms.AES
-import dev.whyoleg.cryptography.random.CryptographyRandom
-import io.github.andreypfau.kotlinx.crypto.HMac
-import io.github.andreypfau.kotlinx.crypto.Sha256
+import com.vitorpamplona.mls.platform.aes.AesGcmKey
+import com.vitorpamplona.mls.platform.sha2.Sha512Digest
 
-internal actual fun sha256(data: ByteArray): ByteArray = Sha256().apply { update(data) }.digest()
+internal actual fun sha512(data: ByteArray): ByteArray = Sha512Digest().apply { update(data) }.digest()
 
-internal actual class MacInstance actual constructor(
-    algorithm: String,
-    key: ByteArray,
-) {
-    private val hmac =
-        when (algorithm) {
-            "HmacSHA256" -> HMac(Sha256(), key)
-            else -> error("Algorithm $algorithm is not supported.")
-        }
-
-    actual fun update(array: ByteArray) {
-        hmac.update(array)
-    }
-
-    actual fun update(byte: Byte) {
-        hmac.update(byte)
-    }
-
-    actual fun doFinal(): ByteArray = hmac.digest()
-}
-
-private val aesGcm = CryptographyProvider.Default.get(AES.GCM)
-
-@OptIn(DelicateCryptographyApi::class)
+/**
+ * AES-GCM in Kotlin on every native target: CommonCrypto has no public GCM, and the
+ * Apple implementation that has one, CryptoKit, is Swift-only.
+ */
 internal actual class AESGCM actual constructor(
     keyBytes: ByteArray,
     private val nonce: ByteArray,
 ) {
-    private val key = aesGcm.keyDecoder().decodeFromByteArrayBlocking(AES.Key.Format.RAW, keyBytes)
+    private val key = AesGcmKey(keyBytes)
 
     actual fun encrypt(
         bytesToEncrypt: ByteArray,
         aad: ByteArray,
-    ): ByteArray = key.cipher().encryptWithIvBlocking(nonce, bytesToEncrypt, aad)
+    ): ByteArray = key.encrypt(nonce, bytesToEncrypt, aad)
 
     actual fun decrypt(
         bytesToDecrypt: ByteArray,
         aad: ByteArray,
-    ): ByteArray = key.cipher().decryptWithIvBlocking(nonce, bytesToDecrypt, aad)
-}
-
-internal actual fun secureRandomBytes(output: ByteArray) {
-    CryptographyRandom.nextBytes(output)
+    ): ByteArray = key.decrypt(nonce, bytesToDecrypt, aad)
 }

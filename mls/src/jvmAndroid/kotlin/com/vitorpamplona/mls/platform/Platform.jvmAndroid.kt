@@ -30,6 +30,12 @@ import javax.crypto.spec.SecretKeySpec
 
 internal actual fun sha256(data: ByteArray): ByteArray = MessageDigest.getInstance("SHA-256").digest(data)
 
+// One digest per thread: MessageDigest.getInstance is a provider lookup, and Ed25519 sign
+// and verify hash two or three times each.
+private val sha512Digest: ThreadLocal<MessageDigest> = ThreadLocal.withInitial { MessageDigest.getInstance("SHA-512") }
+
+internal actual fun sha512(data: ByteArray): ByteArray = sha512Digest.get()!!.digest(data)
+
 internal actual class MacInstance actual constructor(
     algorithm: String,
     key: ByteArray,

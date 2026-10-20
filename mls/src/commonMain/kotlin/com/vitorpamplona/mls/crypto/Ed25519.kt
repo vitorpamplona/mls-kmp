@@ -21,7 +21,7 @@
 package com.vitorpamplona.mls.crypto
 
 import com.vitorpamplona.mls.platform.RandomInstance
-import io.github.andreypfau.kotlinx.crypto.Sha512
+import com.vitorpamplona.mls.platform.sha512
 
 /**
  * Ed25519 digital signature operations for MLS ciphersuite 0x0001.
@@ -176,13 +176,6 @@ object Ed25519 {
 
         val p = scalarMultBase(d.copyOfRange(0, 32))
         return packPoint(p)
-    }
-
-    /** SHA-512 hash using the platform library. */
-    private fun sha512(data: ByteArray): ByteArray {
-        val digest = Sha512()
-        digest.update(data)
-        return digest.digest()
     }
 
     // --- Extended Edwards point operations ---
