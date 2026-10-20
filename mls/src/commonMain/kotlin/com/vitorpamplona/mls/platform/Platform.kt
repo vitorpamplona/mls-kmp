@@ -23,14 +23,21 @@ package com.vitorpamplona.mls.platform
 /*
  * The few primitives the engine needs from the platform. They used to come from
  * Quartz's utils; they are internal here so this library depends on nothing Nostr.
- * Ciphersuite 0x0001 only needs SHA-256, HMAC-SHA256, AES-128-GCM and a CSPRNG
- * (Ed25519/X25519 and their SHA-512 are pure Kotlin in `crypto/`).
+ * Ciphersuite 0x0001 needs SHA-256, HMAC-SHA256, AES-128-GCM, a CSPRNG, and SHA-512
+ * for Ed25519 (Ed25519 and X25519 themselves are pure Kotlin in `crypto/`).
+ *
+ * JVM and Android use JCA; Apple uses CommonCrypto for SHA-256 and HMAC; Linux uses the
+ * pure-Kotlin `sha2/` and `mac/`; every native target uses the constant-time Kotlin
+ * AES-GCM in `aes/` (CommonCrypto has no public GCM). No third-party crypto library.
  */
 
 /** SHA-256 of [data]. */
 internal expect fun sha256(data: ByteArray): ByteArray
 
-/** Incremental HMAC. Only `HmacSHA256` is supported. */
+/** SHA-512 of [data], for Ed25519. */
+internal expect fun sha512(data: ByteArray): ByteArray
+
+/** Incremental HMAC, one message per instance. Only `HmacSHA256` is supported. */
 internal expect class MacInstance(
     algorithm: String,
     key: ByteArray,

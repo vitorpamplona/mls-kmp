@@ -81,10 +81,22 @@ require `@OptIn(InternalMlsApi::class)` and are not a stable API.
 
 ## Platform primitives
 
-Ed25519, X25519 and SHA-512 are pure Kotlin on every platform. SHA-256,
-HMAC-SHA256, AES-128-GCM and the CSPRNG come from the platform: JCA on JVM and
-Android; `kotlinx-crypto` and `cryptography-kotlin` on native. They sit behind
-the internal `com.vitorpamplona.mls.platform` package.
+The library has no runtime dependencies beyond the Kotlin standard library: no
+third-party crypto. Ed25519 and X25519 are pure Kotlin on every platform. The rest
+sits behind the internal `com.vitorpamplona.mls.platform` package:
+
+| | JVM / Android | Apple | Linux |
+| --- | --- | --- | --- |
+| SHA-256 | JCA | CommonCrypto | pure Kotlin (`platform/sha2`) |
+| SHA-512 (Ed25519) | JCA | pure Kotlin | pure Kotlin |
+| HMAC-SHA256 | JCA | CommonCrypto | pure Kotlin (`platform/mac`) |
+| AES-128-GCM | JCA | pure Kotlin (`platform/aes`) | pure Kotlin |
+| CSPRNG | `SecureRandom` | `SecRandomCopyBytes` | `/dev/urandom` |
+
+The Kotlin AES is a port of BearSSL's constant-time `aes_ct64` (bitsliced, no
+secret-indexed tables) with GHASH from `ghash_ctmul64`. CommonCrypto has no public
+GCM. These files are kept in sync with Quartz's `utils/sha2`, `utils/mac` and
+`utils/ciphers/aes`, where they were written and reviewed.
 
 JS and Wasm are not targets yet: AES-GCM there is only available through the
 asynchronous WebCrypto API, and the engine is synchronous.
