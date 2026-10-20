@@ -1,0 +1,25 @@
+[versions]
+agp = "9.4.1"
+kotlin = "2.4.20"
+android-minSdk = "26"
+android-compileSdk = "37"
+mavenPublish = "0.37.0"
+spotless = "8.10.3"
+kotlinxSerialization = "1.11.0"
+andreypfauKotlinxCrypto = "0.0.4"
+devWhyolegCryptography = "0.6.0"
+
+[libraries]
+kotlin-test = { module = "org.jetbrains.kotlin:kotlin-test", version.ref = "kotlin" }
+kotlinx-serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "kotlinxSerialization" }
+andreypfau-kotlinx-crypto-sha2 = { module = "io.github.andreypfau:kotlinx-crypto-sha2", version.ref = "andreypfauKotlinxCrypto" }
+andreypfau-kotlinx-crypto-hmac = { module = "io.github.andreypfau:kotlinx-crypto-hmac", version.ref = "andreypfauKotlinxCrypto" }
+dev-whyoleg-cryptography-provider-optimal = { module = "dev.whyoleg.cryptography:cryptography-provider-optimal", version.ref = "devWhyolegCryptography" }
+dev-whyoleg-cryptography-random = { module = "dev.whyoleg.cryptography:cryptography-random", version.ref = "devWhyolegCryptography" }
+
+[plugins]
+kotlinMultiplatform = { id = "org.jetbrains.kotlin.multiplatform", version.ref = "kotlin" }
+androidKotlinMultiplatformLibrary = { id = "com.android.kotlin.multiplatform.library", version.ref = "agp" }
+serialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }
+vanniktech-mavenPublish = { id = "com.vanniktech.maven.publish", version.ref = "mavenPublish" }
+diffplugSpotless = { id = "com.diffplug.spotless", version.ref = "spotless" }
