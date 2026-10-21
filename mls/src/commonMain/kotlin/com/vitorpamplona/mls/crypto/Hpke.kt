@@ -20,7 +20,9 @@
  */
 package com.vitorpamplona.mls.crypto
 
-import com.vitorpamplona.mls.platform.AESGCM
+import com.vitorpamplona.crypto.aes.AESGCM
+import com.vitorpamplona.crypto.curve25519.X25519
+import com.vitorpamplona.crypto.curve25519.X25519KeyPair
 
 /**
  * HPKE (Hybrid Public Key Encryption) implementation for MLS (RFC 9180).

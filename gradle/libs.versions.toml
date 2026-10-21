@@ -6,8 +6,11 @@ android-compileSdk = "37"
 mavenPublish = "0.37.0"
 spotless = "8.10.3"
 kotlinxSerialization = "1.11.0"
+# SHA, HMAC, HKDF, AES-GCM, X25519, Ed25519 and secure random: vitorpamplona/crypto-kmp.
+cryptoKmp = "1.0.0"
 
 [libraries]
+crypto = { module = "com.vitorpamplona.crypto:crypto", version.ref = "cryptoKmp" }
 kotlin-test = { module = "org.jetbrains.kotlin:kotlin-test", version.ref = "kotlin" }
 kotlinx-serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "kotlinxSerialization" }
 

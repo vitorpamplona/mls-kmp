@@ -20,11 +20,11 @@
  */
 package com.vitorpamplona.mls.interop
 
+import com.vitorpamplona.crypto.curve25519.X25519
 import com.vitorpamplona.mls.JsonMapper
 import com.vitorpamplona.mls.TestResourceLoader
 import com.vitorpamplona.mls.codec.TlsReader
 import com.vitorpamplona.mls.crypto.MlsCryptoProvider
-import com.vitorpamplona.mls.crypto.X25519
 import com.vitorpamplona.mls.framing.MlsMessage
 import com.vitorpamplona.mls.framing.WireFormat
 import com.vitorpamplona.mls.hexToByteArray

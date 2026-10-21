@@ -20,11 +20,11 @@
  */
 package com.vitorpamplona.mls.group
 
+import com.vitorpamplona.crypto.sha2.sha256
 import com.vitorpamplona.mls.codec.TlsReader
 import com.vitorpamplona.mls.codec.TlsWriter
 import com.vitorpamplona.mls.messages.GroupContext
 import com.vitorpamplona.mls.messages.Proposal
-import com.vitorpamplona.mls.platform.sha256
 import com.vitorpamplona.mls.schedule.EpochSecrets
 import com.vitorpamplona.mls.schedule.SenderRatchetState
 
