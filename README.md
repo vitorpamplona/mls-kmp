@@ -1,7 +1,7 @@
 # MLS for Kotlin Multiplatform
 
 A Messaging Layer Security ([RFC 9420](https://www.rfc-editor.org/rfc/rfc9420)) engine in
-pure Kotlin Multiplatform: TLS presentation-language codec, HPKE, X25519/Ed25519, the
+pure Kotlin Multiplatform: TLS presentation-language codec, HPKE, the
 ratchet tree, the key schedule, the secret tree, message framing, proposals, commits,
 Welcome, and the `app_data_dictionary` component carrier from
 `draft-ietf-mls-extensions-10`.
@@ -79,24 +79,15 @@ PSK secret, the `required_capabilities` checks, the join-time parent-hash
 verifier) are public only so the bindings' own test suites can reach them. They
 require `@OptIn(InternalMlsApi::class)` and are not a stable API.
 
-## Platform primitives
+## Crypto
 
-The library has no runtime dependencies beyond the Kotlin standard library: no
-third-party crypto. Ed25519 and X25519 are pure Kotlin on every platform. The rest
-sits behind the internal `com.vitorpamplona.mls.platform` package:
-
-| | JVM / Android | Apple | Linux |
-| --- | --- | --- | --- |
-| SHA-256 | JCA | CommonCrypto | pure Kotlin (`platform/sha2`) |
-| SHA-512 (Ed25519) | JCA | pure Kotlin | pure Kotlin |
-| HMAC-SHA256 | JCA | CommonCrypto | pure Kotlin (`platform/mac`) |
-| AES-128-GCM | JCA | pure Kotlin (`platform/aes`) | pure Kotlin |
-| CSPRNG | `SecureRandom` | `SecRandomCopyBytes` | `/dev/urandom` |
-
-The Kotlin AES is a port of BearSSL's constant-time `aes_ct64` (bitsliced, no
-secret-indexed tables) with GHASH from `ghash_ctmul64`. CommonCrypto has no public
-GCM. These files are kept in sync with Quartz's `utils/sha2`, `utils/mac` and
-`utils/ciphers/aes`, where they were written and reviewed.
+Every primitive comes from [crypto-kmp](https://github.com/vitorpamplona/crypto-kmp)
+(`com.vitorpamplona.crypto:crypto`): SHA-256, HMAC-SHA256 and HKDF, AES-128-GCM,
+X25519, Ed25519 and the secure random source. It is an `api` dependency because
+`MlsGroup` takes its `Ed25519KeyPair`. crypto-kmp uses JCA on the JVM and Android,
+CommonCrypto on Apple where it has the primitive, and constant-time pure Kotlin
+elsewhere, and depends on nothing but the Kotlin stdlib. So does this library,
+apart from crypto-kmp.
 
 JS and Wasm are not targets yet: AES-GCM there is only available through the
 asynchronous WebCrypto API, and the engine is synchronous.

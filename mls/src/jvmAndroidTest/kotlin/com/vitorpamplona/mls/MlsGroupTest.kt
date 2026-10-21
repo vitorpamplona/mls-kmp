@@ -20,6 +20,7 @@
  */
 package com.vitorpamplona.mls
 
+import com.vitorpamplona.crypto.curve25519.Ed25519
 import com.vitorpamplona.mls.group.MlsGroup
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -47,9 +48,7 @@ class MlsGroupTest {
     @Test
     fun testCreateGroupWithSigningKey() {
         val identity = "alice@nostr".encodeToByteArray()
-        val sigKp =
-            com.vitorpamplona.mls.crypto.Ed25519
-                .generateKeyPair()
+        val sigKp = Ed25519.generateKeyPair()
         val group = MlsGroup.create(identity, sigKp.privateKey)
 
         assertEquals(0L, group.epoch)

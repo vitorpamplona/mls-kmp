@@ -20,7 +20,7 @@
  */
 package com.vitorpamplona.mls
 
-import com.vitorpamplona.mls.crypto.X25519
+import com.vitorpamplona.crypto.curve25519.X25519
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse

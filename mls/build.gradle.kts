@@ -68,24 +68,23 @@ kotlin {
     }
 
     sourceSets {
+        commonMain.dependencies {
+            // SHA-256, HMAC, HKDF, AES-GCM, X25519, Ed25519 and secure random.
+            // api: MlsGroup takes crypto-kmp's Ed25519KeyPair.
+            api(libs.crypto)
+        }
+
         commonTest.dependencies {
             implementation(libs.kotlin.test)
             implementation(libs.kotlinx.serialization.json)
         }
 
-        // JVM and Android share the JCA-backed primitives (MessageDigest, Mac, Cipher, SecureRandom).
-        val jvmAndroid =
-            create("jvmAndroid") {
-                dependsOn(commonMain.get())
-            }
-
+        // JVM/Android-only tests (java.io, JCA cross-checks).
         val jvmAndroidTest =
             create("jvmAndroidTest") {
                 dependsOn(commonTest.get())
             }
 
-        jvmMain { dependsOn(jvmAndroid) }
-        androidMain { dependsOn(jvmAndroid) }
         jvmTest { dependsOn(jvmAndroidTest) }
         getByName("androidHostTest") { dependsOn(jvmAndroidTest) }
     }

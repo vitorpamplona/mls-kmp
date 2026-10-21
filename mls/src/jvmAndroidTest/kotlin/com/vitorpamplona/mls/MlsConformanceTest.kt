@@ -20,11 +20,11 @@
  */
 package com.vitorpamplona.mls
 
+import com.vitorpamplona.crypto.curve25519.Ed25519
+import com.vitorpamplona.crypto.curve25519.X25519
 import com.vitorpamplona.mls.codec.TlsReader
-import com.vitorpamplona.mls.crypto.Ed25519
 import com.vitorpamplona.mls.crypto.Hpke
 import com.vitorpamplona.mls.crypto.MlsCryptoProvider
-import com.vitorpamplona.mls.crypto.X25519
 import com.vitorpamplona.mls.group.MlsGroup
 import com.vitorpamplona.mls.messages.GroupInfo
 import com.vitorpamplona.mls.messages.MlsKeyPackage

@@ -20,22 +20,24 @@
  */
 package com.vitorpamplona.mls.crypto
 
+import com.vitorpamplona.crypto.aes.AESGCM
+import com.vitorpamplona.crypto.curve25519.Ed25519
+import com.vitorpamplona.crypto.kdf.Hkdf
+import com.vitorpamplona.crypto.mac.MacInstance
+import com.vitorpamplona.crypto.random.RandomInstance
+import com.vitorpamplona.crypto.sha2.sha256
 import com.vitorpamplona.mls.codec.TlsReader
 import com.vitorpamplona.mls.codec.TlsSerializable
 import com.vitorpamplona.mls.codec.TlsWriter
-import com.vitorpamplona.mls.platform.AESGCM
-import com.vitorpamplona.mls.platform.MacInstance
-import com.vitorpamplona.mls.platform.RandomInstance
-import com.vitorpamplona.mls.platform.sha256
 
 /**
  * Cryptographic provider for MLS ciphersuite 0x0001:
  * MLS_128_DHKEMX25519_AES128GCM_SHA256_Ed25519.
  *
- * Wraps the platform primitives (HMAC, AES-GCM, SHA-256) and adds
+ * Wraps crypto-kmp's primitives (HKDF, AES-GCM, SHA-256) and adds
  * MLS-specific derivation functions (ExpandWithLabel, DeriveSecret, RefHash).
  *
- * Ed25519 and X25519 operations are delegated to expect/actual implementations.
+ * Ed25519 and X25519 come from crypto-kmp.
  */
 object MlsCryptoProvider {
     // Ciphersuite 0x0001 constants
@@ -48,6 +50,8 @@ object MlsCryptoProvider {
     const val KEM_PUBLIC_KEY_LENGTH = 32 // X25519
     const val KEM_SECRET_KEY_LENGTH = 32 // X25519
 
+    private val hkdf = Hkdf("HmacSHA256", HASH_OUTPUT_LENGTH)
+
     // --- Hash ---
 
     fun hash(data: ByteArray): ByteArray = sha256(data)
@@ -57,11 +61,7 @@ object MlsCryptoProvider {
     fun hkdfExtract(
         salt: ByteArray,
         ikm: ByteArray,
-    ): ByteArray {
-        val mac = MacInstance("HmacSHA256", salt)
-        mac.update(ikm)
-        return mac.doFinal()
-    }
+    ): ByteArray = hkdf.extract(ikm, salt)
 
     /**
      * MLS ExpandWithLabel (RFC 9420 Section 8):

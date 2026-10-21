@@ -20,15 +20,16 @@
  */
 package com.vitorpamplona.mls.group
 
+import com.vitorpamplona.crypto.curve25519.Ed25519
+import com.vitorpamplona.crypto.curve25519.Ed25519KeyPair
+import com.vitorpamplona.crypto.curve25519.X25519
+import com.vitorpamplona.crypto.mac.MacInstance
 import com.vitorpamplona.mls.InternalMlsApi
 import com.vitorpamplona.mls.codec.TlsReader
 import com.vitorpamplona.mls.codec.TlsWriter
 import com.vitorpamplona.mls.components.AppDataDictionary
-import com.vitorpamplona.mls.crypto.Ed25519
-import com.vitorpamplona.mls.crypto.Ed25519KeyPair
 import com.vitorpamplona.mls.crypto.Hpke
 import com.vitorpamplona.mls.crypto.MlsCryptoProvider
-import com.vitorpamplona.mls.crypto.X25519
 import com.vitorpamplona.mls.framing.ContentType
 import com.vitorpamplona.mls.framing.MlsMessage
 import com.vitorpamplona.mls.framing.PrivateMessage
@@ -52,7 +53,6 @@ import com.vitorpamplona.mls.messages.ProposalOrRef
 import com.vitorpamplona.mls.messages.UpdatePath
 import com.vitorpamplona.mls.messages.Welcome
 import com.vitorpamplona.mls.platform.Hex
-import com.vitorpamplona.mls.platform.MacInstance
 import com.vitorpamplona.mls.platform.TimeUtils
 import com.vitorpamplona.mls.schedule.EpochSecrets
 import com.vitorpamplona.mls.schedule.KeySchedule
