@@ -50,7 +50,7 @@ object MlsCryptoProvider {
     const val KEM_PUBLIC_KEY_LENGTH = 32 // X25519
     const val KEM_SECRET_KEY_LENGTH = 32 // X25519
 
-    private val hkdf = Hkdf("HmacSHA256", HASH_OUTPUT_LENGTH)
+    private val hkdf = Hkdf("HmacSHA256")
 
     // --- Hash ---
 
