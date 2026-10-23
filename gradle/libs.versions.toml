@@ -7,7 +7,7 @@ mavenPublish = "0.37.0"
 spotless = "8.10.4"
 kotlinxSerialization = "1.12.0"
 # SHA, HMAC, HKDF, AES-GCM, X25519, Ed25519 and secure random: vitorpamplona/crypto-kmp.
-cryptoKmp = "1.0.0"
+cryptoKmp = "2.0.0"
 
 [libraries]
 crypto = { module = "com.vitorpamplona.crypto:crypto", version.ref = "cryptoKmp" }

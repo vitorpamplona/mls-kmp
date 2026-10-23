@@ -1535,8 +1535,7 @@ class MlsGroup private constructor(
 
     /**
      * Decrypt an application message from a PrivateMessage (RFC 9420 Section 6.3).
-     * @throws IllegalArgumentException if the message format is invalid
-     * @throws javax.crypto.AEADBadTagException if decryption fails
+     * @throws IllegalArgumentException if the message format is invalid or decryption fails
      */
     fun decrypt(messageBytes: ByteArray): DecryptedMessage {
         val mlsMsg = MlsMessage.decodeTls(TlsReader(messageBytes))
