@@ -11,8 +11,9 @@ It implements ciphersuite `0x0001`
 (arm64 and simulator), macOS (arm64) and Linux (x64).
 
 It is the engine under [Amethyst](https://github.com/vitorpamplona/amethyst)'s two MLS
-bindings, Marmot (MLS over Nostr) and cordn (MLS over an MCP coordinator), both in
-Quartz. **It knows nothing about either, nor about Nostr, and must stay that way.**
+bindings, each its own library: [marmot-kmp](https://github.com/vitorpamplona/marmot-kmp) (MLS
+over Nostr) and [cordn-kmp](https://github.com/vitorpamplona/cordn-kmp) (MLS over an MCP
+coordinator). **It knows nothing about either, nor about Nostr, and must stay that way.**
 The library depends on no Nostr code, so a binding cannot leak into it.
 
 ## Setup
@@ -109,17 +110,20 @@ itself with a recording policy.
 ```
 
 Vector generators: `tools/tsmls-vector-gen` (ts-mls) here; the OpenMLS one is
-Amethyst's `quartz/tools/mdk-vector-gen`, because it shares an MDK pin with
+marmot-kmp's `marmot/tools/mdk-vector-gen`, because it shares an MDK pin with
 Marmot's vectors.
 
-### Working on it together with Amethyst
+### Working on it together with a binding
 
-Amethyst consumes the published artifact. To build Amethyst against a local
-checkout instead, point it at this directory:
+marmot-kmp, cordn-kmp and Amethyst consume the published artifact. To build one
+against a local checkout instead, point it at this directory:
 
 ```bash
-./gradlew -PmlsKmpDir=../mls-kmp :quartz:jvmTest
+./gradlew -PmlsKmpDir=../mls-kmp :marmot:jvmTest      # in marmot-kmp
+./gradlew -PmlsKmpDir=../mls-kmp :cordn:jvmTest       # in cordn-kmp
 ```
+
+[AGENTS.md](AGENTS.md) has the project rules, for people and coding agents alike.
 
 ## Releasing
 
