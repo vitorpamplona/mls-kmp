@@ -28,6 +28,7 @@ import com.vitorpamplona.mls.InternalMlsApi
 import com.vitorpamplona.mls.codec.TlsReader
 import com.vitorpamplona.mls.codec.TlsWriter
 import com.vitorpamplona.mls.components.AppDataDictionary
+import com.vitorpamplona.mls.components.ComponentsList
 import com.vitorpamplona.mls.crypto.Hpke
 import com.vitorpamplona.mls.crypto.MlsCryptoProvider
 import com.vitorpamplona.mls.framing.ContentType
@@ -639,6 +640,29 @@ class MlsGroup private constructor(
     }
 
     /**
+     * What our own leaf should advertise from the next commit on, replacing the
+     * capabilities and leaf extensions that a commit's UpdatePath otherwise
+     * carries over from our current leaf. Cleared by that commit.
+     */
+    private var pendingLeafAdvertisement: Pair<Capabilities, List<Extension>>? = null
+
+    /**
+     * Make the next [commit] replace our leaf with one advertising [capabilities]
+     * and [leafExtensions] (keys are still rotated as usual). This is how a
+     * member refreshes a stale leaf, for example to start advertising an app
+     * component it gained support for after it joined: a LeafNode's
+     * advertisement changes only through an Update or the UpdatePath of its own
+     * Commit. Pass the extensions to keep, not only the changed one: whatever is
+     * not passed is no longer on the leaf.
+     */
+    fun advertiseInNextCommit(
+        capabilities: Capabilities,
+        leafExtensions: List<Extension>,
+    ) {
+        pendingLeafAdvertisement = capabilities to leafExtensions
+    }
+
+    /**
      * Create a GroupContextExtensions proposal to update the group's extensions.
      * Used for changing group metadata (name, description, etc.) via MIP-01.
      */
@@ -774,12 +798,15 @@ class MlsGroup private constructor(
         val addedMembers = mutableListOf<Pair<Int, MlsKeyPackage>>()
         val addProposals = mutableListOf<PendingProposal>()
         val appDataUpdates = mutableListOf<Proposal.AppDataUpdate>()
+        val requiredComponentsBefore = requiredAppComponents()
+        val changedLeaves = mutableSetOf<Int>()
         for (pending in proposals) {
             when (val p = pending.proposal) {
                 is Proposal.Add -> addProposals.add(pending)
                 is Proposal.AppDataUpdate -> appDataUpdates.add(p)
                 else -> applyProposal(p, pending.senderLeafIndex)
             }
+            if (pending.proposal is Proposal.Update) changedLeaves.add(pending.senderLeafIndex)
         }
         applyAppDataUpdateProposals(appDataUpdates)
         // Apply Adds after Removes/Updates
@@ -787,8 +814,10 @@ class MlsGroup private constructor(
             val p = pending.proposal as Proposal.Add
             val leafIndex = applyProposalAdd(p)
             addedMembers.add(leafIndex to p.keyPackage)
+            changedLeaves.add(leafIndex)
         }
         enforceRequiredCapabilities()
+        enforceRequiredAppComponents(requiredComponentsBefore, changedLeaves)
 
         // Generate new path secrets on the updated tree
         val leafSecret = MlsCryptoProvider.randomBytes(MlsCryptoProvider.HASH_OUTPUT_LENGTH)
@@ -928,8 +957,8 @@ class MlsGroup private constructor(
                         groupId = groupId,
                         leafIndex = myLeafIndex,
                         parentHash = leafParentHash,
-                        capabilities = previousLeaf?.capabilities ?: policy.defaultLeafCapabilities,
-                        leafExtensions = previousLeaf?.extensions ?: emptyList(),
+                        capabilities = pendingLeafAdvertisement?.first ?: previousLeaf?.capabilities ?: policy.defaultLeafCapabilities,
+                        leafExtensions = pendingLeafAdvertisement?.second ?: previousLeaf?.extensions ?: emptyList(),
                     )
                 encryptionPrivateKey = newEncKp.privateKey
                 tree.setLeaf(myLeafIndex, newLeafNode)
@@ -1096,6 +1125,7 @@ class MlsGroup private constructor(
         pendingEncryptionKey?.let { encryptionPrivateKey = it }
         pendingSigningKey = null
         pendingEncryptionKey = null
+        pendingLeafAdvertisement = null
 
         pendingProposals.clear()
         sentKeys.clear()
@@ -1954,8 +1984,11 @@ class MlsGroup private constructor(
         val inlineAdds = mutableListOf<Proposal.Add>()
         val referenceAddSenders = mutableListOf<Pair<Proposal.Add, Int>>()
         val inboundAppDataUpdates = mutableListOf<Proposal.AppDataUpdate>()
+        val requiredComponentsBefore = requiredAppComponents()
+        val changedLeaves = mutableSetOf<Int>()
         for ((idx, pending) in resolvedPending.withIndex()) {
             val isInline = commit.proposals[idx] is ProposalOrRef.Inline
+            if (pending.proposal is Proposal.Update) changedLeaves.add(pending.senderLeafIndex)
             when (val p = pending.proposal) {
                 is Proposal.Add -> {
                     if (isInline) {
@@ -1980,6 +2013,7 @@ class MlsGroup private constructor(
             newLeavesInCommit.add(applyProposalAdd(add))
         }
         enforceRequiredCapabilities()
+        enforceRequiredAppComponents(requiredComponentsBefore, changedLeaves + newLeavesInCommit)
 
         // If the proposals just removed *us*, there is no path-decrypt to do
         // and no confirmation_tag to verify against our (now bogus) commit
@@ -2034,6 +2068,9 @@ class MlsGroup private constructor(
             val preUpdateSiblingHashes = capturePreUpdateSiblingHashes(senderLeafIndex)
 
             tree.setLeaf(senderLeafIndex, updatePath.leafNode)
+            // The committer's replacement leaf must still advertise every
+            // component the group requires (extensions draft, app_components).
+            enforceRequiredAppComponents(requiredAppComponents(), setOf(senderLeafIndex))
             tree.applyUpdatePath(senderLeafIndex, updatePath.nodes)
 
             // Verify parent hash chain (RFC 9420 Section 7.9.2) using pre-update sibling hashes
@@ -2870,6 +2907,42 @@ class MlsGroup private constructor(
         for (i in 0 until tree.leafCount) {
             val leaf = tree.getLeaf(i) ?: continue
             requireCapabilitiesMeetRequirements(leaf.capabilities, required, "Member leaf $i")
+        }
+    }
+
+    /** The component ids the GroupContext's `app_components` entry requires, or empty when it has none. */
+    private fun requiredAppComponents(): Set<Int> = ComponentsList.supportedOrRequired(appDataDictionary()).toSet()
+
+    /**
+     * draft-ietf-mls-extensions: every member must support the components the
+     * GroupContext's `app_components` entry requires, as advertised by the
+     * `app_components` entry in its own LeafNode's `app_data_dictionary`.
+     *
+     * Checked against the leaves a commit adds or replaces ([changedLeaves]),
+     * which is what keeps an Add of an unsupported KeyPackage or a downgrading
+     * Update out. When the commit grows the required set (an activation), every
+     * leaf is checked: a component may be required only once all leaves
+     * advertise it. A commit that changes neither leaves a sitting member alone,
+     * so a group that predates this check is not made un-committable by it.
+     *
+     * Run AFTER every proposal is applied, like [enforceRequiredCapabilities].
+     */
+    private fun enforceRequiredAppComponents(
+        requiredBefore: Set<Int>,
+        changedLeaves: Set<Int>,
+    ) {
+        val required = requiredAppComponents()
+        if (required.isEmpty()) return
+        val activating = !requiredBefore.containsAll(required)
+        val leaves = if (activating) (0 until tree.leafCount).toList() else changedLeaves
+        for (i in leaves) {
+            val leaf = tree.getLeaf(i) ?: continue
+            val supported = AppDataDictionary.fromExtensions(leaf.extensions)?.let { ComponentsList.supportedOrRequired(it) }.orEmpty()
+            val missing = required.filterNot { it in supported }
+            require(missing.isEmpty()) {
+                "Member leaf $i does not advertise required app components " +
+                    missing.joinToString { "0x" + it.toString(16).padStart(4, '0') }
+            }
         }
     }
 
