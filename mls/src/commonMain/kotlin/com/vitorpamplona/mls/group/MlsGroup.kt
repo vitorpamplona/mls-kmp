@@ -659,6 +659,16 @@ class MlsGroup private constructor(
         capabilities: Capabilities,
         leafExtensions: List<Extension>,
     ) {
+        // Refused here, before anything changes: [commit] would only find out after it has
+        // rotated our keys and rewritten the tree, which it cannot undo.
+        val required = requiredAppComponents()
+        val previous = tree.getLeaf(myLeafIndex)
+        val mustKeep = previous?.let { leaf -> advertisedComponents(leaf).filter { it in required } } ?: required.toList()
+        val offered = AppDataDictionary.fromExtensions(leafExtensions)?.let { ComponentsList.supportedOrRequired(it) }.orEmpty()
+        val dropped = mustKeep.filterNot { it in offered }
+        require(dropped.isEmpty()) {
+            "The advertisement drops required app components " + dropped.joinToString { "0x" + it.toString(16).padStart(4, '0') }
+        }
         pendingLeafAdvertisement = capabilities to leafExtensions
     }
 
@@ -789,8 +799,11 @@ class MlsGroup private constructor(
         // Remove proposal. A commit whose only non-SelfRemove proposals are
         // Adds MAY omit the path — we still include one for extra forward
         // secrecy, which is spec-compliant.
+        // A pending advertisement travels in our UpdatePath, so it forces one too (a path is always
+        // allowed); otherwise a SelfRemove-only commit would clear it unsent.
         val needsPath =
-            proposals.isEmpty() ||
+            pendingLeafAdvertisement != null ||
+                proposals.isEmpty() ||
                 proposals.any { it.proposal !is Proposal.SelfRemove }
 
         // Apply proposals to tree FIRST (RFC 9420 Section 12.4.2)
