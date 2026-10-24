@@ -28,6 +28,7 @@ import com.vitorpamplona.mls.InternalMlsApi
 import com.vitorpamplona.mls.codec.TlsReader
 import com.vitorpamplona.mls.codec.TlsWriter
 import com.vitorpamplona.mls.components.AppDataDictionary
+import com.vitorpamplona.mls.components.ComponentsList
 import com.vitorpamplona.mls.crypto.Hpke
 import com.vitorpamplona.mls.crypto.MlsCryptoProvider
 import com.vitorpamplona.mls.framing.ContentType
@@ -639,6 +640,39 @@ class MlsGroup private constructor(
     }
 
     /**
+     * What our own leaf should advertise from the next commit on, replacing the
+     * capabilities and leaf extensions that a commit's UpdatePath otherwise
+     * carries over from our current leaf. Cleared by that commit.
+     */
+    private var pendingLeafAdvertisement: Pair<Capabilities, List<Extension>>? = null
+
+    /**
+     * Make the next [commit] replace our leaf with one advertising [capabilities]
+     * and [leafExtensions] (keys are still rotated as usual). This is how a
+     * member refreshes a stale leaf, for example to start advertising an app
+     * component it gained support for after it joined: a LeafNode's
+     * advertisement changes only through an Update or the UpdatePath of its own
+     * Commit. Pass the extensions to keep, not only the changed one: whatever is
+     * not passed is no longer on the leaf.
+     */
+    fun advertiseInNextCommit(
+        capabilities: Capabilities,
+        leafExtensions: List<Extension>,
+    ) {
+        // Refused here, before anything changes: [commit] would only find out after it has
+        // rotated our keys and rewritten the tree, which it cannot undo.
+        val required = requiredAppComponents()
+        val previous = tree.getLeaf(myLeafIndex)
+        val mustKeep = previous?.let { leaf -> advertisedComponents(leaf).filter { it in required } } ?: required.toList()
+        val offered = AppDataDictionary.fromExtensions(leafExtensions)?.let { ComponentsList.supportedOrRequired(it) }.orEmpty()
+        val dropped = mustKeep.filterNot { it in offered }
+        require(dropped.isEmpty()) {
+            "The advertisement drops required app components " + dropped.joinToString { "0x" + it.toString(16).padStart(4, '0') }
+        }
+        pendingLeafAdvertisement = capabilities to leafExtensions
+    }
+
+    /**
      * Create a GroupContextExtensions proposal to update the group's extensions.
      * Used for changing group metadata (name, description, etc.) via MIP-01.
      */
@@ -765,8 +799,11 @@ class MlsGroup private constructor(
         // Remove proposal. A commit whose only non-SelfRemove proposals are
         // Adds MAY omit the path — we still include one for extra forward
         // secrecy, which is spec-compliant.
+        // A pending advertisement travels in our UpdatePath, so it forces one too (a path is always
+        // allowed); otherwise a SelfRemove-only commit would clear it unsent.
         val needsPath =
-            proposals.isEmpty() ||
+            pendingLeafAdvertisement != null ||
+                proposals.isEmpty() ||
                 proposals.any { it.proposal !is Proposal.SelfRemove }
 
         // Apply proposals to tree FIRST (RFC 9420 Section 12.4.2)
@@ -774,7 +811,11 @@ class MlsGroup private constructor(
         val addedMembers = mutableListOf<Pair<Int, MlsKeyPackage>>()
         val addProposals = mutableListOf<PendingProposal>()
         val appDataUpdates = mutableListOf<Proposal.AppDataUpdate>()
+        val requiredComponentsBefore = requiredAppComponents()
+        val addedLeaves = mutableSetOf<Int>()
+        val replacedLeaves = mutableMapOf<Int, LeafNode?>()
         for (pending in proposals) {
+            if (pending.proposal is Proposal.Update) replacedLeaves.getOrPut(pending.senderLeafIndex) { tree.getLeaf(pending.senderLeafIndex) }
             when (val p = pending.proposal) {
                 is Proposal.Add -> addProposals.add(pending)
                 is Proposal.AppDataUpdate -> appDataUpdates.add(p)
@@ -787,8 +828,10 @@ class MlsGroup private constructor(
             val p = pending.proposal as Proposal.Add
             val leafIndex = applyProposalAdd(p)
             addedMembers.add(leafIndex to p.keyPackage)
+            addedLeaves.add(leafIndex)
         }
         enforceRequiredCapabilities()
+        enforceRequiredAppComponents(requiredComponentsBefore, addedLeaves, replacedLeaves)
 
         // Generate new path secrets on the updated tree
         val leafSecret = MlsCryptoProvider.randomBytes(MlsCryptoProvider.HASH_OUTPUT_LENGTH)
@@ -928,11 +971,14 @@ class MlsGroup private constructor(
                         groupId = groupId,
                         leafIndex = myLeafIndex,
                         parentHash = leafParentHash,
-                        capabilities = previousLeaf?.capabilities ?: policy.defaultLeafCapabilities,
-                        leafExtensions = previousLeaf?.extensions ?: emptyList(),
+                        capabilities = pendingLeafAdvertisement?.first ?: previousLeaf?.capabilities ?: policy.defaultLeafCapabilities,
+                        leafExtensions = pendingLeafAdvertisement?.second ?: previousLeaf?.extensions ?: emptyList(),
                     )
                 encryptionPrivateKey = newEncKp.privateKey
                 tree.setLeaf(myLeafIndex, newLeafNode)
+                // Receivers hold our replacement leaf to the rule below; refusing here keeps
+                // us from merging a commit every peer would reject.
+                enforceRequiredAppComponents(requiredAppComponents(), emptySet(), mapOf(myLeafIndex to previousLeaf))
 
                 // Path-encryption context (RFC 9420 §7.6 / openmls `compute_path`):
                 // serialize the GroupContext AFTER applying the tree mutations
@@ -1096,6 +1142,7 @@ class MlsGroup private constructor(
         pendingEncryptionKey?.let { encryptionPrivateKey = it }
         pendingSigningKey = null
         pendingEncryptionKey = null
+        pendingLeafAdvertisement = null
 
         pendingProposals.clear()
         sentKeys.clear()
@@ -1954,8 +2001,11 @@ class MlsGroup private constructor(
         val inlineAdds = mutableListOf<Proposal.Add>()
         val referenceAddSenders = mutableListOf<Pair<Proposal.Add, Int>>()
         val inboundAppDataUpdates = mutableListOf<Proposal.AppDataUpdate>()
+        val requiredComponentsBefore = requiredAppComponents()
+        val replacedLeaves = mutableMapOf<Int, LeafNode?>()
         for ((idx, pending) in resolvedPending.withIndex()) {
             val isInline = commit.proposals[idx] is ProposalOrRef.Inline
+            if (pending.proposal is Proposal.Update) replacedLeaves.getOrPut(pending.senderLeafIndex) { tree.getLeaf(pending.senderLeafIndex) }
             when (val p = pending.proposal) {
                 is Proposal.Add -> {
                     if (isInline) {
@@ -1980,6 +2030,7 @@ class MlsGroup private constructor(
             newLeavesInCommit.add(applyProposalAdd(add))
         }
         enforceRequiredCapabilities()
+        enforceRequiredAppComponents(requiredComponentsBefore, newLeavesInCommit, replacedLeaves)
 
         // If the proposals just removed *us*, there is no path-decrypt to do
         // and no confirmation_tag to verify against our (now bogus) commit
@@ -2033,7 +2084,12 @@ class MlsGroup private constructor(
             // Capture sibling tree hashes BEFORE applying UpdatePath (needed for parent hash verification)
             val preUpdateSiblingHashes = capturePreUpdateSiblingHashes(senderLeafIndex)
 
+            val committerPreviousLeaf = tree.getLeaf(senderLeafIndex)
             tree.setLeaf(senderLeafIndex, updatePath.leafNode)
+            // The committer's replacement leaf may not drop a component the group
+            // requires (extensions draft, app_components); a new committer (an
+            // external join) must advertise all of them.
+            enforceRequiredAppComponents(requiredAppComponents(), emptySet(), mapOf(senderLeafIndex to committerPreviousLeaf))
             tree.applyUpdatePath(senderLeafIndex, updatePath.nodes)
 
             // Verify parent hash chain (RFC 9420 Section 7.9.2) using pre-update sibling hashes
@@ -2870,6 +2926,67 @@ class MlsGroup private constructor(
         for (i in 0 until tree.leafCount) {
             val leaf = tree.getLeaf(i) ?: continue
             requireCapabilitiesMeetRequirements(leaf.capabilities, required, "Member leaf $i")
+        }
+    }
+
+    /** The component ids the GroupContext's `app_components` entry requires, or empty when it has none. */
+    private fun requiredAppComponents(): Set<Int> = ComponentsList.supportedOrRequired(appDataDictionary()).toSet()
+
+    /**
+     * draft-ietf-mls-extensions: every member must support the components the
+     * GroupContext's `app_components` entry requires, as advertised by the
+     * `app_components` entry in its own LeafNode's `app_data_dictionary`.
+     *
+     * A leaf a commit adds ([addedLeaves]) must advertise all of them, which
+     * keeps an Add of an unsupported KeyPackage out. A leaf it replaces
+     * ([replacedLeaves], new index to the leaf it had before) may not stop
+     * advertising one its previous leaf did, which keeps a downgrading Update or
+     * UpdatePath out; a replacement with no previous leaf counts as added. When
+     * the commit grows the required set (an activation), every leaf is checked:
+     * a component may be required only once all leaves advertise it.
+     *
+     * A sitting member whose leaf already lacked a required component (a group
+     * that predates this check) can still commit with its old advertisement:
+     * rejecting that would fork the group, because the committer merges its own
+     * commit while every receiver refuses it.
+     *
+     * Run AFTER every proposal is applied, like [enforceRequiredCapabilities].
+     */
+    private fun enforceRequiredAppComponents(
+        requiredBefore: Set<Int>,
+        addedLeaves: Set<Int>,
+        replacedLeaves: Map<Int, LeafNode?>,
+    ) {
+        val required = requiredAppComponents()
+        if (required.isEmpty()) return
+        if (!requiredBefore.containsAll(required)) {
+            for (i in 0 until tree.leafCount) requireAdvertised(i, required)
+            return
+        }
+        for (i in addedLeaves) requireAdvertised(i, required)
+        for ((i, previous) in replacedLeaves) {
+            if (previous == null) {
+                requireAdvertised(i, required)
+            } else {
+                val previouslyAdvertised = advertisedComponents(previous)
+                requireAdvertised(i, required.filterTo(mutableSetOf()) { it in previouslyAdvertised })
+            }
+        }
+    }
+
+    private fun advertisedComponents(leaf: LeafNode): List<Int> = AppDataDictionary.fromExtensions(leaf.extensions)?.let { ComponentsList.supportedOrRequired(it) }.orEmpty()
+
+    private fun requireAdvertised(
+        leafIndex: Int,
+        components: Set<Int>,
+    ) {
+        if (components.isEmpty()) return
+        val leaf = tree.getLeaf(leafIndex) ?: return
+        val supported = advertisedComponents(leaf)
+        val missing = components.filterNot { it in supported }
+        require(missing.isEmpty()) {
+            "Member leaf $leafIndex does not advertise required app components " +
+                missing.joinToString { "0x" + it.toString(16).padStart(4, '0') }
         }
     }
 
