@@ -23,6 +23,7 @@ package com.vitorpamplona.mls.group
 import com.vitorpamplona.crypto.sha2.sha256
 import com.vitorpamplona.mls.codec.TlsReader
 import com.vitorpamplona.mls.codec.TlsWriter
+import com.vitorpamplona.mls.framing.SenderType
 import com.vitorpamplona.mls.messages.GroupContext
 import com.vitorpamplona.mls.messages.Proposal
 import com.vitorpamplona.mls.schedule.EpochSecrets
@@ -106,6 +107,20 @@ data class MlsGroupState(
      * does. A state imported from ts-mls has these instead of a root.
      */
     val nodeSecrets: Map<Int, ByteArray> = emptyMap(),
+    /**
+     * `resumption_psk` of this group's former epochs, by epoch (STATE_VERSION
+     * 8+), so a resumption PreSharedKey proposal naming one still resolves
+     * after a restart.
+     */
+    val resumptionPsks: Map<Long, ByteArray> = emptyMap(),
+    /**
+     * Private keys for our own Update proposals that another member may still
+     * commit (STATE_VERSION 8+): the leaf encryption key, its private half,
+     * and the signature private key of that leaf.
+     */
+    val pendingUpdateKeys: List<PendingUpdateKeys> = emptyList(),
+    /** The ReInit proposal a committed commit carried, if any (STATE_VERSION 8+). */
+    val reInitPending: Proposal.ReInit? = null,
 ) {
     fun encodeTls(): ByteArray {
         val writer = TlsWriter()
@@ -192,6 +207,24 @@ data class MlsGroupState(
         writeNodeSecrets(writer, nodeSecrets)
         for (retained in retainedEpochs) writeNodeSecrets(writer, retained.nodeSecrets)
 
+        // STATE_VERSION 8+: who sent each staged proposal (v4 kept only a leaf
+        // index, which cannot tell an external sender's index from a member's),
+        // former epochs' resumption PSKs, our uncommitted Updates' keys, and a
+        // committed ReInit.
+        for (pending in pendingProposals) writer.putUint8(pending.senderType.value)
+        writer.putUint32(resumptionPsks.size.toLong())
+        for ((epoch, psk) in resumptionPsks) {
+            writer.putUint64(epoch)
+            writer.putOpaqueVarInt(psk)
+        }
+        writer.putUint32(pendingUpdateKeys.size.toLong())
+        for (keys in pendingUpdateKeys) {
+            writer.putOpaqueVarInt(keys.encryptionKey)
+            writer.putOpaqueVarInt(keys.encryptionPrivateKey)
+            writer.putOpaqueVarInt(keys.signaturePrivateKey)
+        }
+        writer.putOpaqueVarInt(reInitPending?.toTlsBytes() ?: ByteArray(0))
+
         return writer.toByteArray()
     }
 
@@ -226,8 +259,12 @@ data class MlsGroupState(
          * v7: appends the secret tree's [nodeSecrets], current and retained
          *     epochs, so a state whose root secret is gone (imported from
          *     ts-mls) restores. Older blobs derive from the root, as before.
+         * v8: appends each staged proposal's sender type, former epochs'
+         *     resumption PSKs, the keys of our uncommitted Update proposals and
+         *     a committed ReInit. Older blobs decode with member senders and
+         *     none of the rest.
          */
-        private const val STATE_VERSION = 7
+        private const val STATE_VERSION = 8
 
         fun decodeTls(data: ByteArray): MlsGroupState {
             val reader = TlsReader(data)
@@ -349,6 +386,25 @@ data class MlsGroupState(
                 retainedWithNodes = retainedEpochs.map { it.copy(nodeSecrets = readNodeSecrets(reader)) }
             }
 
+            // v8+: sender types, resumption PSKs, Update keys, ReInit.
+            var pendingWithSenders = pendingProposals
+            var resumptionPsks = emptyMap<Long, ByteArray>()
+            var pendingUpdateKeys = emptyList<PendingUpdateKeys>()
+            var reInitPending: Proposal.ReInit? = null
+            if (version >= 8 && reader.hasRemaining) {
+                pendingWithSenders = pendingProposals.map { it.copy(senderType = SenderType.fromValue(reader.readUint8())) }
+                resumptionPsks =
+                    buildMap {
+                        repeat(reader.readUint32().toInt()) { put(reader.readUint64(), reader.readOpaqueVarInt()) }
+                    }
+                pendingUpdateKeys =
+                    List(reader.readUint32().toInt()) {
+                        PendingUpdateKeys(reader.readOpaqueVarInt(), reader.readOpaqueVarInt(), reader.readOpaqueVarInt())
+                    }
+                reInitPending =
+                    reader.readOpaqueVarInt().takeIf { it.isNotEmpty() }?.let { Proposal.decodeTls(TlsReader(it)) as Proposal.ReInit }
+            }
+
             return MlsGroupState(
                 groupContext = groupContext,
                 treeBytes = treeBytes,
@@ -361,11 +417,14 @@ data class MlsGroupState(
                 encryptionSecret = encryptionSecret,
                 senderRatchetStates = senderRatchetStates,
                 pathPrivateKeys = pathPrivateKeys,
-                pendingProposals = pendingProposals,
+                pendingProposals = pendingWithSenders,
                 skippedApplicationSecrets = skippedApplicationSecrets,
                 skippedHandshakeSecrets = skippedHandshakeSecrets,
                 retainedEpochs = retainedWithNodes,
                 nodeSecrets = nodeSecrets,
+                resumptionPsks = resumptionPsks,
+                pendingUpdateKeys = pendingUpdateKeys,
+                reInitPending = reInitPending,
             )
         }
 
@@ -658,3 +717,11 @@ data class OwnSenderRatchet(
             }
     }
 }
+
+/** The private keys behind one of our own Update proposals, kept until a commit applies it or the epoch ends. */
+class PendingUpdateKeys(
+    /** The new leaf's encryption public key, which identifies the Update. */
+    val encryptionKey: ByteArray,
+    val encryptionPrivateKey: ByteArray,
+    val signaturePrivateKey: ByteArray,
+)

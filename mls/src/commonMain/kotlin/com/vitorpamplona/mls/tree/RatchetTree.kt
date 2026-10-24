@@ -414,76 +414,6 @@ class RatchetTree(
     }
 
     /**
-     * Apply an UpdatePath to the tree: update parent nodes along the sender's
-     * **filtered** direct path (RFC 9420 §7.9) with the provided path nodes.
-     */
-    fun applyUpdatePath(
-        senderLeafIndex: Int,
-        pathNodes: List<UpdatePathNode>,
-    ) {
-        val (filteredDp, _) = filteredDirectPath(senderLeafIndex)
-        require(pathNodes.size == filteredDp.size) {
-            "UpdatePath node count (${pathNodes.size}) doesn't match filtered direct path length (${filteredDp.size})"
-        }
-
-        for (i in filteredDp.indices) {
-            val nodeIdx = filteredDp[i]
-            val pathNode = pathNodes[i]
-
-            setParent(
-                nodeIdx,
-                ParentNode(
-                    encryptionKey = pathNode.encryptionKey,
-                    parentHash = ByteArray(0), // Computed separately
-                    unmergedLeaves = emptyList(),
-                ),
-            )
-        }
-    }
-
-    /**
-     * Derive path secrets and keys for an UpdatePath.
-     *
-     * Starting from a leaf secret, derives the chain of path secrets along
-     * the direct path to the root. Each path secret produces an HPKE key pair
-     * for the corresponding tree node.
-     *
-     * @param leafIndex the sender's leaf index
-     * @param leafSecret the initial secret (commit_secret or update secret)
-     * @return list of (pathSecret, hpkeKeyPair) for each direct path node
-     */
-    fun derivePathSecrets(
-        leafIndex: Int,
-        leafSecret: ByteArray,
-    ): List<PathSecretAndKey> {
-        val directPath = BinaryTree.directPath(leafIndex, _leafCount)
-        val results = mutableListOf<PathSecretAndKey>()
-
-        var currentSecret = leafSecret
-        for (nodeIdx in directPath) {
-            // RFC 9420 §7.4: path_secret[0] = leafSecret,
-            //                node_secret[n] = DeriveSecret(path_secret[n], "node"),
-            //                node's HPKE keypair = DeriveKeyPair(node_secret).
-            // DeriveKeyPair is HPKE's (RFC 9180 §7.1.3), NOT an MLS ExpandWithLabel —
-            // it uses the "HPKE-v1" + KEM suite_id labels, and produces a keypair
-            // that openmls/mdk can reproduce from the same path_secret. If we derive
-            // with a different formula, receivers compute different public keys and
-            // reject the UpdatePath with `UpdatePathError(PathMismatch)`.
-            val nodeSecret = MlsCryptoProvider.deriveSecret(currentSecret, "node")
-            val kp =
-                com.vitorpamplona.mls.crypto.Hpke
-                    .deriveKeyPair(nodeSecret)
-
-            results.add(PathSecretAndKey(currentSecret, kp.privateKey, kp.publicKey))
-
-            // path_secret[n+1] = DeriveSecret(path_secret[n], "path")
-            currentSecret = MlsCryptoProvider.deriveSecret(currentSecret, "path")
-        }
-
-        return results
-    }
-
-    /**
      * Find the resolution of a node (RFC 9420 Section 7.7).
      *
      * The resolution of a node is the set of non-blank leaf and parent nodes
@@ -553,12 +483,28 @@ class RatchetTree(
             val nodesList = mutableListOf<TreeNode?>()
 
             while (treeReader.hasRemaining) {
-                val present = treeReader.readUint8()
-                if (present == 1) {
-                    nodesList.add(TreeNode.decodeTls(treeReader))
-                } else {
-                    nodesList.add(null)
+                val nodeIndex = nodesList.size
+                when (val present = treeReader.readUint8()) {
+                    0 -> {
+                        nodesList.add(null)
+                    }
+
+                    1 -> {
+                        val node = TreeNode.decodeTls(treeReader)
+                        // RFC 9420 §7.1: leaves sit at even node indices, parents at odd ones.
+                        require((node is TreeNode.Leaf) == BinaryTree.isLeaf(nodeIndex)) {
+                            "ratchet_tree node $nodeIndex has the wrong node type for its position"
+                        }
+                        nodesList.add(node)
+                    }
+
+                    else -> {
+                        throw IllegalArgumentException("Invalid optional<Node> presence flag: $present")
+                    }
                 }
+            }
+            require(nodesList.isEmpty() || nodesList.size % 2 == 1) {
+                "ratchet_tree has an even node count (${nodesList.size}); it must end on a leaf"
             }
 
             val tree = RatchetTree()
@@ -650,19 +596,4 @@ data class UpdatePathNode(
                     },
             )
     }
-}
-
-/** Result of path secret derivation */
-data class PathSecretAndKey(
-    val pathSecret: ByteArray,
-    val privateKey: ByteArray,
-    val publicKey: ByteArray,
-) {
-    override fun equals(other: Any?): Boolean {
-        if (this === other) return true
-        if (other !is PathSecretAndKey) return false
-        return pathSecret.contentEquals(other.pathSecret)
-    }
-
-    override fun hashCode(): Int = pathSecret.contentHashCode()
 }

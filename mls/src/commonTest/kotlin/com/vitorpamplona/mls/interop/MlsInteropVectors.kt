@@ -326,3 +326,27 @@ data class PassiveClientEpoch(
     val commit: String,
     @SerialName("epoch_authenticator") val epochAuthenticator: String,
 )
+
+// --- psk_secret.json ---
+
+@Serializable
+data class PskSecretVector(
+    @SerialName("cipher_suite") val cipherSuite: Int,
+    val psks: List<PskSecretEntry>,
+    @SerialName("psk_secret") val pskSecret: String,
+)
+
+@Serializable
+data class PskSecretEntry(
+    @SerialName("psk_id") val pskId: String,
+    val psk: String,
+    @SerialName("psk_nonce") val pskNonce: String,
+)
+
+// --- deserialization.json ---
+
+@Serializable
+data class DeserializationVector(
+    @SerialName("vlbytes_header") val vlbytesHeader: String,
+    val length: Int,
+)

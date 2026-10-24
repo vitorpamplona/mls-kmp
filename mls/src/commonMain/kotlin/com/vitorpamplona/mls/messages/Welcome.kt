@@ -250,20 +250,20 @@ data class GroupContext(
 }
 
 /**
- * GroupSecrets: the secrets encrypted per-recipient in Welcome messages.
+ * RFC 9420 §12.4.3.1 GroupSecrets, HPKE-sealed to each joiner's init_key:
  *
  * ```
  * struct {
- *     opaque joiner_secret<V>;
- *     optional<PathSecret> path_secret;
- *     PreSharedKeyID psks<V>;
+ *   opaque joiner_secret<V>;
+ *   optional<PathSecret> path_secret;
+ *   PreSharedKeyID psks<V>;
  * } GroupSecrets;
  * ```
  */
 data class GroupSecrets(
     val joinerSecret: ByteArray,
     val pathSecret: ByteArray?,
-    val psks: List<ByteArray> = emptyList(),
+    val psks: List<PreSharedKeyId> = emptyList(),
 ) : TlsSerializable {
     override fun encodeTls(writer: TlsWriter) {
         writer.putOpaqueVarInt(joinerSecret)
@@ -273,11 +273,7 @@ data class GroupSecrets(
         } else {
             writer.putUint8(0)
         }
-        val pskWriter = TlsWriter()
-        for (psk in psks) {
-            pskWriter.putOpaqueVarInt(psk)
-        }
-        writer.putOpaqueVarInt(pskWriter.toByteArray())
+        writer.putVectorVarInt(psks)
     }
 
     override fun equals(other: Any?): Boolean {
@@ -292,12 +288,7 @@ data class GroupSecrets(
         fun decodeTls(reader: TlsReader): GroupSecrets {
             val joinerSecret = reader.readOpaqueVarInt()
             val pathSecret = reader.readOptional { it.readOpaqueVarInt() }
-            val pskBytes = reader.readOpaqueVarInt()
-            val pskReader = TlsReader(pskBytes)
-            val psks = mutableListOf<ByteArray>()
-            while (pskReader.hasRemaining) {
-                psks.add(pskReader.readOpaqueVarInt())
-            }
+            val psks = reader.readVectorVarInt { PreSharedKeyId.decodeTls(it) }
             return GroupSecrets(joinerSecret, pathSecret, psks)
         }
     }

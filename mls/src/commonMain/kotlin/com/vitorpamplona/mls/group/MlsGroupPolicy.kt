@@ -22,6 +22,7 @@ package com.vitorpamplona.mls.group
 
 import com.vitorpamplona.mls.messages.CommitResult
 import com.vitorpamplona.mls.tree.Capabilities
+import com.vitorpamplona.mls.tree.Credential
 import com.vitorpamplona.mls.tree.Extension
 
 /**
@@ -83,6 +84,36 @@ interface MlsGroupPolicy {
      * whose every commit peers would reject.
      */
     fun validateJoin(group: GroupView) = Unit
+
+    /**
+     * Rejects, by throwing, a standalone proposal this member should not hold.
+     *
+     * Called when a proposal arrives on its own (by reference, RFC 9420
+     * §12.1), after the engine has authenticated it and checked it is valid.
+     * Whatever is accepted waits in the pending pool, and [MlsGroup.commit]
+     * commits the whole pool — so this is where a binding keeps, say, a
+     * non-admin's Add out of an admin's next commit. Inline proposals never
+     * reach this hook; they are judged as part of their commit by
+     * [authorizeCommit].
+     */
+    fun authorizeProposal(
+        group: GroupView,
+        proposal: PendingProposal,
+    ) = Unit
+
+    /**
+     * Rejects, by throwing, a credential the application does not accept as
+     * the holder of [signatureKey] (RFC 9420 §5.3.1).
+     *
+     * MLS authenticates members only as far as their credentials do, and the
+     * protocol itself cannot tell whether a credential is genuine: that is the
+     * Authentication Service's job. Called for every LeafNode the engine
+     * validates — in KeyPackages, Updates, UpdatePaths and a joined tree.
+     */
+    fun validateCredential(
+        credential: Credential,
+        signatureKey: ByteArray,
+    ) = Unit
 
     /**
      * Leaf capabilities a new leaf advertises when the caller names none.

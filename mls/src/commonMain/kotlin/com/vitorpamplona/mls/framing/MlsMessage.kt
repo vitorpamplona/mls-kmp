@@ -210,28 +210,14 @@ data class PublicMessage(
             val contentType = ContentType.fromValue(reader.readUint8())
 
             // RFC 9420 §6 FramedContent.content body varies by content_type.
-            // For PROPOSAL/COMMIT we decode the inner struct to advance the reader
-            // and then re-serialize back to bytes so the invariant
-            // "content holds the serialized body" holds for all variants.
+            // For PROPOSAL/COMMIT the struct is decoded to find where it ends,
+            // and its received bytes are kept as-is: the signature, the
+            // membership tag and a ProposalRef all cover those exact bytes.
             val content: ByteArray =
                 when (contentType) {
-                    ContentType.APPLICATION -> {
-                        reader.readOpaqueVarInt()
-                    }
-
-                    ContentType.PROPOSAL -> {
-                        val proposal = Proposal.decodeTls(reader)
-                        val w = TlsWriter()
-                        proposal.encodeTls(w)
-                        w.toByteArray()
-                    }
-
-                    ContentType.COMMIT -> {
-                        val commit = Commit.decodeTls(reader)
-                        val w = TlsWriter()
-                        commit.encodeTls(w)
-                        w.toByteArray()
-                    }
+                    ContentType.APPLICATION -> reader.readOpaqueVarInt()
+                    ContentType.PROPOSAL -> reader.readCapturing { Proposal.decodeTls(it) }.second
+                    ContentType.COMMIT -> reader.readCapturing { Commit.decodeTls(it) }.second
                 }
             val signature = reader.readOpaqueVarInt()
 
@@ -242,8 +228,9 @@ data class PublicMessage(
                     null
                 }
 
+            // RFC 9420 §6.2: membership_tag is present exactly when the sender is a member.
             val membershipTag =
-                if (sender.senderType == SenderType.MEMBER && reader.hasRemaining) {
+                if (sender.senderType == SenderType.MEMBER) {
                     reader.readOpaqueVarInt()
                 } else {
                     null

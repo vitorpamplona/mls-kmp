@@ -226,29 +226,37 @@ sealed class Proposal : TlsSerializable {
     }
 
     /**
-     * PSK proposal: include a pre-shared key in the epoch.
+     * PreSharedKey proposal (RFC 9420 §12.1.4): fold the PSK named by [psk]
+     * into the next epoch's key schedule.
      */
-    data class Psk(
-        val pskType: Int,
-        val pskId: ByteArray,
-        val pskNonce: ByteArray,
+    class Psk(
+        val psk: PreSharedKeyId,
     ) : Proposal() {
         override val proposalType = ProposalType.PSK
 
+        /** An external PSK, the only kind the old three-field shape could name. */
+        constructor(pskType: Int, pskId: ByteArray, pskNonce: ByteArray) : this(
+            run {
+                require(pskType == PreSharedKeyId.TYPE_EXTERNAL) { "Use Psk(PreSharedKeyId.Resumption(...)) for psktype $pskType" }
+                PreSharedKeyId.External(pskId, pskNonce)
+            },
+        )
+
+        val pskType: Int get() = psk.pskType
+
+        /** The external `psk_id`, or empty for a resumption PSK. */
+        val pskId: ByteArray get() = (psk as? PreSharedKeyId.External)?.pskId ?: ByteArray(0)
+
+        val pskNonce: ByteArray get() = psk.pskNonce
+
         override fun encodeTls(writer: TlsWriter) {
             writer.putUint16(proposalType.value)
-            writer.putUint8(pskType)
-            writer.putOpaqueVarInt(pskId)
-            writer.putOpaqueVarInt(pskNonce)
+            psk.encodeTls(writer)
         }
 
-        override fun equals(other: Any?): Boolean {
-            if (this === other) return true
-            if (other !is Psk) return false
-            return pskId.contentEquals(other.pskId)
-        }
+        override fun equals(other: Any?): Boolean = other is Psk && psk == other.psk
 
-        override fun hashCode(): Int = pskId.contentHashCode()
+        override fun hashCode(): Int = psk.hashCode()
     }
 
     /**
@@ -340,7 +348,7 @@ sealed class Proposal : TlsSerializable {
                 }
 
                 ProposalType.PSK -> {
-                    Psk(reader.readUint8(), reader.readOpaqueVarInt(), reader.readOpaqueVarInt())
+                    Psk(PreSharedKeyId.decodeTls(reader))
                 }
 
                 ProposalType.REINIT -> {

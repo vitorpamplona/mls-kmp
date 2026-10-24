@@ -121,15 +121,21 @@ class TlsReader(
                 first
             }
 
+            // RFC 9420 §2.1.2: a varint MUST use the smallest encoding that fits,
+            // and one using more bits than necessary MUST be treated as malformed.
             1 -> {
-                ((first and 0x3F) shl 8) or readUint8()
+                val value = ((first and 0x3F) shl 8) or readUint8()
+                require(value >= 64) { "Non-minimal VarInt encoding: $value in 2 bytes" }
+                value
             }
 
             2 -> {
                 val b1 = readUint8()
                 val b2 = readUint8()
                 val b3 = readUint8()
-                ((first and 0x3F) shl 24) or (b1 shl 16) or (b2 shl 8) or b3
+                val value = ((first and 0x3F) shl 24) or (b1 shl 16) or (b2 shl 8) or b3
+                require(value >= 16384) { "Non-minimal VarInt encoding: $value in 4 bytes" }
+                value
             }
 
             else -> {
@@ -203,9 +209,29 @@ class TlsReader(
     /**
      * Read an optional value (uint8 presence flag + value if present).
      */
-    fun <T> readOptional(readValue: (TlsReader) -> T): T? {
-        val present = readUint8()
-        return if (present == 1) readValue(this) else null
+    fun <T> readOptional(readValue: (TlsReader) -> T): T? =
+        when (val present = readUint8()) {
+            0 -> null
+            1 -> readValue(this)
+            else -> throw IllegalArgumentException("Invalid optional<T> presence flag: $present")
+        }
+
+    /**
+     * Runs [block] and also returns the exact bytes it consumed.
+     *
+     * For structs whose canonical encoding is needed as-is afterwards, e.g. a
+     * Proposal or Commit inside FramedContent: hashing the received bytes
+     * rather than a re-encoding keeps signatures and references exact.
+     */
+    fun <T> readCapturing(block: (TlsReader) -> T): Pair<T, ByteArray> {
+        val start = position
+        val value = block(this)
+        return value to data.copyOfRange(start, position)
+    }
+
+    /** Fails unless every byte has been consumed: MLS structs carry no trailing data. */
+    fun requireFullyConsumed(what: String) {
+        require(!hasRemaining) { "$what has $remaining trailing bytes" }
     }
 
     /**

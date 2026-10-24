@@ -29,9 +29,14 @@ import com.vitorpamplona.mls.codec.TlsWriter
  * For Marmot, we use BasicCredential with the Nostr public key.
  */
 sealed class Credential : TlsSerializable {
+    /** The `credential_type` on the wire. */
+    abstract val credentialType: Int
+
     data class Basic(
         val identity: ByteArray,
     ) : Credential() {
+        override val credentialType: Int get() = CREDENTIAL_TYPE_BASIC
+
         override fun encodeTls(writer: TlsWriter) {
             writer.putUint16(CREDENTIAL_TYPE_BASIC)
             writer.putOpaqueVarInt(identity)
@@ -53,6 +58,8 @@ sealed class Credential : TlsSerializable {
     data class X509(
         val certChain: List<ByteArray>,
     ) : Credential() {
+        override val credentialType: Int get() = CREDENTIAL_TYPE_X509
+
         override fun encodeTls(writer: TlsWriter) {
             writer.putUint16(CREDENTIAL_TYPE_X509)
             writer.putVectorVarInt(

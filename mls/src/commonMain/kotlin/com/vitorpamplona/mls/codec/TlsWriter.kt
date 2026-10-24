@@ -115,13 +115,18 @@ class TlsWriter(
      * - 16384..1073741823: 4 bytes (30-bit value, 2-bit prefix 10)
      */
     fun putOpaqueVarInt(data: ByteArray) {
-        val len = data.size
-        when {
-            len < 64 -> putUint8(len)
-            len < 16384 -> putUint16(len or 0x4000)
-            else -> putUint32((len.toLong() or 0x80000000L))
-        }
+        putVarInt(data.size)
         putBytes(data)
+    }
+
+    /** Write a variable-length integer in its minimal encoding (RFC 9420 §2.1.2). */
+    fun putVarInt(value: Int) {
+        require(value in 0..0x3FFFFFFF) { "VarInt out of range: $value" }
+        when {
+            value < 64 -> putUint8(value)
+            value < 16384 -> putUint16(value or 0x4000)
+            else -> putUint32((value.toLong() or 0x80000000L))
+        }
     }
 
     /** Write a TLS-serializable struct */

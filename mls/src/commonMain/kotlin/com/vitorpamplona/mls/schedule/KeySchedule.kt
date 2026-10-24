@@ -68,7 +68,17 @@ class KeySchedule(
         //     "joiner", GroupContext, Nh)
         val prk = MlsCryptoProvider.hkdfExtract(initSecret, commitSecret)
         val joinerSecret = MlsCryptoProvider.expandWithLabel(prk, "joiner", groupContext, MlsCryptoProvider.HASH_OUTPUT_LENGTH)
+        return fromJoinerSecret(joinerSecret, pskSecret)
+    }
 
+    /**
+     * The epoch secrets a joiner derives from a Welcome's `joiner_secret`
+     * (RFC 9420 §8): everything below `joiner_secret` in the key schedule.
+     */
+    fun fromJoinerSecret(
+        joinerSecret: ByteArray,
+        pskSecret: ByteArray = ByteArray(MlsCryptoProvider.HASH_OUTPUT_LENGTH),
+    ): EpochSecrets {
         // member_secret = HKDF-Extract(joiner_secret, psk_secret)
         val memberSecret = MlsCryptoProvider.hkdfExtract(joinerSecret, pskSecret)
 
@@ -108,6 +118,34 @@ class KeySchedule(
     }
 
     companion object {
+        /**
+         * `psk_secret` (RFC 9420 §8.4) for PSKs in proposal order, each paired
+         * with its secret value. All zeros when there are none.
+         *
+         * ```
+         * psk_extracted_i = Extract(0, psk_i)
+         * psk_input_i     = ExpandWithLabel(psk_extracted_i, "derived psk", PSKLabel(id_i, i, n), Nh)
+         * psk_secret_i    = Extract(salt = psk_input_i, ikm = psk_secret_[i-1])
+         * ```
+         */
+        fun pskSecret(psks: List<Pair<com.vitorpamplona.mls.messages.PreSharedKeyId, ByteArray>>): ByteArray {
+            val zero = ByteArray(MlsCryptoProvider.HASH_OUTPUT_LENGTH)
+            var secret = zero
+            for ((index, entry) in psks.withIndex()) {
+                val (id, value) = entry
+                val label =
+                    com.vitorpamplona.mls.codec
+                        .TlsWriter()
+                id.encodeTls(label)
+                label.putUint16(index)
+                label.putUint16(psks.size)
+                val extracted = MlsCryptoProvider.hkdfExtract(zero, value)
+                val input = MlsCryptoProvider.expandWithLabel(extracted, "derived psk", label.toByteArray(), MlsCryptoProvider.HASH_OUTPUT_LENGTH)
+                secret = MlsCryptoProvider.hkdfExtract(salt = input, ikm = secret)
+            }
+            return secret
+        }
+
         /**
          * MLS-Exporter function (RFC 9420 Section 8.5):
          *
