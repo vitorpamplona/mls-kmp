@@ -335,7 +335,17 @@ class MaliciousMemberTest {
                 val path = Commit.decodeTls(TlsReader(honest.commitBytes)).updatePath!!
                 forge(w.alice, inline(), path.copy(nodes = path.nodes.toMutableList().also { it[0] = it[0].copy(encryptionKey = ByteArray(32) { 5 }) }))
             },
-            Case("an update path that reuses the committer's encryption key", "reuses") { w ->
+            Case("an update path that reuses a key already in the tree", "already in the tree") { w ->
+                val honest = w.alice.stageCommit().also { w.alice.clearPendingCommit() }
+                val path = Commit.decodeTls(TlsReader(honest.commitBytes)).updatePath!!
+                forge(w.alice, inline(), path.copy(nodes = path.nodes.toMutableList().also { it[0] = it[0].copy(encryptionKey = leafOf(w, w.bob).encryptionKey) }))
+            },
+            Case("an update path that repeats a key", "repeats a public key") { w ->
+                val honest = w.alice.stageCommit().also { w.alice.clearPendingCommit() }
+                val path = Commit.decodeTls(TlsReader(honest.commitBytes)).updatePath!!
+                forge(w.alice, inline(), path.copy(nodes = path.nodes.toMutableList().also { it[1] = it[1].copy(encryptionKey = it[0].encryptionKey) }))
+            },
+            Case("an update path that reuses the committer's encryption key", "reuses the committer's encryption key") { w ->
                 val honest = w.alice.stageCommit().also { w.alice.clearPendingCommit() }
                 val path = Commit.decodeTls(TlsReader(honest.commitBytes)).updatePath!!
                 val oldKey =

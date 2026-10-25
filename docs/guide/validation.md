@@ -28,7 +28,7 @@ reason and stay where they were.
 | PSKs: a nonce of the hash length, each PSK once; a reinit or branch PSK only in a new group's first commit, and only one | §8.4, §11, §12.2 | `MaliciousMemberTest` › "a psk with a short nonce", "the same psk twice", "a branch psk outside a new group's first commit" |
 | Every proposal type supported by every member, and never a GREASE one | §12.2, §13.5 | `MaliciousMemberTest` › "a proposal type some member does not support", "a grease proposal" |
 | An UpdatePath wherever one is required | §12.4.2 | `MaliciousMemberTest` › "remove without a path", "empty commit without a path" |
-| UpdatePath parent hashes, and derived keys matching the path | §7.9, §12.4.2 | `MaliciousMemberTest` › "a tampered update path", `TreeKemInteropTest` |
+| UpdatePath parent hashes, fresh and distinct public keys, and derived keys matching the path | §7.9, §12.4.2 | `MaliciousMemberTest` › "a tampered update path", "an update path that reuses a key already in the tree", "an update path that repeats a key", `TreeKemInteropTest` |
 | A ProposalRef names a proposal that was sent this epoch | §12.4.2 | `MaliciousMemberTest` › "a reference to an unknown proposal", `AuditRegressionTest.aCommitCannotReferenceAProposalWeStagedButNeverSent` |
 | A commit that removes us gets every public check too | §12.4.2 | `MaliciousMemberTest` › "remove without a path" (carol is the one removed) |
 | A joined tree: tree hash, parent hashes, every leaf, credential support across leaves, unmerged leaves | §12.4.3.1 | `TreeValidationInteropTest.testFullTreeValidation`, `JoinedTreeValidationTest` (trees only a malicious GroupInfo signer could build) |
