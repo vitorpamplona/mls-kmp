@@ -4,37 +4,45 @@
 
 Every check below runs on our own commits before they are sent, and on every
 commit and proposal we receive before it is applied. A failure throws and
-leaves the group unchanged. Each row names a test that breaks the rule on
-purpose.
+leaves the group unchanged. Each row names the test that breaks the rule on
+purpose. The `MaliciousMemberTest` cases are commits from a real member,
+signed and MACed with its keys, that break only that one rule. Every other
+member and a [PublicGroup](public-group.md) view must refuse each one for that
+reason and stay where they were.
 
 | Check | RFC 9420 | Tested by |
 | ----- | -------- | --------- |
-| Message syntax: minimal varints, strict optionals, nothing left over | §2.1 | `TlsCodecTest`, `PskSecretAndDeserializationInteropTest` |
-| Group id, epoch and wire format of every message | §6 | `MlsGroupNegativeTest.wrongWireFormatIsRejected`, `PublicGroupTest.aCommitFromTheWrongEpochOrGroupIsRejected` |
-| Sender signature over `FramedContentTBS` | §6.1 | `MlsGroupNegativeTest.tamperedSignatureIsRejectedAndStateRolledBack`, `spoofedSenderLeafIndexIsRejected` |
-| Membership tag on a member's PublicMessage | §6.2 | `MlsGroupNegativeTest.tamperedMembershipTagFailsPublicMessageCheck` |
-| Confirmation tag on every commit | §6.1, §8 | `MlsGroupNegativeTest.tamperedConfirmationTagIsRejectedAndStateRolledBack`, `emptyConfirmationTagIsRejected` |
-| LeafNode rules: source, signature, capabilities, unique keys | §7.3 | `ProposalValidationTest.keyPackagesThatBreakLeafRulesAreRefusedLocally` |
+| Message syntax: minimal varints, strict optionals, in-range indices and counts, nothing left over | §2.1 | `TlsCodecTest`, `HostileInputTest`, `MessageFuzzTest` |
+| Group id and epoch of every message | §6 | `MaliciousMemberTest` › "wrong epoch", "wrong group" |
+| Sender signature over `FramedContentTBS`, from a leaf in the tree | §6.1 | `MaliciousMemberTest` › "signed by someone else", "claims another member's leaf", "sender leaf off the end of the tree" |
+| Membership tag on a member's PublicMessage | §6.2 | `MaliciousMemberTest` › "bad membership tag" |
+| Confirmation tag on every commit | §6.1, §8 | `MaliciousMemberTest` › "bad confirmation tag" |
+| LeafNode rules: source, signature, capabilities, unique keys | §7.3 | `ProposalValidationTest.keyPackagesThatBreakLeafRulesAreRefusedLocally`, `MaliciousMemberTest` › "an update path that reuses the committer's encryption key" |
 | KeyPackage lifetime, judged by the committer only, so no receiver forks itself off over its own clock | §7.3 | `AuditRegressionTest.aMemberPastAKeyPackagesLifetimeStillAppliesTheCommitThatAddedIt` |
-| A ProposalRef names only a proposal that was sent | §12.4.2 | `AuditRegressionTest.aCommitCannotReferenceAProposalWeStagedButNeverSent` |
-| KeyPackage signature, suite and init key | §10.1 | `ProposalValidationTest.anAddWithAForgedKeyPackageIsRejected` |
-| No Add of a member already in the group | §12.2 | `ProposalValidationTest.anAddOfAMemberAlreadyInTheGroupIsRejected` |
-| One Update or Remove per leaf; no removal of the committer; not the committer's own Update | §12.2 | `ProposalValidationTest.twoRemovalsOfOneLeafAreRejected`, `removingTheCommitterIsRejected`, `theCommittersOwnUpdateIsRejected` |
-| At most one GroupContextExtensions; ReInit alone; ExternalInit only in external commits | §12.2 | `ProposalValidationTest.twoGroupContextExtensionsAreRejected`, `aReInitWithOtherProposalsIsRejected`, `anExternalInitInAMemberCommitIsRejected` |
-| Every proposal type supported by every member | §12.2 | `ProposalValidationTest.aProposalTypeSomeMemberDoesNotSupportIsRejected`, `RfcFlowsTest.aCustomProposalNotEveryMemberSupportsIsRefused` |
-| An UpdatePath wherever one is required | §12.4.2 | `ProposalValidationTest.aRemoveWithoutAPathIsRejected`, `anEmptyCommitWithoutAPathIsRejected` |
-| UpdatePath parent hashes, and derived keys matching the path | §7.9, §12.4.2 | `ProposalValidationTest.aTamperedUpdatePathIsRejected`, `TreeKemInteropTest` |
+| KeyPackage signature, suite and init key | §10.1 | `MaliciousMemberTest` › "an add with a forged key package" |
+| No Add of a member already in the group, or of one client twice | §12.2 | `MaliciousMemberTest` › "an add of a member already in the group", "two adds of one client" |
+| One Update or Remove per leaf, of a live leaf; not the committer's removal or its own Update | §12.2 | `MaliciousMemberTest` › "two removes of one leaf", "removes a blank leaf", "removes a leaf off the end of the tree", "removes the committer", "the committer's own update" |
+| At most one GroupContextExtensions; ReInit alone; ExternalInit only in external commits | §12.2 | `MaliciousMemberTest` › "two group context extensions", "reinit with other proposals", "external init in a member commit" |
+| PSKs: a nonce of the hash length, each PSK once | §8.4, §12.2 | `MaliciousMemberTest` › "a psk with a short nonce", "the same psk twice" |
+| Every proposal type supported by every member | §12.2 | `MaliciousMemberTest` › "a proposal type some member does not support" |
+| An UpdatePath wherever one is required | §12.4.2 | `MaliciousMemberTest` › "remove without a path", "empty commit without a path" |
+| UpdatePath parent hashes, and derived keys matching the path | §7.9, §12.4.2 | `MaliciousMemberTest` › "a tampered update path", `TreeKemInteropTest` |
+| A ProposalRef names a proposal that was sent this epoch | §12.4.2 | `MaliciousMemberTest` › "a reference to an unknown proposal", `AuditRegressionTest.aCommitCannotReferenceAProposalWeStagedButNeverSent` |
+| A commit that removes us gets every public check too | §12.4.2 | `MaliciousMemberTest` › "remove without a path" (carol is the one removed) |
 | A joined tree: tree hash, parent hashes, every leaf | §12.4.3.1 | `TreeValidationInteropTest.testFullTreeValidation` |
 | External commits: signer, path, resync identity | §12.4.3.2 | `RfcFlowsTest.externalResyncMustKeepTheCredential` |
 | A successor group matches its ReInit or branch | §11 | `RfcFlowsTest.aSuccessorMustMatchItsPredecessor` |
 | Default extensions in their allowed message, well formed, not repeated | §17.3 | `ExtensionValidationTest` |
 | The group's wire-format policy | §6 | `WireFormatPolicyTest` |
-| All-or-nothing: a failed commit changes nothing | | `RfcFlowsTest.aFailedCommitChangesNothing` |
+| Size: no message, Welcome, GroupInfo or tree over the policy's `maxMessageSize` | | `HostileInputTest.maxMessageSizeIsCheckedBeforeDecoding` |
+| All-or-nothing: a failed commit changes nothing | | `RfcFlowsTest.aFailedCommitChangesNothing`, every `MaliciousMemberTest` case |
 
 The official RFC 9420 test vectors from
 [mls-implementations](https://github.com/mlswg/mls-implementations) run
 through the same code in the `interop` suites. Groups mls-kmp creates are
-replayed by OpenMLS, mls-rs and ts-mls in CI.
+replayed by OpenMLS, mls-rs and ts-mls in CI. `GroupSimulationTest` runs
+random multi-member scenarios and checks after every step that all members,
+and a PublicGroup view, agree on the group.
 
 ## What you must check
 

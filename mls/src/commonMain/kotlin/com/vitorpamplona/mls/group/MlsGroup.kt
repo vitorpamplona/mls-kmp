@@ -2273,17 +2273,13 @@ class MlsGroup private constructor(
         // The external init secret comes from THIS epoch's external key pair.
         val externalInitSecret = if (observer) null else applied.externalInit?.let { deriveExternalInitSecret(it.kemOutput) }
 
-        // A commit that removes us still changed the tree; keep that state so
-        // the caller can see we are out, but there is no key schedule we can
-        // follow — the path was not encrypted to us. Judge by the proposals,
+        // A commit that removes us still has to be a valid commit: everything
+        // public about it is checked below as for anyone else, so a member
+        // cannot talk us out of the group with one the others would refuse.
+        // Only the key schedule is out of reach — the path was not encrypted
+        // to us — and with it the confirmation tag. Judge by the proposals,
         // not the tree: the same commit may add someone into our old leaf.
-        if (myLeafIndex in applied.removedLeaves) removedFromGroup = true
-        if (!observer && !isLocalMember()) {
-            pendingProposals.clear()
-            sentKeys.clear()
-            pendingCommit = null
-            return
-        }
+        val removesUs = !observer && (myLeafIndex in applied.removedLeaves || !isLocalMember())
 
         val updatePath = commit.updatePath
         require(updatePath != null || !applied.pathRequired) { "Commit is missing its required UpdatePath (RFC 9420 §12.4.2)" }
@@ -2324,7 +2320,7 @@ class MlsGroup private constructor(
             }
             prunePathKeys()
 
-            if (!observer) {
+            if (!observer && !removesUs) {
                 val provisional = groupContext.copy(epoch = epoch + 1, treeHash = newTreeHash).toTlsBytes()
                 val decrypted =
                     TreeKem.decryptPathSecrets(
@@ -2344,6 +2340,15 @@ class MlsGroup private constructor(
 
         val confirmedTranscriptHash =
             MlsCryptoProvider.hash(interimTranscriptHash + Framing.confirmedTranscriptHashInput(wireFormat, content, signature))
+
+        if (removesUs) {
+            // The tree we keep shows the commit that took us out; nothing else follows.
+            removedFromGroup = true
+            pendingProposals.clear()
+            sentKeys.clear()
+            pendingCommit = null
+            return
+        }
 
         if (observer) {
             // Everything public about the new epoch, on the committer's word for the tag.
