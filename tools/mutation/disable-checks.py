@@ -83,6 +83,8 @@ UNREACHABLE = {
     "content.groupId.contentEquals(groupId)": "every entry point checks it before applyCommit",
     "content.epoch == epoch": "every entry point checks it before applyCommit",
     "content.contentType == ContentType.COMMIT": "every caller routes by content type before applyCommit",
+    "wireFormat == WireFormat.PUBLIC_MESSAGE":
+        "a PrivateMessage's sender data is a leaf index, so it can only carry a member's commit",
     "tree.leafCount > 0":
         "an empty tree has no GroupInfo signer, which is refused first",
 }
