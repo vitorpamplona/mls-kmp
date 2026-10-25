@@ -119,3 +119,47 @@ jobs:
 
       - name: mls-rs replays them
         run: tools/mlsrs-verifier/run.sh $RUNNER_TEMP/mls-kmp-passive.json
+
+  # The bindings built on this engine, run against THIS checkout: a change that
+  # breaks Marmot or cordn shows up here, before a release does. Non-blocking
+  # for now, so a binding that still needs adapting does not stop mls-kmp
+  # changes; read the result.
+  downstream:
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - repo: marmot-kmp
+            task: ":marmot:jvmTest"
+          - repo: cordn-kmp
+            task: ":cordn:jvmTest"
+    steps:
+      - name: Checkout mls-kmp
+        uses: actions/checkout@v7
+        with:
+          path: mls-kmp
+
+      - name: Checkout ${{ matrix.repo }}
+        uses: actions/checkout@v7
+        with:
+          repository: vitorpamplona/${{ matrix.repo }}
+          path: downstream
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v6
+        with:
+          distribution: 'zulu'
+          java-version: 21
+
+      - name: Point the build at Quartz if its release is not on Maven Central yet
+        run: echo "QUARTZ_ARGS=$(QUARTZ_CLONE_TO=$RUNNER_TEMP/quartz downstream/tools/ci/quartz-args.sh)" >> $GITHUB_ENV
+
+      - name: ${{ matrix.repo }} tests against this mls-kmp
+        working-directory: downstream
+        run: ./gradlew $QUARTZ_ARGS -PmlsKmpDir=$GITHUB_WORKSPACE/mls-kmp ${{ matrix.task }}
+
+      - name: Flag a downstream break
+        if: failure()
+        run: echo "::warning title=${{ matrix.repo }}::${{ matrix.repo }}'s tests fail against this mls-kmp. Fix the binding (or this change) before releasing."

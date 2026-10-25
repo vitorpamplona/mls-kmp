@@ -1,0 +1,66 @@
+name: Nightly hardening
+
+# The long runs of the suites every build runs briefly: more fuzzing, more
+# and longer group simulations, and the disabled-check mutation campaign.
+# Each prints the seed it used; MLSKMP_FUZZ_SEED / MLSKMP_SIM_SEED replay it.
+on:
+  schedule:
+    - cron: '17 3 * * *'
+  workflow_dispatch:
+
+jobs:
+  long-runs:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: fuzz
+            env: MLSKMP_FUZZ_ITERATIONS=20000
+            tests: --tests com.vitorpamplona.mls.fuzz.*
+          - name: simulation
+            env: MLSKMP_SIM_RUNS=60 MLSKMP_SIM_STEPS=400
+            tests: --tests com.vitorpamplona.mls.sim.*
+    name: ${{ matrix.name }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v6
+        with:
+          distribution: 'zulu'
+          java-version: 21
+
+      - name: Long ${{ matrix.name }} run
+        run: env ${{ matrix.env }} ./gradlew :mls:jvmTest --rerun ${{ matrix.tests }}
+
+  mutation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 300
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v6
+        with:
+          distribution: 'zulu'
+          java-version: 21
+
+      - name: Warm the build
+        run: ./gradlew :mls:jvmTest --tests com.vitorpamplona.mls.group.*
+
+      - name: Disable each validation check in turn
+        run: python3 tools/mutation/disable-checks.py --report mutation-report.md
+
+      - name: Report
+        if: always()
+        run: cat mutation-report.md >> $GITHUB_STEP_SUMMARY
+
+      - uses: actions/upload-artifact@v5
+        if: always()
+        with:
+          name: mutation-report
+          path: mutation-report.md
