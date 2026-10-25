@@ -49,6 +49,13 @@ replayed by OpenMLS, mls-rs and ts-mls in CI. `GroupSimulationTest` runs
 random multi-member scenarios and checks after every step that all members,
 and a PublicGroup view, agree on the group.
 
+Each check above is also tested for whether the tests would notice it gone.
+`tools/mutation/disable-checks.py` disables every `require` in the
+validation code in turn and runs the suites. Of 97 checks, 84 are caught by a
+test failing for that reason. The other 13 sit behind an earlier check that
+refuses the same input first, and the script lists each with why. The
+nightly fails if a check survives that is not on that list.
+
 ## What you must check
 
 RFC 9420 leaves these to the application, and mls-kmp cannot do them for
