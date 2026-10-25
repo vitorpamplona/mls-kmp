@@ -245,6 +245,7 @@ class MaliciousMemberTest {
             },
             Case("the committer's own self-remove", "its own SelfRemove") { w -> forge(w.alice, inline(Proposal.SelfRemove())) },
             Case("an external commit not signed by its new leaf", "signature on external commit") { w -> forgeExternal(w, signingKey = Ed25519.generateKeyPair().privateKey) },
+            Case("an external commit that references a proposal", "cannot reference proposals") { w -> forgeExternal(w) { p -> p + ProposalOrRef.Reference(ByteArray(32) { 9 }) } },
             Case("an external commit without an external init", "exactly one ExternalInit") { w -> forgeExternal(w) { p -> p.filterNot { (it as? ProposalOrRef.Inline)?.proposal is Proposal.ExternalInit } } },
             Case("an external commit with two external inits", "exactly one ExternalInit") { w -> forgeExternal(w) { p -> p + p } },
             Case("an external commit that removes two members", "at most one leaf") { w -> forgeExternal(w) { p -> p + inline(Proposal.Remove(w.bob.leafIndex), Proposal.Remove(w.carol.leafIndex)) } },
