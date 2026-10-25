@@ -341,7 +341,7 @@ class MaliciousMemberTest {
             ) { w ->
                 add(w, keyPackage(leaf = { it.copy(credential = Credential.Custom(OTHER_CREDENTIAL, ByteArray(4)), capabilities = it.capabilities.copy(credentials = listOf(OTHER_CREDENTIAL))) }))
             },
-            Case("an add that reuses a member's encryption key", "Duplicate encryption key") { w ->
+            Case("an add that reuses a member's encryption key", "Duplicate encryption key: leaf 1 already uses it") { w ->
                 add(w, keyPackage(leaf = { it.copy(encryptionKey = leafOf(w, w.bob).encryptionKey) }))
             },
             Case("an add of a key package for another protocol version", "version") { w -> add(w, keyPackage(edit = { it.copy(version = 2) })) },
