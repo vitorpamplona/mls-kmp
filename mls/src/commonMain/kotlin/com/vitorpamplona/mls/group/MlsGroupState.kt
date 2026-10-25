@@ -24,6 +24,7 @@ import com.vitorpamplona.crypto.sha2.sha256
 import com.vitorpamplona.mls.codec.TlsReader
 import com.vitorpamplona.mls.codec.TlsWriter
 import com.vitorpamplona.mls.framing.SenderType
+import com.vitorpamplona.mls.messages.CommitResult
 import com.vitorpamplona.mls.messages.GroupContext
 import com.vitorpamplona.mls.messages.Proposal
 import com.vitorpamplona.mls.schedule.EpochSecrets
@@ -121,6 +122,10 @@ data class MlsGroupState(
     val pendingUpdateKeys: List<PendingUpdateKeys> = emptyList(),
     /** The ReInit proposal a committed commit carried, if any (STATE_VERSION 8+). */
     val reInitPending: Proposal.ReInit? = null,
+    /** Whether a commit removed us (STATE_VERSION 9+); our old leaf may hold someone else. */
+    val removedFromGroup: Boolean = false,
+    /** A commit staged by [MlsGroup.stageCommit] and not yet merged (STATE_VERSION 9+). */
+    val pendingCommit: StagedCommitState? = null,
 ) {
     fun encodeTls(): ByteArray {
         val writer = TlsWriter()
@@ -225,6 +230,22 @@ data class MlsGroupState(
         }
         writer.putOpaqueVarInt(reInitPending?.toTlsBytes() ?: ByteArray(0))
 
+        // STATE_VERSION 9+: removal flag and a staged commit, saved as the
+        // CommitResult plus the whole state merging it leads to.
+        writer.putUint8(if (removedFromGroup) 1 else 0)
+        if (pendingCommit == null) {
+            writer.putUint8(0)
+        } else {
+            writer.putUint8(1)
+            writer.putUint64(pendingCommit.fromEpoch)
+            writer.putOpaqueVarInt(pendingCommit.result.commitBytes)
+            writer.putOpaqueVarInt(pendingCommit.result.framedCommitBytes)
+            writer.putOpaqueVarInt(pendingCommit.result.welcomeBytes ?: ByteArray(0))
+            writer.putOpaqueVarInt(pendingCommit.result.groupInfoBytes ?: ByteArray(0))
+            writer.putOpaqueVarInt(pendingCommit.result.preCommitExporterSecret)
+            writer.putOpaqueVarInt(pendingCommit.after.encodeTls())
+        }
+
         return writer.toByteArray()
     }
 
@@ -263,8 +284,11 @@ data class MlsGroupState(
          *     resumption PSKs, the keys of our uncommitted Update proposals and
          *     a committed ReInit. Older blobs decode with member senders and
          *     none of the rest.
+         * v9: appends whether a commit removed us and a staged commit (its
+         *     CommitResult and the state merging it leads to). Older blobs
+         *     decode as still members with nothing staged.
          */
-        private const val STATE_VERSION = 8
+        private const val STATE_VERSION = 9
 
         fun decodeTls(data: ByteArray): MlsGroupState {
             val reader = TlsReader(data)
@@ -405,6 +429,25 @@ data class MlsGroupState(
                     reader.readOpaqueVarInt().takeIf { it.isNotEmpty() }?.let { Proposal.decodeTls(TlsReader(it)) as Proposal.ReInit }
             }
 
+            // v9+: removal flag and a staged commit.
+            var removedFromGroup = false
+            var pendingCommit: StagedCommitState? = null
+            if (version >= 9 && reader.hasRemaining) {
+                removedFromGroup = reader.readUint8() == 1
+                if (reader.readUint8() == 1) {
+                    val fromEpoch = reader.readUint64()
+                    val result =
+                        CommitResult(
+                            commitBytes = reader.readOpaqueVarInt(),
+                            framedCommitBytes = reader.readOpaqueVarInt(),
+                            welcomeBytes = reader.readOpaqueVarInt().takeIf { it.isNotEmpty() },
+                            groupInfoBytes = reader.readOpaqueVarInt().takeIf { it.isNotEmpty() },
+                            preCommitExporterSecret = reader.readOpaqueVarInt(),
+                        )
+                    pendingCommit = StagedCommitState(fromEpoch, result, decodeTls(reader.readOpaqueVarInt()))
+                }
+            }
+
             return MlsGroupState(
                 groupContext = groupContext,
                 treeBytes = treeBytes,
@@ -425,6 +468,8 @@ data class MlsGroupState(
                 resumptionPsks = resumptionPsks,
                 pendingUpdateKeys = pendingUpdateKeys,
                 reInitPending = reInitPending,
+                removedFromGroup = removedFromGroup,
+                pendingCommit = pendingCommit,
             )
         }
 
@@ -724,4 +769,11 @@ class PendingUpdateKeys(
     val encryptionKey: ByteArray,
     val encryptionPrivateKey: ByteArray,
     val signaturePrivateKey: ByteArray,
+)
+
+/** A staged, unmerged commit as persisted: where it was built, what it produced, and the state it leads to. */
+class StagedCommitState(
+    val fromEpoch: Long,
+    val result: CommitResult,
+    val after: MlsGroupState,
 )

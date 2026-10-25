@@ -192,8 +192,14 @@ class MlsGroup private constructor(
      * shrunk past `myLeafIndex`. Either condition means we can't propose,
      * commit, encrypt, or decrypt any further; surface that here so callers
      * get a clean answer instead of poking at private tree internals.
+     *
+     * Once a commit removes us this stays false even when the same commit
+     * adds someone else into the leaf we held.
      */
-    fun isLocalMember(): Boolean = myLeafIndex < tree.leafCount && tree.getLeaf(myLeafIndex) != null
+    fun isLocalMember(): Boolean = !removedFromGroup && myLeafIndex in 0 until tree.leafCount && tree.getLeaf(myLeafIndex) != null
+
+    /** Set when a commit removed our leaf; the slot may since hold another member. */
+    private var removedFromGroup: Boolean = false
 
     /**
      * The read-only projection this group hands to its [MlsGroupPolicy].
@@ -328,6 +334,19 @@ class MlsGroup private constructor(
             resumptionPsks = resumptionPsks.toMap(),
             pendingUpdateKeys = pendingUpdateKeys.values.toList(),
             reInitPending = reInitPending,
+            removedFromGroup = removedFromGroup,
+            // A staged commit is saved as the state it leads to, so a restart
+            // can still merge it once the delivery service confirms it.
+            pendingCommit =
+                pendingCommit?.let { staged ->
+                    val current = captureState()
+                    pendingCommit = null
+                    restoreState(staged.after)
+                    val after = saveState()
+                    restoreState(current)
+                    pendingCommit = staged
+                    StagedCommitState(staged.fromEpoch, staged.result, after)
+                },
         )
     }
 
@@ -449,6 +468,7 @@ class MlsGroup private constructor(
         val reInitPending: Proposal.ReInit?,
         val resumptionPsks: Map<Long, ByteArray>,
         val pendingUpdateKeys: Map<String, PendingUpdateKeys>,
+        val removedFromGroup: Boolean,
     )
 
     private fun captureState(): StateSnapshot =
@@ -472,6 +492,7 @@ class MlsGroup private constructor(
             reInitPending = reInitPending,
             resumptionPsks = resumptionPsks.toMap(),
             pendingUpdateKeys = pendingUpdateKeys.toMap(),
+            removedFromGroup = removedFromGroup,
         )
 
     private fun restoreState(s: StateSnapshot) {
@@ -500,6 +521,7 @@ class MlsGroup private constructor(
         resumptionPsks.putAll(s.resumptionPsks)
         pendingUpdateKeys.clear()
         pendingUpdateKeys.putAll(s.pendingUpdateKeys)
+        removedFromGroup = s.removedFromGroup
     }
 
     /**
@@ -1272,6 +1294,8 @@ class MlsGroup private constructor(
         val reInit: Proposal.ReInit?,
         /** The leaf an external commit's Remove took out (a resync), before it was blanked. */
         val resyncedLeaf: LeafNode?,
+        /** Every leaf a Remove or SelfRemove took out. */
+        val removedLeaves: Set<Int>,
         /** RFC 9420 §12.4.2: whether the commit MUST carry an UpdatePath. */
         val pathRequired: Boolean,
     )
@@ -1295,7 +1319,10 @@ class MlsGroup private constructor(
         // §12.3 order: GroupContextExtensions, Update, Remove, Add. App-data
         // updates edit the dictionary a GroupContextExtensions just installed.
         val gce = proposals.firstNotNullOfOrNull { it.proposal as? Proposal.GroupContextExtensions }
-        gce?.let { groupContext = groupContext.copy(extensions = it.extensions) }
+        gce?.let {
+            GroupValidation.validateExtensions(it.extensions, GroupValidation.ExtensionContext.GROUP_CONTEXT)
+            groupContext = groupContext.copy(extensions = it.extensions)
+        }
         applyAppDataUpdateProposals(proposals.mapNotNull { it.proposal as? Proposal.AppDataUpdate })
 
         for (p in proposals) {
@@ -1306,6 +1333,7 @@ class MlsGroup private constructor(
             require(!update.leafNode.encryptionKey.contentEquals(previous.encryptionKey)) {
                 "Update proposal reuses leaf $leafIndex's encryption key"
             }
+            policy.validateCredentialSuccession(previous.credential, update.leafNode.credential)
             replacedLeaves[leafIndex] = previous
             tree.updateLeaf(leafIndex, update.leafNode)
             if (leafIndex == myLeafIndex) adoptUpdateKeys(update.leafNode)
@@ -1348,6 +1376,7 @@ class MlsGroup private constructor(
             externalInit = proposals.firstNotNullOfOrNull { it.proposal as? Proposal.ExternalInit },
             reInit = proposals.firstNotNullOfOrNull { it.proposal as? Proposal.ReInit },
             resyncedLeaf = resyncedLeaf,
+            removedLeaves = proposals.mapNotNull { removedLeafOf(it) }.toSet(),
             pathRequired =
                 proposals.isEmpty() ||
                     proposals.any {
@@ -2002,7 +2031,9 @@ class MlsGroup private constructor(
 
         // A commit that removes us still changed the tree; keep that state so
         // the caller can see we are out, but there is no key schedule we can
-        // follow — the path was not encrypted to us.
+        // follow — the path was not encrypted to us. Judge by the proposals,
+        // not the tree: the same commit may add someone into our old leaf.
+        if (myLeafIndex in applied.removedLeaves) removedFromGroup = true
         if (!isLocalMember()) {
             pendingProposals.clear()
             sentKeys.clear()
@@ -2021,9 +2052,8 @@ class MlsGroup private constructor(
                 senderLeafIndex = (0 until tree.leafCount).firstOrNull { tree.getLeaf(it) == null } ?: tree.leafCount
                 GroupValidation.validateLeafNode(updatePath.leafNode, LeafNodeSource.COMMIT, groupId, senderLeafIndex, tree, null, groupContext.extensions, policy, now = null)
                 // A resync replaces a member's earlier leaf, and must be the same member.
-                applied.resyncedLeaf?.let { old ->
-                    require(old.credential == updatePath.leafNode.credential) { "A resync must keep the removed leaf's credential" }
-                }
+                applied.resyncedLeaf?.let { old -> policy.validateCredentialSuccession(old.credential, updatePath.leafNode.credential) }
+                policy.authorizeExternalCommit(view(), updatePath.leafNode, applied.resyncedLeaf)
                 requireFreshPathKeys(updatePath)
                 check(tree.addLeaf(updatePath.leafNode) == senderLeafIndex)
                 enforceRequiredAppComponents(requiredAppComponents(), emptySet(), mapOf(senderLeafIndex to null))
@@ -2034,6 +2064,7 @@ class MlsGroup private constructor(
                 require(!updatePath.leafNode.encryptionKey.contentEquals(previous.encryptionKey)) {
                     "UpdatePath leaf reuses the committer's encryption key"
                 }
+                policy.validateCredentialSuccession(previous.credential, updatePath.leafNode.credential)
                 requireFreshPathKeys(updatePath)
                 tree.setLeaf(committer, updatePath.leafNode)
                 // The committer's replacement leaf may not drop a component the group requires.
@@ -2233,6 +2264,7 @@ class MlsGroup private constructor(
                 val previous = checkNotNull(tree.getLeaf(sender.leafIndex))
                 GroupValidation.validateLeafNode(proposal.leafNode, LeafNodeSource.UPDATE, groupId, sender.leafIndex, tree, sender.leafIndex, groupContext.extensions, policy, now = null)
                 require(!proposal.leafNode.encryptionKey.contentEquals(previous.encryptionKey)) { "Update proposal reuses the leaf's encryption key" }
+                policy.validateCredentialSuccession(previous.credential, proposal.leafNode.credential)
             }
 
             is Proposal.Remove -> {
@@ -2336,7 +2368,8 @@ class MlsGroup private constructor(
     ): GroupInfo {
         val extensions = mutableListOf<Extension>()
         if (includeRatchetTree) extensions.add(Extension(RATCHET_TREE_EXTENSION_TYPE, exportTreeBytesInternal()))
-        if (includeExternalPub) extensions.add(Extension(EXTERNAL_PUB_EXTENSION_TYPE, externalPub()))
+        // ExternalPub is `struct { HPKEPublicKey external_pub; }`, and an HPKEPublicKey is opaque<V>.
+        if (includeExternalPub) extensions.add(Extension(EXTERNAL_PUB_EXTENSION_TYPE, TlsWriter().apply { putOpaqueVarInt(externalPub()) }.toByteArray()))
         val unsigned =
             GroupInfo(
                 groupContext = groupContext,
@@ -2958,6 +2991,7 @@ class MlsGroup private constructor(
             // binding's own group-metadata extension, so a later joiner can read
             // it without first decrypting a pre-membership bootstrap commit.
             val baseExtensions = listOfNotNull(requiredCapabilities)
+            GroupValidation.validateExtensions(baseExtensions + initialExtensions, GroupValidation.ExtensionContext.GROUP_CONTEXT)
             val groupContext =
                 GroupContext(
                     groupId = newGroupId,
@@ -3051,6 +3085,7 @@ class MlsGroup private constructor(
             val groupInfo = GroupInfo.decodeTls(giReader)
             giReader.requireFullyConsumed("GroupInfo")
             val groupContext = groupInfo.groupContext
+            GroupValidation.validateExtensions(groupInfo.extensions, GroupValidation.ExtensionContext.GROUP_INFO)
 
             require(groupContext.version == bundle.keyPackage.version && groupContext.cipherSuite == bundle.keyPackage.cipherSuite) {
                 "The group's version or ciphersuite doesn't match our KeyPackage"
@@ -3189,6 +3224,7 @@ class MlsGroup private constructor(
         ): ExternalJoinResult {
             val groupInfo = decodeGroupInfo(groupInfoBytes)
             val groupContext = groupInfo.groupContext
+            GroupValidation.validateExtensions(groupInfo.extensions, GroupValidation.ExtensionContext.GROUP_INFO)
             require(groupContext.version == GroupValidation.MLS_VERSION && groupContext.cipherSuite == GroupValidation.CIPHER_SUITE) {
                 "Unsupported group version ${groupContext.version} / ciphersuite ${groupContext.cipherSuite}"
             }
@@ -3201,9 +3237,12 @@ class MlsGroup private constructor(
             require(groupInfo.verifySignature(signerLeaf.signatureKey)) { "Invalid GroupInfo signature in externalJoin" }
             GroupValidation.validateTree(tree, groupContext, policy)
 
-            val externalPub =
+            val externalPubData =
                 groupInfo.extensions.find { it.extensionType == EXTERNAL_PUB_EXTENSION_TYPE }?.extensionData
                     ?: throw IllegalArgumentException("GroupInfo missing external_pub extension")
+            // RFC 9420 encodes the key as opaque<V>; mls-kmp 1.2 and older wrote the bare key.
+            val externalPub =
+                if (externalPubData.size == MlsCryptoProvider.KEM_PUBLIC_KEY_LENGTH) externalPubData else TlsReader(externalPubData).let { r -> r.readOpaqueVarInt().also { r.requireFullyConsumed("external_pub") } }
 
             val sigKp =
                 signingKey?.let { key -> Ed25519KeyPair(key, Ed25519.publicFromPrivate(key)) } ?: Ed25519.generateKeyPair()
@@ -3290,7 +3329,13 @@ class MlsGroup private constructor(
                 policy = policy,
                 resumptionPsks = state.resumptionPsks.toMutableMap(),
                 pendingUpdateKeys = state.pendingUpdateKeys.associateByTo(mutableMapOf()) { Hex.encode(it.encryptionKey) },
-            ).also { it.reInitPending = state.reInitPending }
+            ).also { group ->
+                group.reInitPending = state.reInitPending
+                group.removedFromGroup = state.removedFromGroup
+                state.pendingCommit?.let { staged ->
+                    group.pendingCommit = StagedCommit(staged.fromEpoch, staged.result, restore(staged.after, policy).captureState())
+                }
+            }
         }
 
         /**
@@ -3415,7 +3460,7 @@ class MlsGroup private constructor(
             )
         tree.setLeaf(leafIndex, leaf)
         GroupValidation.validateLeafNode(leaf, LeafNodeSource.COMMIT, groupId, leafIndex, tree, leafIndex, groupContext.extensions, policy, now = null)
-        applied.resyncedLeaf?.let { old -> require(old.credential == credential) { "A resync must keep the removed leaf's credential" } }
+        applied.resyncedLeaf?.let { old -> policy.validateCredentialSuccession(old.credential, credential) }
         enforceRequiredAppComponents(requiredAppComponents(), emptySet(), mapOf(leafIndex to null))
         encryptionPrivateKey = encKp.privateKey
         pathPrivateKeys.putAll(generated.privateKeysByNode())

@@ -24,6 +24,7 @@ import com.vitorpamplona.mls.messages.CommitResult
 import com.vitorpamplona.mls.tree.Capabilities
 import com.vitorpamplona.mls.tree.Credential
 import com.vitorpamplona.mls.tree.Extension
+import com.vitorpamplona.mls.tree.LeafNode
 
 /**
  * The application's rules about who in a group may do what.
@@ -113,6 +114,38 @@ interface MlsGroupPolicy {
     fun validateCredential(
         credential: Credential,
         signatureKey: ByteArray,
+    ) = Unit
+
+    /**
+     * Rejects, by throwing, [next] as the successor of [previous] when a
+     * member replaces its leaf — an Update, its own UpdatePath, or an external
+     * resync (RFC 9420 §5.3.1: the new credential must present identifiers
+     * that are valid successors of the old ones).
+     *
+     * The default keeps the credential type and, for a BasicCredential, the
+     * identity: a member may rotate keys, not become someone else. A binding
+     * whose identities legitimately change overrides it.
+     */
+    fun validateCredentialSuccession(
+        previous: Credential,
+        next: Credential,
+    ) {
+        require(previous.credentialType == next.credentialType) { "A member cannot change its credential type" }
+        if (previous is Credential.Basic) require(previous == next) { "A member cannot change its BasicCredential identity" }
+    }
+
+    /**
+     * Rejects, by throwing, an external commit (RFC 9420 §12.4.3.2): a
+     * non-member adding itself, or a member re-joining in place of [resynced].
+     *
+     * Anyone holding the group's GroupInfo can build one, so a group that
+     * publishes its GroupInfo only to some may still want to refuse others.
+     * [joiner] is the LeafNode the commit puts in the tree.
+     */
+    fun authorizeExternalCommit(
+        group: GroupView,
+        joiner: LeafNode,
+        resynced: LeafNode?,
     ) = Unit
 
     /**

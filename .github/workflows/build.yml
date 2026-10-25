@@ -62,3 +62,44 @@ jobs:
 
       - name: Build (gradle)
         run: ./gradlew assemble --no-daemon
+
+  # What mls-kmp SENDS, replayed by independent implementations: mls-kmp writes
+  # passive-client vectors (Welcomes, every commit shape, proposals by
+  # reference, external joins, PSKs) and ts-mls and OpenMLS must follow them.
+  sending-interop:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v6
+        with:
+          distribution: 'zulu'
+          java-version: 21
+
+      - name: Set up Node
+        uses: actions/setup-node@v5
+        with:
+          node-version: 22
+
+      - name: Cache cargo
+        uses: actions/cache@v6
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            tools/openmls-verifier/build
+          key: ${{ runner.os }}-openmls-${{ hashFiles('tools/openmls-verifier/*') }}
+
+      - name: Write mls-kmp-authored vectors
+        run: MLSKMP_PASSIVE_VECTORS=$RUNNER_TEMP/mls-kmp-passive.json ./gradlew :mls:jvmTest --tests com.vitorpamplona.mls.MlsKmpAuthoredVectorsWriter
+
+      - name: ts-mls replays them
+        working-directory: tools/tsmls-vector-gen
+        run: |
+          npm install --legacy-peer-deps
+          node verify-passive-client.mjs $RUNNER_TEMP/mls-kmp-passive.json
+
+      - name: OpenMLS replays them
+        run: tools/openmls-verifier/run.sh $RUNNER_TEMP/mls-kmp-passive.json

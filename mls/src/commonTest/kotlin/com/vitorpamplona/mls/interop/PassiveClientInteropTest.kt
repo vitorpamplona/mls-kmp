@@ -58,8 +58,27 @@ class PassiveClientInteropTest {
             .decodeFromString<List<PassiveClientVector>>(TestResourceLoader().loadString("mls/$name.json"))
             .filter { it.cipherSuite == 1 }
 
+    private fun runAll(name: String) {
+        val vectors = load(name)
+        assertTrue(vectors.isNotEmpty(), "No cipher_suite==1 $name vectors")
+        val failures = vectors.withIndex().mapNotNull { (i, v) -> PassiveClientRunner.run(v)?.let { "$name[$i]: $it" } }
+        assertTrue(failures.isEmpty(), "${failures.size} of ${vectors.size} vectors failed:\n" + failures.joinToString("\n"))
+    }
+
+    @Test
+    fun passiveClientWelcome() = runAll("passive-client-welcome")
+
+    @Test
+    fun passiveClientHandlingCommit() = runAll("passive-client-handling-commit")
+
+    @Test
+    fun passiveClientRandom() = runAll("passive-client-random")
+}
+
+/** Replays one passive-client vector through [MlsGroup] as the passive member. */
+internal object PassiveClientRunner {
     /** Runs one vector; returns null when it passes, or what went wrong. */
-    private fun run(v: PassiveClientVector): String? {
+    fun run(v: PassiveClientVector): String? {
         val kpMsg = MlsMessage.decodeTls(TlsReader(v.keyPackage.hexToByteArray()))
         check(kpMsg.wireFormat == WireFormat.KEY_PACKAGE)
         val kp = MlsKeyPackage.decodeTls(TlsReader(kpMsg.payload))
@@ -98,20 +117,4 @@ class PassiveClientInteropTest {
         }
         return null
     }
-
-    private fun runAll(name: String) {
-        val vectors = load(name)
-        assertTrue(vectors.isNotEmpty(), "No cipher_suite==1 $name vectors")
-        val failures = vectors.withIndex().mapNotNull { (i, v) -> run(v)?.let { "$name[$i]: $it" } }
-        assertTrue(failures.isEmpty(), "${failures.size} of ${vectors.size} vectors failed:\n" + failures.joinToString("\n"))
-    }
-
-    @Test
-    fun passiveClientWelcome() = runAll("passive-client-welcome")
-
-    @Test
-    fun passiveClientHandlingCommit() = runAll("passive-client-handling-commit")
-
-    @Test
-    fun passiveClientRandom() = runAll("passive-client-random")
 }

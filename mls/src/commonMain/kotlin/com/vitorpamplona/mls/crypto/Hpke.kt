@@ -291,19 +291,22 @@ class HpkeExportContext(
     private val exporterSecret: ByteArray,
 ) {
     /**
-     * Export a secret from the HPKE context.
-     * secret = LabeledExpand(exporter_secret, "sec", Hash(exporter_context), L)
+     * Export a secret from the HPKE context (RFC 9180 §5.3):
+     * secret = LabeledExpand(exporter_secret, "sec", exporter_context, L).
+     *
+     * The exporter context goes in as-is. Hashing it first is what
+     * MLS-Exporter does (RFC 9420 §8.5), not HPKE; doing it here gave an
+     * external joiner an init_secret no other implementation derives.
      */
     fun export(
         exporterContext: ByteArray,
         length: Int,
     ): ByteArray {
         val suiteId = Hpke.HPKE_SUITE_ID
-        val contextHash = MlsCryptoProvider.hash(exporterContext)
         return MlsCryptoProvider.hkdfExpand(
             exporterSecret,
             byteArrayOf((length shr 8).toByte(), length.toByte()) +
-                "HPKE-v1".encodeToByteArray() + suiteId + "sec".encodeToByteArray() + contextHash,
+                "HPKE-v1".encodeToByteArray() + suiteId + "sec".encodeToByteArray() + exporterContext,
             length,
         )
     }

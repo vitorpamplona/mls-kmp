@@ -153,7 +153,9 @@ class MlsConformanceTest {
         // Must contain external_pub extension (RFC 9420 §13.3: type 0x0004)
         val externalPubExt = decoded.extensions.find { it.extensionType == 0x0004 }
         assertTrue(externalPubExt != null, "GroupInfo must contain external_pub extension")
-        assertEquals(32, externalPubExt.extensionData.size, "external_pub must be 32 bytes (X25519)")
+        // ExternalPub { HPKEPublicKey external_pub; } is an opaque<V>: a length byte, then the 32-byte X25519 key.
+        assertEquals(33, externalPubExt.extensionData.size, "external_pub must be an opaque<V> X25519 key")
+        assertEquals(32, externalPubExt.extensionData[0].toInt())
     }
 
     @Test
@@ -396,7 +398,7 @@ class MlsConformanceTest {
         val groupInfo = group.groupInfo()
         // RFC 9420 §13.3: external_pub is extension type 0x0004.
         val extPubFromGI = groupInfo.extensions.find { it.extensionType == 0x0004 }
-        assertContentEquals(externalPub, extPubFromGI!!.extensionData)
+        assertContentEquals(externalPub, extPubFromGI!!.extensionData.copyOfRange(1, 33))
     }
 
     // -----------------------------------------------------------------------

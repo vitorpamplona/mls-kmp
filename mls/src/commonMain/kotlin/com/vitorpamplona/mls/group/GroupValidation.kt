@@ -20,10 +20,12 @@
  */
 package com.vitorpamplona.mls.group
 
+import com.vitorpamplona.mls.codec.TlsReader
 import com.vitorpamplona.mls.crypto.MlsCryptoProvider
 import com.vitorpamplona.mls.messages.GroupContext
 import com.vitorpamplona.mls.messages.MlsKeyPackage
 import com.vitorpamplona.mls.tree.BinaryTree
+import com.vitorpamplona.mls.tree.Credential
 import com.vitorpamplona.mls.tree.Extension
 import com.vitorpamplona.mls.tree.LeafNode
 import com.vitorpamplona.mls.tree.LeafNodeSource
@@ -53,6 +55,46 @@ internal object GroupValidation {
 
     /** Proposal types RFC 9420 §7.2 calls default (add … group_context_extensions). */
     val DEFAULT_PROPOSAL_TYPES = (1..7).toSet()
+
+    /** Where an extension list sits, for the RFC 9420 §17.3 "Message(s)" column. */
+    enum class ExtensionContext { GROUP_CONTEXT, LEAF_NODE, GROUP_INFO, KEY_PACKAGE }
+
+    /** The one message type each default extension may appear in (RFC 9420 §17.3). */
+    private val DEFAULT_EXTENSION_CONTEXT =
+        mapOf(
+            0x0001 to ExtensionContext.LEAF_NODE, // application_id
+            0x0002 to ExtensionContext.GROUP_INFO, // ratchet_tree
+            0x0003 to ExtensionContext.GROUP_CONTEXT, // required_capabilities
+            0x0004 to ExtensionContext.GROUP_INFO, // external_pub
+            0x0005 to ExtensionContext.GROUP_CONTEXT, // external_senders
+        )
+
+    /**
+     * An extension list must not repeat a type, a default extension may only
+     * appear in the message RFC 9420 §17.3 lists for it, and its data must be
+     * the struct the RFC defines. Other implementations parse the default
+     * extensions they find, so a malformed one makes the whole message
+     * unreadable to them.
+     */
+    fun validateExtensions(
+        extensions: List<Extension>,
+        context: ExtensionContext,
+    ) {
+        val seen = mutableSetOf<Int>()
+        for (ext in extensions) {
+            require(seen.add(ext.extensionType)) { "Extension type ${ext.extensionType} appears twice" }
+            val allowedIn = DEFAULT_EXTENSION_CONTEXT[ext.extensionType] ?: continue
+            require(allowedIn == context) { "Extension type ${ext.extensionType} may not appear in a $context" }
+            val reader = TlsReader(ext.extensionData)
+            when (ext.extensionType) {
+                0x0001, 0x0004 -> reader.readOpaqueVarInt()
+                0x0002 -> RatchetTree.decodeTls(reader)
+                0x0003 -> repeat(3) { reader.readOpaqueVarInt() }
+                0x0005 -> reader.readVectorVarInt { r -> r.readOpaqueVarInt().also { Credential.decodeTls(r) } }
+            }
+            reader.requireFullyConsumed("Extension ${ext.extensionType}")
+        }
+    }
 
     /**
      * RFC 9420 §7.3 LeafNode validation.
@@ -124,6 +166,7 @@ internal object GroupValidation {
             require(now.toULong() in lifetime.notBefore.toULong()..lifetime.notAfter.toULong()) { "KeyPackage lifetime expired or not yet valid" }
         }
 
+        validateExtensions(leaf.extensions, ExtensionContext.LEAF_NODE)
         for (ext in leaf.extensions) {
             require(ext.extensionType in DEFAULT_EXTENSION_TYPES || ext.extensionType in caps.extensions) {
                 "LeafNode carries extension ${ext.extensionType} its capabilities do not list"
@@ -152,6 +195,7 @@ internal object GroupValidation {
         require(!keyPackage.initKey.contentEquals(keyPackage.leafNode.encryptionKey)) {
             "KeyPackage init_key equals its leaf's encryption_key"
         }
+        validateExtensions(keyPackage.extensions, ExtensionContext.KEY_PACKAGE)
         validateLeafNode(keyPackage.leafNode, LeafNodeSource.KEY_PACKAGE, groupContext.groupId, null, tree, null, groupContext.extensions, policy, now)
     }
 
@@ -170,6 +214,7 @@ internal object GroupValidation {
         policy: MlsGroupPolicy,
     ) {
         require(tree.leafCount > 0) { "ratchet_tree is empty" }
+        validateExtensions(groupContext.extensions, ExtensionContext.GROUP_CONTEXT)
         require(tree.treeHash().contentEquals(groupContext.treeHash)) { "GroupInfo tree_hash does not match ratchet_tree" }
         MlsGroup.verifyTreeParentHashesForJoin(tree)?.let { reason ->
             throw IllegalStateException("ratchet_tree fails parent_hash validation: $reason")

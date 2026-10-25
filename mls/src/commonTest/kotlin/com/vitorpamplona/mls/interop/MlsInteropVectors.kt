@@ -303,6 +303,8 @@ data class WelcomeVector(
 @Serializable
 data class PassiveClientVector(
     @SerialName("cipher_suite") val cipherSuite: Int,
+    /** What the vector exercises; absent from the mlswg files, set by our own generator. */
+    val description: String = "",
     @SerialName("external_psks") val externalPsks: List<PassiveClientPsk> = emptyList(),
     @SerialName("key_package") val keyPackage: String,
     @SerialName("signature_priv") val signaturePriv: String,

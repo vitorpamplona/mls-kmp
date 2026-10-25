@@ -67,6 +67,15 @@ class RfcFlowsTest {
         return Trio(alice, MlsGroup.processWelcome(add.welcomeBytes!!, b), MlsGroup.processWelcome(add.welcomeBytes!!, c))
     }
 
+    /** A well-formed GroupContext extension every member satisfies: required_capabilities naming BasicCredential. */
+    private fun requiredBasicCredentials(): Extension {
+        val w = TlsWriter()
+        w.putOpaqueVarInt(ByteArray(0))
+        w.putOpaqueVarInt(ByteArray(0))
+        w.putOpaqueVarInt(byteArrayOf(0, 1))
+        return Extension(MlsGroup.REQUIRED_CAPABILITIES_EXTENSION_TYPE, w.toByteArray())
+    }
+
     private fun assertSameEpoch(vararg groups: MlsGroup) {
         val first = groups.first()
         for (g in groups) {
@@ -202,7 +211,7 @@ class RfcFlowsTest {
         val t = trio()
         val dave = keyPackage("dave")
         val add = t.bob.proposalMessage(Proposal.Add(dave.keyPackage))
-        val gce = t.carol.proposalMessage(Proposal.GroupContextExtensions(listOf(Extension(0x0001, "app".encodeToByteArray()))))
+        val gce = t.carol.proposalMessage(Proposal.GroupContextExtensions(listOf(requiredBasicCredentials())))
         t.alice.processMessage(add)
         t.carol.processMessage(add)
         t.alice.processMessage(gce)
@@ -212,13 +221,7 @@ class RfcFlowsTest {
         t.carol.processFramedCommit(commit.framedCommitBytes)
         val joined = MlsGroup.processWelcome(commit.welcomeBytes!!, dave)
         assertSameEpoch(t.alice, t.bob, t.carol, joined)
-        assertEquals(
-            "app",
-            joined.extensions
-                .single { it.extensionType == 0x0001 }
-                .extensionData
-                .decodeToString(),
-        )
+        assertEquals(listOf(1), MlsGroup.findRequiredCapabilities(joined.extensions)!!.credentials)
 
         val remove = t.bob.proposalMessage(Proposal.Remove(t.carol.leafIndex))
         t.alice.processMessage(remove)
@@ -400,5 +403,52 @@ class RfcFlowsTest {
         t.carol.processFramedCommit(commit.framedCommitBytes)
         assertSameEpoch(restored, t.carol)
         assertEquals(2, restored.memberCount)
+    }
+
+    @Test
+    fun aStagedCommitSurvivesARestart() {
+        val t = trio()
+        val staged = t.alice.stageCommit()
+        val restored = MlsGroup.restore(MlsGroupState.decodeTls(t.alice.saveState().encodeTls()))
+        assertTrue(restored.hasPendingCommit)
+        assertEquals(t.alice.epoch, restored.epoch)
+        t.bob.processFramedCommit(staged.framedCommitBytes)
+        // The delivery service's echo merges the restored staged commit.
+        restored.processFramedCommit(staged.framedCommitBytes)
+        assertSameEpoch(restored, t.bob)
+        assertTalk(restored, t.bob)
+    }
+
+    @Test
+    fun aRemovedMemberStaysRemovedWhenItsLeafIsReused() {
+        val t = trio()
+        val dave = keyPackage("dave")
+        // One commit removes Carol and adds Dave, who takes Carol's leaf.
+        t.alice.proposeRemove(t.carol.leafIndex)
+        t.alice.proposeAdd(dave.keyPackage.toTlsBytes())
+        val commit = t.alice.commit()
+        t.carol.processFramedCommit(commit.framedCommitBytes)
+        t.bob.processFramedCommit(commit.framedCommitBytes)
+        val joined = MlsGroup.processWelcome(commit.welcomeBytes!!, dave)
+        assertEquals(t.carol.leafIndex, joined.leafIndex)
+        assertFalse(t.carol.isLocalMember())
+        assertFalse(MlsGroup.restore(MlsGroupState.decodeTls(t.carol.saveState().encodeTls())).isLocalMember())
+        assertSameEpoch(t.alice, t.bob, joined)
+    }
+
+    @Test
+    fun aPolicyCanRefuseExternalJoins() {
+        val closed =
+            object : MlsGroupPolicy {
+                override fun authorizeExternalCommit(
+                    group: GroupView,
+                    joiner: com.vitorpamplona.mls.tree.LeafNode,
+                    resynced: com.vitorpamplona.mls.tree.LeafNode?,
+                ): Unit = throw IllegalStateException("no external joins")
+            }
+        val alice = MlsGroup.create("alice".encodeToByteArray(), policy = closed)
+        val join = MlsGroup.externalJoin(alice.groupInfo().toTlsBytes(), "zara".encodeToByteArray())
+        assertFailsWith<IllegalStateException> { alice.processFramedCommit(join.framedCommitBytes) }
+        assertEquals(0L, alice.epoch)
     }
 }
