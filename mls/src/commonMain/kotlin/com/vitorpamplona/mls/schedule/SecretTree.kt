@@ -43,9 +43,19 @@ import com.vitorpamplona.mls.tree.BinaryTree
  * application_secret_[N+1] = ExpandWithLabel(application_secret_[N], "secret", "", Hash.length)
  * ```
  */
-class SecretTree(
+public class SecretTree(
     encryptionSecret: ByteArray,
     private val leafCount: Int,
+    /**
+     * How many generations one message may jump a sender's ratchet ahead.
+     * Each step is a hash, and the generation comes from the (authenticated
+     * but sender-chosen) sender data, so this bounds the work one message can
+     * cause. A member that missed more messages than this cannot read the
+     * next one at this epoch.
+     */
+    private val maxForwardDistance: Int = DEFAULT_MAX_FORWARD_DISTANCE,
+    /** How many skipped generations' keys are kept for late, out-of-order messages. */
+    private val outOfOrderTolerance: Int = DEFAULT_OUT_OF_ORDER_TOLERANCE,
 ) {
     /** Per-sender ratchet state: (handshake generation, handshake secret, app generation, app secret) */
     private val senderState = mutableMapOf<Int, SenderRatchetState>()
@@ -86,35 +96,21 @@ class SecretTree(
             if (encryptionSecret.isNotEmpty()) it[BinaryTree.root(leafCount)] = encryptionSecret
         }
 
-    private companion object {
-        /** Maximum number of skipped key entries to retain (prevents unbounded memory growth). */
-        const val MAX_SKIPPED_KEYS = 1000
+    public companion object {
+        /** Default for [maxForwardDistance]; OpenMLS defaults to 1000. */
+        public const val DEFAULT_MAX_FORWARD_DISTANCE: Int = 4096
+
+        /** Default for [outOfOrderTolerance]. */
+        public const val DEFAULT_OUT_OF_ORDER_TOLERANCE: Int = 1000
 
         /** Maximum consumed generation entries to track per sender before pruning. */
-        const val MAX_CONSUMED_GENERATIONS_PER_SENDER = 1000
-
-        /**
-         * Hard cap on how many ratchet steps a single decrypt request may
-         * fast-forward through. Without this an attacker who can deliver a
-         * single PrivateMessage with a forged `generation` field can force
-         * the receiver into ~`generation` HKDF-Expand steps — trivially
-         * many seconds of CPU per packet. The skipped-key cache itself
-         * stops at [MAX_SKIPPED_KEYS] entries, but the ratchet keeps
-         * advancing past that point, so the cache cap doesn't bound
-         * compute cost.
-         *
-         * 4096 leaves room for a realistic application/handshake gap
-         * (e.g. mobile catching up after a long sleep) while making the
-         * attack worst-case ~4096 SHA-256 invocations — bounded enough
-         * that the receiver stays responsive.
-         */
-        const val MAX_RATCHET_STEPS_PER_CALL = 4096
+        private const val MAX_CONSUMED_GENERATIONS_PER_SENDER = 1000
     }
 
     /**
      * Get the next (key, nonce) for application messages from a given sender.
      */
-    fun nextApplicationKeyNonce(leafIndex: Int): KeyNonceGeneration {
+    public fun nextApplicationKeyNonce(leafIndex: Int): KeyNonceGeneration {
         val state = getOrInitSender(leafIndex)
         val result = deriveKeyNonce(state.applicationSecret, state.applicationGeneration)
 
@@ -138,7 +134,7 @@ class SecretTree(
     /**
      * Get the next (key, nonce) for handshake messages from a given sender.
      */
-    fun nextHandshakeKeyNonce(leafIndex: Int): KeyNonceGeneration {
+    public fun nextHandshakeKeyNonce(leafIndex: Int): KeyNonceGeneration {
         val state = getOrInitSender(leafIndex)
         val result = deriveKeyNonce(state.handshakeSecret, state.handshakeGeneration)
 
@@ -166,7 +162,7 @@ class SecretTree(
      * are cached in [skippedKeys] so that out-of-order messages arriving later
      * can still be decrypted.
      */
-    fun applicationKeyNonceForGeneration(
+    public fun applicationKeyNonceForGeneration(
         leafIndex: Int,
         generation: Int,
     ): KeyNonceGeneration {
@@ -195,10 +191,10 @@ class SecretTree(
         // DoS guard: a malicious sender can put any uint32 in the
         // PrivateMessage generation field, and without this cap a single
         // packet would force unbounded HKDF-Expand work. See
-        // MAX_RATCHET_STEPS_PER_CALL.
-        require(generation - state.applicationGeneration <= MAX_RATCHET_STEPS_PER_CALL) {
+        // maxForwardDistance.
+        require(generation - state.applicationGeneration <= maxForwardDistance) {
             "Application generation jump too large: " +
-                "${generation - state.applicationGeneration} steps (cap $MAX_RATCHET_STEPS_PER_CALL); " +
+                "${generation - state.applicationGeneration} steps (cap $maxForwardDistance); " +
                 "sender $leafIndex from ${state.applicationGeneration} to $generation"
         }
 
@@ -221,7 +217,7 @@ class SecretTree(
         while (gen < generation) {
             // Save the intermediate generation's secret for later out-of-order retrieval
             val cacheKey = Pair(leafIndex, gen)
-            if (skippedKeys.size < MAX_SKIPPED_KEYS) {
+            if (skippedKeys.size < outOfOrderTolerance) {
                 skippedKeys[cacheKey] = secret
             }
             secret = MlsCryptoProvider.expandWithLabel(secret, "secret", generationContext(gen), MlsCryptoProvider.HASH_OUTPUT_LENGTH)
@@ -251,7 +247,7 @@ class SecretTree(
      * ratchet-forward the handshake chain when decrypting an inbound
      * PrivateMessage commit.
      */
-    fun handshakeKeyNonceForGeneration(
+    public fun handshakeKeyNonceForGeneration(
         leafIndex: Int,
         generation: Int,
     ): KeyNonceGeneration {
@@ -280,9 +276,9 @@ class SecretTree(
                 "Handshake generation $generation already consumed (current: ${state.handshakeGeneration})",
             )
         }
-        require(generation - state.handshakeGeneration <= MAX_RATCHET_STEPS_PER_CALL) {
+        require(generation - state.handshakeGeneration <= maxForwardDistance) {
             "Handshake generation jump too large: " +
-                "${generation - state.handshakeGeneration} steps (cap $MAX_RATCHET_STEPS_PER_CALL); " +
+                "${generation - state.handshakeGeneration} steps (cap $maxForwardDistance); " +
                 "sender $leafIndex from ${state.handshakeGeneration} to $generation"
         }
 
@@ -306,7 +302,7 @@ class SecretTree(
         var gen = state.handshakeGeneration
         while (gen < generation) {
             val cacheKey = Pair(leafIndex, gen)
-            if (handshakeSkippedKeys.size < MAX_SKIPPED_KEYS) {
+            if (handshakeSkippedKeys.size < outOfOrderTolerance) {
                 handshakeSkippedKeys[cacheKey] = secret
             }
             secret = MlsCryptoProvider.expandWithLabel(secret, "secret", generationContext(gen), MlsCryptoProvider.HASH_OUTPUT_LENGTH)
@@ -453,7 +449,7 @@ class SecretTree(
      * captured. The replay-detection and skipped-key caches are runtime-only
      * and deliberately excluded — they are safe to drop across a restart.
      */
-    fun exportSenderStates(): Map<Int, SenderRatchetState> = senderState.toMap()
+    public fun exportSenderStates(): Map<Int, SenderRatchetState> = senderState.toMap()
 
     /**
      * Seed per-sender ratchet positions from an [exportSenderStates]
@@ -461,7 +457,7 @@ class SecretTree(
      * [states] simply re-derives from generation 0 on first use, which is
      * correct for receive-only ratchets.
      */
-    fun importSenderStates(states: Map<Int, SenderRatchetState>) {
+    public fun importSenderStates(states: Map<Int, SenderRatchetState>) {
         senderState.putAll(states)
     }
 
@@ -472,31 +468,31 @@ class SecretTree(
      * past these generations, so a message that was skipped before a restart
      * can only be opened after it if its secret survives.
      */
-    fun exportSkippedApplicationSecrets(): Map<Pair<Int, Int>, ByteArray> = skippedKeys.toMap()
+    public fun exportSkippedApplicationSecrets(): Map<Pair<Int, Int>, ByteArray> = skippedKeys.toMap()
 
     /** Same for the HANDSHAKE ratchet. */
-    fun exportSkippedHandshakeSecrets(): Map<Pair<Int, Int>, ByteArray> = handshakeSkippedKeys.toMap()
+    public fun exportSkippedHandshakeSecrets(): Map<Pair<Int, Int>, ByteArray> = handshakeSkippedKeys.toMap()
 
     /** Tree-node secrets not expanded yet, by node index (ts-mls `intermediateNodes`). */
-    fun exportNodeSecrets(): Map<Int, ByteArray> = nodeSecrets.toMap()
+    public fun exportNodeSecrets(): Map<Int, ByteArray> = nodeSecrets.toMap()
 
     /** Replaces the unexpanded node secrets, e.g. with a state saved by another implementation. */
-    fun importNodeSecrets(secrets: Map<Int, ByteArray>) {
+    public fun importNodeSecrets(secrets: Map<Int, ByteArray>) {
         nodeSecrets.clear()
         nodeSecrets.putAll(secrets)
     }
 
     /** Restores skipped-generation secrets, up to the usual cache bound per ratchet. */
-    fun importSkippedSecrets(
+    public fun importSkippedSecrets(
         application: Map<Pair<Int, Int>, ByteArray>,
         handshake: Map<Pair<Int, Int>, ByteArray>,
     ) {
-        for ((k, v) in application) if (skippedKeys.size < MAX_SKIPPED_KEYS) skippedKeys[k] = v
-        for ((k, v) in handshake) if (handshakeSkippedKeys.size < MAX_SKIPPED_KEYS) handshakeSkippedKeys[k] = v
+        for ((k, v) in application) if (skippedKeys.size < outOfOrderTolerance) skippedKeys[k] = v
+        for ((k, v) in handshake) if (handshakeSkippedKeys.size < outOfOrderTolerance) handshakeSkippedKeys[k] = v
     }
 }
 
-data class SenderRatchetState(
+public data class SenderRatchetState(
     val handshakeSecret: ByteArray,
     val handshakeGeneration: Int,
     val applicationSecret: ByteArray,
@@ -512,7 +508,7 @@ data class SenderRatchetState(
     override fun hashCode(): Int = 31 * handshakeGeneration + applicationGeneration
 }
 
-data class KeyNonceGeneration(
+public data class KeyNonceGeneration(
     val key: ByteArray,
     val nonce: ByteArray,
     val generation: Int,
@@ -541,10 +537,10 @@ data class KeyNonceGeneration(
  * [IllegalArgumentException] with the same messages as the `require`s it
  * replaces, so existing catch sites keep working.
  */
-class StaleGenerationException(
-    val leafIndex: Int,
-    val generation: Int,
+public class StaleGenerationException(
+    public val leafIndex: Int,
+    public val generation: Int,
     /** The sender's next expected generation, or null for a replay caught by the consumed set. */
-    val current: Int?,
+    public val current: Int?,
     message: String,
 ) : IllegalArgumentException(message)

@@ -42,7 +42,7 @@ import com.vitorpamplona.mls.codec.TlsWriter
  * it needs the bundle by itself. Neither binding is the right home for a codec
  * over a plain RFC 9420 structure, so it lives here with the structure.
  */
-object KeyPackageBundleCodec {
+public object KeyPackageBundleCodec {
     /**
      * Bumped only for a breaking layout change.
      *
@@ -51,9 +51,9 @@ object KeyPackageBundleCodec {
      * is silently wrong, which surfaces much later as a Welcome that will not
      * open.
      */
-    const val VERSION = 1
+    public const val VERSION: Int = 1
 
-    fun encode(bundle: KeyPackageBundle): ByteArray {
+    public fun encode(bundle: KeyPackageBundle): ByteArray {
         val writer = TlsWriter()
         writer.putUint16(VERSION)
         writer.putOpaque4(bundle.keyPackage.toTlsBytes())
@@ -63,7 +63,7 @@ object KeyPackageBundleCodec {
         return writer.toByteArray()
     }
 
-    fun decode(bytes: ByteArray): KeyPackageBundle {
+    public fun decode(bytes: ByteArray): KeyPackageBundle {
         val reader = TlsReader(bytes)
         val version = reader.readUint16()
         require(version == VERSION) { "unknown KeyPackageBundle layout version $version" }
@@ -72,6 +72,6 @@ object KeyPackageBundleCodec {
             initPrivateKey = reader.readOpaque2(),
             encryptionPrivateKey = reader.readOpaque2(),
             signaturePrivateKey = reader.readOpaque2(),
-        )
+        ).also { reader.requireFullyConsumed("KeyPackageBundle") }
     }
 }

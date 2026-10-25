@@ -50,7 +50,7 @@ import com.vitorpamplona.mls.tree.LeafNode
  * } KeyPackage;
  * ```
  */
-data class MlsKeyPackage(
+public data class MlsKeyPackage(
     val version: Int = 1,
     val cipherSuite: Int = 1,
     val initKey: ByteArray,
@@ -71,7 +71,7 @@ data class MlsKeyPackage(
      * Compute the KeyPackage reference (RFC 9420 Section 5.2).
      * Used to identify which KeyPackage was consumed.
      */
-    fun reference(): ByteArray {
+    public fun reference(): ByteArray {
         val encoded = toTlsBytes()
         return MlsCryptoProvider.refHash("MLS 1.0 KeyPackage Reference", encoded)
     }
@@ -91,14 +91,14 @@ data class MlsKeyPackage(
      * Anything that consumes a KeyPackage has to check this before discarding
      * the bundle.
      */
-    fun isLastResort(): Boolean =
+    public fun isLastResort(): Boolean =
         extensions.any { it.extensionType == LAST_RESORT_EXTENSION_TYPE } ||
             AppDataDictionary.fromExtensionsOrEmpty(extensions).contains(ComponentsList.LAST_RESORT_KEY_PACKAGE_ID)
 
     /**
      * Encode the TBS (to-be-signed) portion for signature verification.
      */
-    fun encodeTbs(): ByteArray {
+    public fun encodeTbs(): ByteArray {
         val writer = TlsWriter()
         writer.putUint16(version)
         writer.putUint16(cipherSuite)
@@ -112,7 +112,7 @@ data class MlsKeyPackage(
      * Verify the KeyPackage signature (RFC 9420 Section 10).
      * The signature is over KeyPackageTBS using the LeafNode's signature key.
      */
-    fun verifySignature(): Boolean {
+    public fun verifySignature(): Boolean {
         val tbs = encodeTbs()
         return MlsCryptoProvider.verifyWithLabel(
             leafNode.signatureKey,
@@ -138,14 +138,14 @@ data class MlsKeyPackage(
         return result
     }
 
-    companion object {
+    public companion object {
         /**
          * `last_resort` KeyPackage extension (MLS Extensions draft). Marks a
          * KeyPackage as reusable rather than single-use.
          */
-        const val LAST_RESORT_EXTENSION_TYPE = 0x000A
+        public const val LAST_RESORT_EXTENSION_TYPE: Int = 0x000A
 
-        fun decodeTls(reader: TlsReader): MlsKeyPackage {
+        public fun decodeTls(reader: TlsReader): MlsKeyPackage {
             val version = reader.readUint16()
             require(version == 1) { "Unsupported MLS version: $version" }
             val cipherSuite = reader.readUint16()
@@ -166,9 +166,12 @@ data class MlsKeyPackage(
 
 /**
  * A KeyPackage bundled with its private keys (for the owner).
- * Never serialized to wire — kept locally for processing Welcome messages.
+ *
+ * Kept locally until a Welcome for [keyPackage] arrives, which may be days
+ * after it was published: [KeyPackageBundleCodec] gives the bytes to keep, and
+ * they hold private keys, so store them as carefully as group state. Never sent.
  */
-data class KeyPackageBundle(
+public data class KeyPackageBundle(
     val keyPackage: MlsKeyPackage,
     val initPrivateKey: ByteArray,
     val encryptionPrivateKey: ByteArray,

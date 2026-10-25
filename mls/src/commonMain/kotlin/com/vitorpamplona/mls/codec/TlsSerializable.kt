@@ -24,10 +24,10 @@ package com.vitorpamplona.mls.codec
  * Interface for types that can be serialized to TLS presentation language
  * encoding as defined in RFC 8446 Section 3 and used by MLS (RFC 9420).
  */
-interface TlsSerializable {
-    fun encodeTls(writer: TlsWriter)
+public interface TlsSerializable {
+    public fun encodeTls(writer: TlsWriter)
 
-    fun toTlsBytes(): ByteArray {
+    public fun toTlsBytes(): ByteArray {
         val writer = TlsWriter()
         encodeTls(writer)
         return writer.toByteArray()

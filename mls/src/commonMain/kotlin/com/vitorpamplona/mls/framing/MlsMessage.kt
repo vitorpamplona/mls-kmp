@@ -50,7 +50,7 @@ import com.vitorpamplona.mls.messages.Proposal
  * } MLSMessage;
  * ```
  */
-data class MlsMessage(
+public data class MlsMessage(
     val version: Int = MLS_VERSION_10,
     val wireFormat: WireFormat,
     val payload: ByteArray,
@@ -74,10 +74,10 @@ data class MlsMessage(
         return result
     }
 
-    companion object {
-        const val MLS_VERSION_10 = 1
+    public companion object {
+        public const val MLS_VERSION_10: Int = 1
 
-        fun decodeTls(reader: TlsReader): MlsMessage {
+        public fun decodeTls(reader: TlsReader): MlsMessage {
             val version = reader.readUint16()
             require(version == MLS_VERSION_10) { "Unsupported MLS version: $version" }
             val wireFormat = WireFormat.fromValue(reader.readUint16())
@@ -87,12 +87,12 @@ data class MlsMessage(
             return MlsMessage(version, wireFormat, payload)
         }
 
-        fun fromPublicMessage(publicMessage: PublicMessage): MlsMessage {
+        public fun fromPublicMessage(publicMessage: PublicMessage): MlsMessage {
             val payload = publicMessage.toTlsBytes()
             return MlsMessage(MLS_VERSION_10, WireFormat.PUBLIC_MESSAGE, payload)
         }
 
-        fun fromPrivateMessage(privateMessage: PrivateMessage): MlsMessage {
+        public fun fromPrivateMessage(privateMessage: PrivateMessage): MlsMessage {
             val payload = privateMessage.toTlsBytes()
             return MlsMessage(MLS_VERSION_10, WireFormat.PRIVATE_MESSAGE, payload)
         }
@@ -104,7 +104,7 @@ data class MlsMessage(
  *
  * This includes the wire_format, content fields, and group context.
  */
-data class FramedContentTbs(
+public data class FramedContentTbs(
     val version: Int = MlsMessage.MLS_VERSION_10,
     val wireFormat: WireFormat,
     val groupId: ByteArray,
@@ -146,7 +146,7 @@ data class FramedContentTbs(
  * Cleartext message format used for Proposals and some Commits.
  * Contains the content, membership MAC, and signature.
  */
-data class PublicMessage(
+public data class PublicMessage(
     val groupId: ByteArray,
     val epoch: Long,
     val sender: Sender,
@@ -195,43 +195,27 @@ data class PublicMessage(
 
     override fun hashCode(): Int = groupId.contentHashCode()
 
-    companion object {
-        /** Same DoS cap that PrivateMessage applies to its AAD field. */
-        const val MAX_AUTHENTICATED_DATA_BYTES = 1 shl 16 // 64 KiB
+    public companion object {
+        /** No longer enforced: `authenticated_data` is bounded by the message carrying it. */
+        @Deprecated("No longer enforced")
+        public const val MAX_AUTHENTICATED_DATA_BYTES: Int = 1 shl 16 // 64 KiB
 
-        fun decodeTls(reader: TlsReader): PublicMessage {
+        public fun decodeTls(reader: TlsReader): PublicMessage {
             val groupId = reader.readOpaqueVarInt()
             val epoch = reader.readUint64()
             val sender = decodeSender(reader)
             val authenticatedData = reader.readOpaqueVarInt()
-            require(authenticatedData.size <= MAX_AUTHENTICATED_DATA_BYTES) {
-                "PublicMessage authenticated_data too large: ${authenticatedData.size} > $MAX_AUTHENTICATED_DATA_BYTES"
-            }
             val contentType = ContentType.fromValue(reader.readUint8())
 
             // RFC 9420 §6 FramedContent.content body varies by content_type.
-            // For PROPOSAL/COMMIT we decode the inner struct to advance the reader
-            // and then re-serialize back to bytes so the invariant
-            // "content holds the serialized body" holds for all variants.
+            // For PROPOSAL/COMMIT the struct is decoded to find where it ends,
+            // and its received bytes are kept as-is: the signature, the
+            // membership tag and a ProposalRef all cover those exact bytes.
             val content: ByteArray =
                 when (contentType) {
-                    ContentType.APPLICATION -> {
-                        reader.readOpaqueVarInt()
-                    }
-
-                    ContentType.PROPOSAL -> {
-                        val proposal = Proposal.decodeTls(reader)
-                        val w = TlsWriter()
-                        proposal.encodeTls(w)
-                        w.toByteArray()
-                    }
-
-                    ContentType.COMMIT -> {
-                        val commit = Commit.decodeTls(reader)
-                        val w = TlsWriter()
-                        commit.encodeTls(w)
-                        w.toByteArray()
-                    }
+                    ContentType.APPLICATION -> reader.readOpaqueVarInt()
+                    ContentType.PROPOSAL -> reader.readCapturing { Proposal.decodeTls(it) }.second
+                    ContentType.COMMIT -> reader.readCapturing { Commit.decodeTls(it) }.second
                 }
             val signature = reader.readOpaqueVarInt()
 
@@ -242,8 +226,9 @@ data class PublicMessage(
                     null
                 }
 
+            // RFC 9420 §6.2: membership_tag is present exactly when the sender is a member.
             val membershipTag =
-                if (sender.senderType == SenderType.MEMBER && reader.hasRemaining) {
+                if (sender.senderType == SenderType.MEMBER) {
                     reader.readOpaqueVarInt()
                 } else {
                     null
@@ -269,7 +254,7 @@ data class PublicMessage(
  *
  * Encrypted message format used for application data and some commits.
  */
-data class PrivateMessage(
+public data class PrivateMessage(
     val groupId: ByteArray,
     val epoch: Long,
     val contentType: ContentType,
@@ -294,38 +279,19 @@ data class PrivateMessage(
 
     override fun hashCode(): Int = groupId.contentHashCode()
 
-    companion object {
-        /**
-         * Per-field DoS cap for `authenticated_data` and
-         * `encrypted_sender_data`. The underlying [TlsReader] already
-         * refuses any opaque<V> field larger than 1 MiB (its global
-         * `MAX_OPAQUE_SIZE`), but those fields shouldn't carry anything
-         * close to that — `encrypted_sender_data` is always exactly the
-         * sender-data AEAD ciphertext (a couple hundred bytes), and
-         * Marmot doesn't put anything in `authenticated_data` today.
-         * Tightening to 64 KiB makes the per-frame memory floor
-         * predictable and turns "we'd allocate up to 3 MiB on every
-         * inbound packet that escapes verification" into "we'll
-         * allocate at most ~1 MiB even before AEAD."
-         */
-        const val MAX_AAD_BYTES = 1 shl 16 // 64 KiB
+    public companion object {
+        /** No longer enforced: these fields are bounded by the message carrying them. */
+        @Deprecated("No longer enforced")
+        public const val MAX_AAD_BYTES: Int = 1 shl 16 // 64 KiB
 
-        fun decodeTls(reader: TlsReader): PrivateMessage {
+        public fun decodeTls(reader: TlsReader): PrivateMessage {
             val groupId = reader.readOpaqueVarInt()
             val epoch = reader.readUint64()
             val contentType = ContentType.fromValue(reader.readUint8())
+            // Every field is bounded by the message itself; RFC 9420 sets no
+            // smaller limit, and other implementations send what it allows.
             val authenticatedData = reader.readOpaqueVarInt()
-            require(authenticatedData.size <= MAX_AAD_BYTES) {
-                "PrivateMessage authenticated_data too large: ${authenticatedData.size} > $MAX_AAD_BYTES"
-            }
             val encryptedSenderData = reader.readOpaqueVarInt()
-            require(encryptedSenderData.size <= MAX_AAD_BYTES) {
-                "PrivateMessage encrypted_sender_data too large: ${encryptedSenderData.size} > $MAX_AAD_BYTES"
-            }
-            // `ciphertext` size is bounded by [TlsReader.MAX_OPAQUE_SIZE]
-            // (1 MiB) — which dominates any peer-side practical limit
-            // (Marmot kind:445 events ride a Nostr relay's per-event
-            // ceiling, typically 64 KiB). No tighter cap needed here.
             val ciphertext = reader.readOpaqueVarInt()
             return PrivateMessage(
                 groupId = groupId,
@@ -363,7 +329,7 @@ internal fun decodeSender(reader: TlsReader): Sender {
     val senderType = SenderType.fromValue(reader.readUint8())
     val leafIndex =
         when (senderType) {
-            SenderType.MEMBER, SenderType.EXTERNAL -> reader.readUint32().toInt()
+            SenderType.MEMBER, SenderType.EXTERNAL -> reader.readIndex()
             else -> 0
         }
     return Sender(senderType, leafIndex)

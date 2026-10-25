@@ -32,7 +32,7 @@ package com.vitorpamplona.mls.codec
  * - Variable-length vectors with 1, 2, or 4 byte length prefixes
  * - Nested struct serialization via TlsSerializable
  */
-class TlsWriter(
+public class TlsWriter(
     initialCapacity: Int = 256,
 ) {
     private var buffer = ByteArray(initialCapacity)
@@ -46,20 +46,20 @@ class TlsWriter(
         }
     }
 
-    fun putUint8(value: Int) {
+    public fun putUint8(value: Int) {
         require(value in 0..0xFF) { "uint8 out of range: $value" }
         ensureCapacity(1)
         buffer[position++] = value.toByte()
     }
 
-    fun putUint16(value: Int) {
+    public fun putUint16(value: Int) {
         require(value in 0..0xFFFF) { "uint16 out of range: $value" }
         ensureCapacity(2)
         buffer[position++] = (value shr 8).toByte()
         buffer[position++] = value.toByte()
     }
 
-    fun putUint32(value: Long) {
+    public fun putUint32(value: Long) {
         require(value in 0..0xFFFFFFFFL) { "uint32 out of range: $value" }
         ensureCapacity(4)
         buffer[position++] = (value shr 24).toByte()
@@ -68,7 +68,7 @@ class TlsWriter(
         buffer[position++] = value.toByte()
     }
 
-    fun putUint64(value: Long) {
+    public fun putUint64(value: Long) {
         ensureCapacity(8)
         buffer[position++] = (value ushr 56).toByte()
         buffer[position++] = (value ushr 48).toByte()
@@ -81,28 +81,28 @@ class TlsWriter(
     }
 
     /** Write raw bytes without any length prefix (fixed-size opaque) */
-    fun putBytes(data: ByteArray) {
+    public fun putBytes(data: ByteArray) {
         ensureCapacity(data.size)
         data.copyInto(buffer, position)
         position += data.size
     }
 
     /** Write a variable-length opaque with a 1-byte length prefix (max 255 bytes) */
-    fun putOpaque1(data: ByteArray) {
+    public fun putOpaque1(data: ByteArray) {
         require(data.size <= 0xFF) { "opaque<1> too large: ${data.size}" }
         putUint8(data.size)
         putBytes(data)
     }
 
     /** Write a variable-length opaque with a 2-byte length prefix (max 65535 bytes) */
-    fun putOpaque2(data: ByteArray) {
+    public fun putOpaque2(data: ByteArray) {
         require(data.size <= 0xFFFF) { "opaque<2> too large: ${data.size}" }
         putUint16(data.size)
         putBytes(data)
     }
 
     /** Write a variable-length opaque with a 4-byte length prefix (max 2^32-1 bytes) */
-    fun putOpaque4(data: ByteArray) {
+    public fun putOpaque4(data: ByteArray) {
         putUint32(data.size.toLong())
         putBytes(data)
     }
@@ -114,18 +114,23 @@ class TlsWriter(
      * - 64..16383: 2 bytes (14-bit value, 2-bit prefix 01)
      * - 16384..1073741823: 4 bytes (30-bit value, 2-bit prefix 10)
      */
-    fun putOpaqueVarInt(data: ByteArray) {
-        val len = data.size
-        when {
-            len < 64 -> putUint8(len)
-            len < 16384 -> putUint16(len or 0x4000)
-            else -> putUint32((len.toLong() or 0x80000000L))
-        }
+    public fun putOpaqueVarInt(data: ByteArray) {
+        putVarInt(data.size)
         putBytes(data)
     }
 
+    /** Write a variable-length integer in its minimal encoding (RFC 9420 §2.1.2). */
+    public fun putVarInt(value: Int) {
+        require(value in 0..0x3FFFFFFF) { "VarInt out of range: $value" }
+        when {
+            value < 64 -> putUint8(value)
+            value < 16384 -> putUint16(value or 0x4000)
+            else -> putUint32((value.toLong() or 0x80000000L))
+        }
+    }
+
     /** Write a TLS-serializable struct */
-    fun putStruct(value: TlsSerializable) {
+    public fun putStruct(value: TlsSerializable) {
         value.encodeTls(this)
     }
 
@@ -133,7 +138,7 @@ class TlsWriter(
      * Write a variable-length vector of TLS-serializable items with a 4-byte length prefix.
      * The length prefix covers the total byte length of all serialized items.
      */
-    fun putVector4(items: List<TlsSerializable>) {
+    public fun putVector4(items: List<TlsSerializable>) {
         val inner = TlsWriter()
         for (item in items) {
             item.encodeTls(inner)
@@ -144,7 +149,7 @@ class TlsWriter(
     /**
      * Write a variable-length vector with VarInt length prefix.
      */
-    fun putVectorVarInt(items: List<TlsSerializable>) {
+    public fun putVectorVarInt(items: List<TlsSerializable>) {
         val inner = TlsWriter()
         for (item in items) {
             item.encodeTls(inner)
@@ -155,7 +160,7 @@ class TlsWriter(
     /**
      * Write a variable-length vector of TLS-serializable items with a 2-byte length prefix.
      */
-    fun putVector2(items: List<TlsSerializable>) {
+    public fun putVector2(items: List<TlsSerializable>) {
         val inner = TlsWriter()
         for (item in items) {
             item.encodeTls(inner)
@@ -166,7 +171,7 @@ class TlsWriter(
     /**
      * Write a variable-length vector of TLS-serializable items with a 1-byte length prefix.
      */
-    fun putVector1(items: List<TlsSerializable>) {
+    public fun putVector1(items: List<TlsSerializable>) {
         val inner = TlsWriter()
         for (item in items) {
             item.encodeTls(inner)
@@ -177,7 +182,7 @@ class TlsWriter(
     /**
      * Write an optional value. MLS uses uint8(1) + value for present, uint8(0) for absent.
      */
-    fun putOptional(value: TlsSerializable?) {
+    public fun putOptional(value: TlsSerializable?) {
         if (value != null) {
             putUint8(1)
             putStruct(value)
@@ -186,7 +191,7 @@ class TlsWriter(
         }
     }
 
-    fun toByteArray(): ByteArray = buffer.copyOfRange(0, position)
+    public fun toByteArray(): ByteArray = buffer.copyOfRange(0, position)
 
-    val size: Int get() = position
+    public val size: Int get() = position
 }

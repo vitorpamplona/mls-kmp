@@ -39,26 +39,26 @@ import com.vitorpamplona.mls.codec.TlsWriter
  *
  * Ed25519 and X25519 come from crypto-kmp.
  */
-object MlsCryptoProvider {
+public object MlsCryptoProvider {
     // Ciphersuite 0x0001 constants
-    const val HASH_OUTPUT_LENGTH = 32 // SHA-256
-    const val KEM_SECRET_LENGTH = 32 // X25519
-    const val AEAD_KEY_LENGTH = 16 // AES-128-GCM
-    const val AEAD_NONCE_LENGTH = 12
-    const val SIGNATURE_PUBLIC_KEY_LENGTH = 32 // Ed25519
-    const val SIGNATURE_SECRET_KEY_LENGTH = 64 // Ed25519 (seed + public)
-    const val KEM_PUBLIC_KEY_LENGTH = 32 // X25519
-    const val KEM_SECRET_KEY_LENGTH = 32 // X25519
+    public const val HASH_OUTPUT_LENGTH: Int = 32 // SHA-256
+    public const val KEM_SECRET_LENGTH: Int = 32 // X25519
+    public const val AEAD_KEY_LENGTH: Int = 16 // AES-128-GCM
+    public const val AEAD_NONCE_LENGTH: Int = 12
+    public const val SIGNATURE_PUBLIC_KEY_LENGTH: Int = 32 // Ed25519
+    public const val SIGNATURE_SECRET_KEY_LENGTH: Int = 64 // Ed25519 (seed + public)
+    public const val KEM_PUBLIC_KEY_LENGTH: Int = 32 // X25519
+    public const val KEM_SECRET_KEY_LENGTH: Int = 32 // X25519
 
     private val hkdf = Hkdf("HmacSHA256")
 
     // --- Hash ---
 
-    fun hash(data: ByteArray): ByteArray = sha256(data)
+    public fun hash(data: ByteArray): ByteArray = sha256(data)
 
     // --- HKDF ---
 
-    fun hkdfExtract(
+    public fun hkdfExtract(
         salt: ByteArray,
         ikm: ByteArray,
     ): ByteArray = hkdf.extract(ikm, salt)
@@ -78,7 +78,7 @@ object MlsCryptoProvider {
      * Both the label and the context use the QUIC-style variable-length
      * integer (`<V>`) prefix defined in RFC 9420 Section 2.1.
      */
-    fun expandWithLabel(
+    public fun expandWithLabel(
         secret: ByteArray,
         label: String,
         context: ByteArray,
@@ -96,7 +96,7 @@ object MlsCryptoProvider {
      * ExpandWithLabel variant that accepts a raw byte array label.
      * The "MLS 1.0 " prefix is prepended to the raw label bytes.
      */
-    fun expandWithLabelRaw(
+    public fun expandWithLabelRaw(
         secret: ByteArray,
         label: ByteArray,
         context: ByteArray,
@@ -115,7 +115,7 @@ object MlsCryptoProvider {
      * MLS DeriveSecret (RFC 9420 Section 8):
      * DeriveSecret(Secret, Label) = ExpandWithLabel(Secret, Label, "", Nh)
      */
-    fun deriveSecret(
+    public fun deriveSecret(
         secret: ByteArray,
         label: String,
     ): ByteArray = expandWithLabel(secret, label, ByteArray(0), HASH_OUTPUT_LENGTH)
@@ -124,7 +124,7 @@ object MlsCryptoProvider {
      * RefHash (RFC 9420 Section 5.2): Hash of a labeled TLS-serialized value.
      * RefHash(label, value) = Hash(label_len || label || value_len || value)
      */
-    fun refHash(
+    public fun refHash(
         label: String,
         value: ByteArray,
     ): ByteArray {
@@ -137,14 +137,14 @@ object MlsCryptoProvider {
 
     // --- AEAD (AES-128-GCM) ---
 
-    fun aeadEncrypt(
+    public fun aeadEncrypt(
         key: ByteArray,
         nonce: ByteArray,
         aad: ByteArray,
         plaintext: ByteArray,
     ): ByteArray = AESGCM(key, nonce).encrypt(plaintext, aad)
 
-    fun aeadDecrypt(
+    public fun aeadDecrypt(
         key: ByteArray,
         nonce: ByteArray,
         aad: ByteArray,
@@ -153,7 +153,7 @@ object MlsCryptoProvider {
 
     // --- Random ---
 
-    fun randomBytes(length: Int): ByteArray = RandomInstance.bytes(length)
+    public fun randomBytes(length: Int): ByteArray = RandomInstance.bytes(length)
 
     // --- HKDF-Expand (general) ---
 
@@ -161,7 +161,7 @@ object MlsCryptoProvider {
      * HKDF-Expand using HMAC-SHA256. Supports arbitrary output length.
      * Implementation per RFC 5869 Section 2.3.
      */
-    fun hkdfExpand(
+    public fun hkdfExpand(
         prk: ByteArray,
         info: ByteArray,
         length: Int,
@@ -190,7 +190,7 @@ object MlsCryptoProvider {
      * SignWithLabel(SignatureKey, Label, Content):
      * Signs the TLS-serialized SignContent structure.
      */
-    fun signWithLabel(
+    public fun signWithLabel(
         signatureKey: ByteArray,
         label: String,
         content: ByteArray,
@@ -203,7 +203,7 @@ object MlsCryptoProvider {
      * VerifyWithLabel(VerificationKey, Label, Content, Signature):
      * Verifies signature over TLS-serialized SignContent structure.
      */
-    fun verifyWithLabel(
+    public fun verifyWithLabel(
         verificationKey: ByteArray,
         label: String,
         content: ByteArray,
@@ -239,7 +239,7 @@ object MlsCryptoProvider {
      * EncryptWithLabel(PublicKey, Label, Context, Plaintext):
      * HPKE single-shot encryption used in TreeKEM UpdatePath.
      */
-    fun encryptWithLabel(
+    public fun encryptWithLabel(
         publicKey: ByteArray,
         label: String,
         context: ByteArray,
@@ -256,7 +256,7 @@ object MlsCryptoProvider {
      * DecryptWithLabel(PrivateKey, Label, Context, KEMOutput, Ciphertext):
      * HPKE single-shot decryption used in TreeKEM UpdatePath processing.
      */
-    fun decryptWithLabel(
+    public fun decryptWithLabel(
         privateKey: ByteArray,
         label: String,
         context: ByteArray,
@@ -275,7 +275,7 @@ object MlsCryptoProvider {
  * HPKE ciphertext container (RFC 9180).
  * Contains both the KEM output (ephemeral public key) and the encrypted payload.
  */
-data class HpkeCiphertext(
+public data class HpkeCiphertext(
     val kemOutput: ByteArray,
     val ciphertext: ByteArray,
 ) : TlsSerializable {
@@ -296,8 +296,8 @@ data class HpkeCiphertext(
         return result
     }
 
-    companion object {
-        fun decodeTls(reader: TlsReader): HpkeCiphertext =
+    public companion object {
+        public fun decodeTls(reader: TlsReader): HpkeCiphertext =
             HpkeCiphertext(
                 kemOutput = reader.readOpaqueVarInt(),
                 ciphertext = reader.readOpaqueVarInt(),

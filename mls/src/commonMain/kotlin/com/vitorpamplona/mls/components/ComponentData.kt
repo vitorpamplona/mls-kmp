@@ -41,7 +41,7 @@ import com.vitorpamplona.mls.codec.TlsWriter
  * variable-length prefixes MLS uses — but that is a coincidence of taste, not a
  * rule this struct enforces. Nothing here interprets [data].
  */
-data class ComponentData(
+public data class ComponentData(
     val componentId: Int,
     val data: ByteArray,
 ) : TlsSerializable {
@@ -64,8 +64,8 @@ data class ComponentData(
 
     override fun hashCode(): Int = 31 * componentId + data.contentHashCode()
 
-    companion object {
-        fun decodeTls(reader: TlsReader): ComponentData =
+    public companion object {
+        public fun decodeTls(reader: TlsReader): ComponentData =
             ComponentData(
                 componentId = reader.readUint16(),
                 data = reader.readOpaqueVarInt(),

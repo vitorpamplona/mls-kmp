@@ -52,13 +52,13 @@ import com.vitorpamplona.mls.codec.TlsWriter
  * contribute to SafeAAD still carries an explicit empty list rather than
  * omitting the component.
  */
-object ComponentsList {
+public object ComponentsList {
     /**
      * Encode [ids] as a component payload. Sorted and de-duplicated on the way
      * out, because ordering is part of the value: two encodings of the same set
      * would otherwise hash differently inside a signed GroupContext.
      */
-    fun encode(ids: Collection<Int>): ByteArray {
+    public fun encode(ids: Collection<Int>): ByteArray {
         val sorted = ids.distinct().sorted()
         for (id in sorted) {
             require(id in 0..0xFFFF) { "ComponentID must fit in a uint16, was $id" }
@@ -80,7 +80,7 @@ object ComponentsList {
      * same list would let two peers hold bytes they each consider valid and
      * disagree about.
      */
-    fun decode(bytes: ByteArray): List<Int> {
+    public fun decode(bytes: ByteArray): List<Int> {
         val reader = TlsReader(bytes)
         val payload = reader.readOpaqueVarInt()
         require(!reader.hasRemaining) { "ComponentsList has trailing bytes" }
@@ -108,10 +108,10 @@ object ComponentsList {
     }
 
     /** Component id of the upstream `app_components` list. */
-    const val APP_COMPONENTS_ID = 0x0001
+    public const val APP_COMPONENTS_ID: Int = 0x0001
 
     /** Component id of the upstream `safe_aad` list. */
-    const val SAFE_AAD_ID = 0x0002
+    public const val SAFE_AAD_ID: Int = 0x0002
 
     /**
      * `last_resort_key_package`: empty-data marker in a KeyPackage's own
@@ -119,8 +119,8 @@ object ComponentsList {
      * MIP-era profile marked last resort with extension `0x000a`, which is now
      * the `self_remove` PROPOSAL type.
      */
-    const val LAST_RESORT_KEY_PACKAGE_ID = 0x0004
+    public const val LAST_RESORT_KEY_PACKAGE_ID: Int = 0x0004
 
     /** The supported/required id list carried by [dictionary], or empty when absent. */
-    fun supportedOrRequired(dictionary: AppDataDictionary): List<Int> = dictionary[APP_COMPONENTS_ID]?.let { decode(it) } ?: emptyList()
+    public fun supportedOrRequired(dictionary: AppDataDictionary): List<Int> = dictionary[APP_COMPONENTS_ID]?.let { decode(it) } ?: emptyList()
 }

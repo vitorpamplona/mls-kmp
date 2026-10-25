@@ -41,8 +41,12 @@ jobs:
       - name: Linter (gradle)
         run: ./gradlew spotlessCheck
 
+      - name: Check public API against mls/api
+        # A change to the public API must update the dump (./gradlew updateKotlinAbi), so it shows up in review.
+        run: ./gradlew checkKotlinAbi
+
       - name: Check JVM
-        run: ./gradlew jvmTest
+        run: ./gradlew jvmTest :interop-client:test
 
       - name: Check Android (host)
         if: matrix.os == 'ubuntu-latest'
@@ -62,3 +66,113 @@ jobs:
 
       - name: Build (gradle)
         run: ./gradlew assemble --no-daemon
+
+  # What mls-kmp SENDS, replayed by independent implementations: mls-kmp writes
+  # passive-client vectors (Welcomes, every commit shape, proposals by
+  # reference, external joins, PSKs) and ts-mls and OpenMLS must follow them.
+  sending-interop:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v6
+        with:
+          distribution: 'zulu'
+          java-version: 21
+
+      - name: Set up Node
+        uses: actions/setup-node@v5
+        with:
+          node-version: 22
+
+      - name: Cache cargo
+        uses: actions/cache@v6
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            tools/openmls-verifier/build
+            tools/mlsrs-verifier/build
+          key: ${{ runner.os }}-rust-verifiers-${{ hashFiles('tools/openmls-verifier/*', 'tools/mlsrs-verifier/*') }}
+
+      - name: Write mls-kmp-authored vectors
+        # --rerun: the variable is not a task input, so a cached result would write nothing.
+        run: MLSKMP_PASSIVE_VECTORS=$RUNNER_TEMP/mls-kmp-passive.json ./gradlew :mls:jvmTest --rerun --tests com.vitorpamplona.mls.MlsKmpAuthoredVectorsWriter
+
+      - name: ts-mls replays them
+        working-directory: tools/tsmls-vector-gen
+        run: |
+          npm install --legacy-peer-deps
+          node verify-passive-client.mjs $RUNNER_TEMP/mls-kmp-passive.json
+
+      - name: mls-kmp joins ts-mls groups by external commit, ts-mls verifies
+        run: |
+          node tools/tsmls-vector-gen/external-join.mjs fixture $RUNNER_TEMP/extjoin-fixture.json
+          MLSKMP_EXTJOIN_FIXTURE=$RUNNER_TEMP/extjoin-fixture.json MLSKMP_EXTJOIN_RESULT=$RUNNER_TEMP/extjoin-result.json \
+            ./gradlew :mls:jvmTest --rerun --tests com.vitorpamplona.mls.ExternalJoinFromTsMls
+          node tools/tsmls-vector-gen/external-join.mjs verify $RUNNER_TEMP/extjoin-fixture.json $RUNNER_TEMP/extjoin-result.json
+
+      - name: OpenMLS replays them
+        run: tools/openmls-verifier/run.sh $RUNNER_TEMP/mls-kmp-passive.json
+
+      - name: mls-rs replays them
+        run: tools/mlsrs-verifier/run.sh $RUNNER_TEMP/mls-kmp-passive.json
+
+      # The other direction with fresh randomness: mls-rs regenerates its own
+      # welcome, handle-commit and random passive-client suites (it writes them
+      # when the files are missing, and checks itself against them), and
+      # mls-kmp replays them.
+      - name: mls-rs writes fresh vectors, mls-kmp replays them
+        run: |
+          d=tools/mlsrs-verifier/build/mls-rs-0.56.0
+          rm -f $d/mls-rs/test_data/interop_passive_client_*.json
+          (cd $d && cargo test -p mls-rs --lib --features test_util interop_passive_client)
+          v=$d/mls-rs/test_data/interop_passive_client
+          MLSKMP_FOREIGN_PASSIVE_VECTORS=$PWD/${v}_welcome.json:$PWD/${v}_handle_commit.json:$PWD/${v}_random.json \
+            ./gradlew :mls:jvmTest --rerun --tests com.vitorpamplona.mls.ForeignPassiveClientVectorsTest
+
+  # The bindings built on this engine, run against THIS checkout: a change that
+  # breaks Marmot or cordn shows up here, before a release does. Non-blocking
+  # for now, so a binding that still needs adapting does not stop mls-kmp
+  # changes; read the result.
+  downstream:
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - repo: marmot-kmp
+            task: ":marmot:jvmTest"
+          - repo: cordn-kmp
+            task: ":cordn:jvmTest"
+    steps:
+      - name: Checkout mls-kmp
+        uses: actions/checkout@v7
+        with:
+          path: mls-kmp
+
+      - name: Checkout ${{ matrix.repo }}
+        uses: actions/checkout@v7
+        with:
+          repository: vitorpamplona/${{ matrix.repo }}
+          path: downstream
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v6
+        with:
+          distribution: 'zulu'
+          java-version: 21
+
+      - name: Point the build at Quartz if its release is not on Maven Central yet
+        run: echo "QUARTZ_ARGS=$(QUARTZ_CLONE_TO=$RUNNER_TEMP/quartz downstream/tools/ci/quartz-args.sh)" >> $GITHUB_ENV
+
+      - name: ${{ matrix.repo }} tests against this mls-kmp
+        working-directory: downstream
+        run: ./gradlew $QUARTZ_ARGS -PmlsKmpDir=$GITHUB_WORKSPACE/mls-kmp ${{ matrix.task }}
+
+      - name: Flag a downstream break
+        if: failure()
+        run: echo "::warning title=${{ matrix.repo }}::${{ matrix.repo }}'s tests fail against this mls-kmp. Fix the binding (or this change) before releasing."

@@ -47,7 +47,7 @@ import com.vitorpamplona.mls.crypto.MlsCryptoProvider
  * The MLS-Exporter function (which Marmot uses for outer encryption keys)
  * derives from exporter_secret.
  */
-class KeySchedule(
+public class KeySchedule(
     private val groupContext: ByteArray,
 ) {
     /**
@@ -58,7 +58,7 @@ class KeySchedule(
      * @param pskSecret pre-shared key secret (zeros if no PSK)
      * @return all derived epoch keys
      */
-    fun deriveEpochSecrets(
+    public fun deriveEpochSecrets(
         commitSecret: ByteArray,
         initSecret: ByteArray,
         pskSecret: ByteArray = ByteArray(MlsCryptoProvider.HASH_OUTPUT_LENGTH),
@@ -68,7 +68,17 @@ class KeySchedule(
         //     "joiner", GroupContext, Nh)
         val prk = MlsCryptoProvider.hkdfExtract(initSecret, commitSecret)
         val joinerSecret = MlsCryptoProvider.expandWithLabel(prk, "joiner", groupContext, MlsCryptoProvider.HASH_OUTPUT_LENGTH)
+        return fromJoinerSecret(joinerSecret, pskSecret)
+    }
 
+    /**
+     * The epoch secrets a joiner derives from a Welcome's `joiner_secret`
+     * (RFC 9420 §8): everything below `joiner_secret` in the key schedule.
+     */
+    public fun fromJoinerSecret(
+        joinerSecret: ByteArray,
+        pskSecret: ByteArray = ByteArray(MlsCryptoProvider.HASH_OUTPUT_LENGTH),
+    ): EpochSecrets {
         // member_secret = HKDF-Extract(joiner_secret, psk_secret)
         val memberSecret = MlsCryptoProvider.hkdfExtract(joinerSecret, pskSecret)
 
@@ -107,7 +117,35 @@ class KeySchedule(
         )
     }
 
-    companion object {
+    public companion object {
+        /**
+         * `psk_secret` (RFC 9420 §8.4) for PSKs in proposal order, each paired
+         * with its secret value. All zeros when there are none.
+         *
+         * ```
+         * psk_extracted_i = Extract(0, psk_i)
+         * psk_input_i     = ExpandWithLabel(psk_extracted_i, "derived psk", PSKLabel(id_i, i, n), Nh)
+         * psk_secret_i    = Extract(salt = psk_input_i, ikm = psk_secret_[i-1])
+         * ```
+         */
+        public fun pskSecret(psks: List<Pair<com.vitorpamplona.mls.messages.PreSharedKeyId, ByteArray>>): ByteArray {
+            val zero = ByteArray(MlsCryptoProvider.HASH_OUTPUT_LENGTH)
+            var secret = zero
+            for ((index, entry) in psks.withIndex()) {
+                val (id, value) = entry
+                val label =
+                    com.vitorpamplona.mls.codec
+                        .TlsWriter()
+                id.encodeTls(label)
+                label.putUint16(index)
+                label.putUint16(psks.size)
+                val extracted = MlsCryptoProvider.hkdfExtract(zero, value)
+                val input = MlsCryptoProvider.expandWithLabel(extracted, "derived psk", label.toByteArray(), MlsCryptoProvider.HASH_OUTPUT_LENGTH)
+                secret = MlsCryptoProvider.hkdfExtract(salt = input, ikm = secret)
+            }
+            return secret
+        }
+
         /**
          * MLS-Exporter function (RFC 9420 Section 8.5):
          *
@@ -120,7 +158,7 @@ class KeySchedule(
          * This is what Marmot uses to derive the outer ChaCha20-Poly1305
          * encryption key: MLS-Exporter("marmot", "group-event", 32)
          */
-        fun mlsExporter(
+        public fun mlsExporter(
             exporterSecret: ByteArray,
             label: String,
             context: ByteArray,
@@ -130,7 +168,7 @@ class KeySchedule(
         /**
          * MLS-Exporter with raw byte label for non-UTF-8 labels.
          */
-        fun mlsExporter(
+        public fun mlsExporter(
             exporterSecret: ByteArray,
             label: ByteArray,
             context: ByteArray,
@@ -146,7 +184,7 @@ class KeySchedule(
 /**
  * All secrets derived from a single epoch's key schedule.
  */
-data class EpochSecrets(
+public data class EpochSecrets(
     /** Used in Welcome messages to encrypt GroupInfo */
     val joinerSecret: ByteArray,
     /** Key for encrypting Welcome message GroupInfo */

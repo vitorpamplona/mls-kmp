@@ -303,6 +303,8 @@ data class WelcomeVector(
 @Serializable
 data class PassiveClientVector(
     @SerialName("cipher_suite") val cipherSuite: Int,
+    /** What the vector exercises; absent from the mlswg files, set by our own generator. */
+    val description: String = "",
     @SerialName("external_psks") val externalPsks: List<PassiveClientPsk> = emptyList(),
     @SerialName("key_package") val keyPackage: String,
     @SerialName("signature_priv") val signaturePriv: String,
@@ -312,6 +314,21 @@ data class PassiveClientVector(
     @SerialName("ratchet_tree") val ratchetTree: String? = null,
     @SerialName("initial_epoch_authenticator") val initialEpochAuthenticator: String,
     val epochs: List<PassiveClientEpoch> = emptyList(),
+    /** mls-kmp extension: after the last epoch, join this ReInit/branch successor group. */
+    val successor: PassiveClientSuccessor? = null,
+)
+
+/** A successor group (RFC 9420 §11) the passive member joins once the epochs are done. */
+@Serializable
+data class PassiveClientSuccessor(
+    /** "reinit" or "branch". */
+    val usage: String,
+    @SerialName("key_package") val keyPackage: String,
+    @SerialName("signature_priv") val signaturePriv: String,
+    @SerialName("encryption_priv") val encryptionPriv: String,
+    @SerialName("init_priv") val initPriv: String,
+    val welcome: String,
+    @SerialName("epoch_authenticator") val epochAuthenticator: String,
 )
 
 @Serializable
@@ -325,4 +342,28 @@ data class PassiveClientEpoch(
     val proposals: List<String> = emptyList(),
     val commit: String,
     @SerialName("epoch_authenticator") val epochAuthenticator: String,
+)
+
+// --- psk_secret.json ---
+
+@Serializable
+data class PskSecretVector(
+    @SerialName("cipher_suite") val cipherSuite: Int,
+    val psks: List<PskSecretEntry>,
+    @SerialName("psk_secret") val pskSecret: String,
+)
+
+@Serializable
+data class PskSecretEntry(
+    @SerialName("psk_id") val pskId: String,
+    val psk: String,
+    @SerialName("psk_nonce") val pskNonce: String,
+)
+
+// --- deserialization.json ---
+
+@Serializable
+data class DeserializationVector(
+    @SerialName("vlbytes_header") val vlbytesHeader: String,
+    val length: Int,
 )
