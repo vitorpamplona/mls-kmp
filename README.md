@@ -25,6 +25,11 @@ dependencies {
 
 ## Using it
 
+**[The guide](docs/guide/README.md)** walks through everything below in order,
+from the first KeyPackage to fork recovery, and covers what the library
+validates and what your application must. Its examples are compiled and run
+as tests. This section is the short version.
+
 ```kotlin
 val group = MlsGroup.create(identity)                    // a plain RFC 9420 group
 val group = MlsGroup.create(identity, policy = myPolicy)  // a binding's profile
@@ -79,7 +84,19 @@ MlsGroup.externalJoin(groupInfo, identity,
 
 `groupInfoMessage()` publishes the GroupInfo as an MLSMessage for external
 joiners; `commit(includeRatchetTreeInWelcome = false)` leaves the tree out of
-Welcomes for applications that deliver it separately.
+Welcomes for applications that deliver it separately. `stageWelcome` does
+everything `processWelcome` does but lets you inspect the group before
+`join()`.
+
+### More
+
+- `MlsGroupPolicy.wireFormatPolicy` sends handshakes as PublicMessages or
+  PrivateMessages and refuses the other kind
+  ([guide](docs/guide/proposals-and-commits.md#wire-formats)).
+- `PublicGroup` follows a group from a server, from its GroupInfo and
+  PublicMessages, without being a member ([guide](docs/guide/public-group.md)).
+- `recoverForkByReadding` and `reboot` repair a forked group
+  ([guide](docs/guide/fork-recovery.md)).
 
 ### ReInit and branches
 
@@ -117,11 +134,12 @@ the spec defers to the application:
 | `authorizeExternalCommit` | every inbound external commit | — |
 | `validateCredential` | every LeafNode validated | — |
 | `validateCredentialSuccession` | every replaced leaf (Update, UpdatePath, resync) | — (default: same type and Basic identity) |
-| `validateJoin` | `processWelcome` | `required_member_roles` on the agent-text-stream component |
+| `validateJoin` | `processWelcome`, `stageWelcome` | `required_member_roles` on the agent-text-stream component |
 | `defaultLeafCapabilities` | every leaf the engine builds | `0xF2EE` + `self_remove` |
 | `defaultRequiredCapabilities` | `create()`, epoch 0 | the MIP-era interop set |
 | `knownExtensionTypes` | GroupContextExtensions validation | `0xF2EE` |
 | `commitExporter` | `CommitResult.preCommitExporterSecret` | `MLS-Exporter("marmot", "group-event", 32)` |
+| `wireFormatPolicy` | the default wire format of commits and proposals; every member's inbound handshake | — (default: send public, accept both) |
 
 Three things to know before you add a binding:
 
@@ -151,34 +169,10 @@ PSK secret, the `required_capabilities` checks, the join-time parent-hash
 verifier) are public only so the bindings' own test suites can reach them. They
 require `@OptIn(InternalMlsApi::class)` and are not a stable API.
 
-## Upgrading from 1.2
+## Upgrading
 
-Several fixes bring the engine in line with RFC 9420 and with OpenMLS, mls-rs
-and ts-mls, and so change what it puts on the wire. Members on 1.2.0 or older
-and members on this version disagree in these cases; upgrade a group's members
-together.
-
-- **Path secrets** are derived along the *filtered* direct path (§7.4). Older
-  versions advanced the chain once per level, so the two disagree on any commit
-  whose sender has a blank subtree on its copath (a removed member in the
-  middle of the tree).
-- **PSKs**: `psk_secret` chains `Extract(psk_input, psk_secret)` as §8.4 says
-  (the arguments were swapped), a Welcome lists full `PreSharedKeyID`s, and
-  resumption PSKs work.
-- **External commits** are signed by the joiner with sender `new_member_commit`
-  and start from the GroupInfo's transcript; receivers verify that signature.
-  The joiner's init secret uses HPKE `Export` as RFC 9180 defines it (the
-  exporter context was hashed first), and `external_pub` is an `opaque<V>`
-  key (it was the bare key), so external joins work across implementations.
-- **Lifetimes** are compared as the uint64s they are: a `not_after` of 2^64-1
-  used to read as expired.
-- `commit()` folds our own Update into the UpdatePath instead of committing it
-  (§12.2 forbids that), and refuses to commit our own SelfRemove.
-- Standalone proposals of every type are accepted, not only SelfRemove — see
-  `authorizeProposal` above.
-- Default extensions are checked for placement, structure and duplicates:
-  `application_id` belongs in a LeafNode, not the GroupContext.
-- `MlsGroupState` is at version 9; older blobs still restore.
+See [docs/guide/upgrading.md](docs/guide/upgrading.md): what changed on the
+wire since 1.2, and the APIs added since.
 
 ## Crypto
 

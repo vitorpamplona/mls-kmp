@@ -680,8 +680,9 @@ class MlsGroup private constructor(
     // --- Key Package Generation ---
 
     /**
-     * Create a new KeyPackage for publishing (MIP-00).
-     * Used by others to add this user to groups.
+     * Create a new KeyPackage under this group's policy. [signingKey] is
+     * ignored, kept for source compatibility; prefer the companion
+     * [MlsGroup.Companion.createKeyPackage], which needs no group.
      */
     fun createKeyPackage(
         identity: ByteArray,
@@ -702,37 +703,7 @@ class MlsGroup private constructor(
         keyPackageExtensions: List<Extension> = emptyList(),
         /** The leaf's lifetime. Null uses the Marmot window (84 days, backdated an hour for clock skew). */
         lifetime: Lifetime? = null,
-    ): KeyPackageBundle {
-        val initKp = X25519.generateKeyPair()
-        val encKp = X25519.generateKeyPair()
-        val sigKp = leafSignatureKeyPair ?: Ed25519.generateKeyPair()
-
-        val leafNode =
-            buildLeafNode(
-                encryptionKey = encKp.publicKey,
-                signatureKey = sigKp.publicKey,
-                identity = identity,
-                source = LeafNodeSource.KEY_PACKAGE,
-                signingKey = sigKp.privateKey,
-                capabilities = greased(policy, capabilities),
-                leafExtensions = leafExtensions,
-                lifetime = lifetime,
-            )
-
-        val unsigned =
-            MlsKeyPackage(
-                initKey = initKp.publicKey,
-                leafNode = leafNode,
-                extensions = keyPackageExtensions,
-                signature = ByteArray(0),
-            )
-        val kp =
-            unsigned.copy(
-                signature = MlsCryptoProvider.signWithLabel(sigKp.privateKey, "KeyPackageTBS", unsigned.encodeTbs()),
-            )
-
-        return KeyPackageBundle(kp, initKp.privateKey, encKp.privateKey, sigKp.privateKey)
-    }
+    ): KeyPackageBundle = Companion.createKeyPackage(identity, policy, leafSignatureKeyPair, leafExtensions, capabilities, keyPackageExtensions, lifetime)
 
     // --- Proposal Creation ---
 
@@ -3466,6 +3437,60 @@ class MlsGroup private constructor(
                     ?: throw IllegalArgumentException("GroupInfo has no ratchet_tree extension and no tree was supplied")
             val reader = TlsReader(bytes)
             return RatchetTree.decodeTls(reader).also { reader.requireFullyConsumed("ratchet_tree") }
+        }
+
+        /**
+         * Create a KeyPackage (RFC 9420 §10): the signed, single-use invitation
+         * others add us to a group with. Publish
+         * [KeyPackageBundle.keyPackage] (`toTlsBytes()`), keep the bundle —
+         * its private keys open the Welcome — and use each one once.
+         *
+         * @param identity the BasicCredential identity of the new leaf
+         * @param policy the profile the leaf is built for: its default
+         *   capabilities, and whether to add GREASE values
+         * @param leafSignatureKeyPair the leaf's signature keypair, when the
+         *   caller generated it (to sign something over it first); fresh if null
+         * @param lifetime the leaf's lifetime; null uses 84 days, backdated an
+         *   hour for clock skew
+         */
+        fun createKeyPackage(
+            identity: ByteArray,
+            policy: MlsGroupPolicy = MlsGroupPolicy.Permissive,
+            leafSignatureKeyPair: Ed25519KeyPair? = null,
+            leafExtensions: List<Extension> = emptyList(),
+            capabilities: Capabilities = policy.defaultLeafCapabilities,
+            keyPackageExtensions: List<Extension> = emptyList(),
+            lifetime: Lifetime? = null,
+        ): KeyPackageBundle {
+            val initKp = X25519.generateKeyPair()
+            val encKp = X25519.generateKeyPair()
+            val sigKp = leafSignatureKeyPair ?: Ed25519.generateKeyPair()
+
+            val leafNode =
+                buildLeafNode(
+                    encryptionKey = encKp.publicKey,
+                    signatureKey = sigKp.publicKey,
+                    identity = identity,
+                    source = LeafNodeSource.KEY_PACKAGE,
+                    signingKey = sigKp.privateKey,
+                    capabilities = greased(policy, capabilities),
+                    leafExtensions = leafExtensions,
+                    lifetime = lifetime,
+                )
+
+            val unsigned =
+                MlsKeyPackage(
+                    initKey = initKp.publicKey,
+                    leafNode = leafNode,
+                    extensions = keyPackageExtensions,
+                    signature = ByteArray(0),
+                )
+            val kp =
+                unsigned.copy(
+                    signature = MlsCryptoProvider.signWithLabel(sigKp.privateKey, "KeyPackageTBS", unsigned.encodeTbs()),
+                )
+
+            return KeyPackageBundle(kp, initKp.privateKey, encKp.privateKey, sigKp.privateKey)
         }
 
         /**
