@@ -99,13 +99,15 @@ class MaliciousMemberTest {
         groupId: ByteArray = sender.groupId,
         senderLeaf: Int = sender.leafIndex,
         signingKey: ByteArray? = null,
+        /** Replaces the signature outright, after signing. */
+        signatureOverride: ByteArray? = null,
         confirmationTag: ByteArray = ByteArray(32),
         membershipTag: ByteArray? = null,
     ): ByteArray {
         val state = sender.saveState()
         val ctx = state.groupContext.toTlsBytes()
         val content = FramedContent(groupId, epoch, Sender(SenderType.MEMBER, senderLeaf), ByteArray(0), ContentType.COMMIT, Commit(proposals, path).toTlsBytes())
-        val signature = Framing.sign(signingKey ?: state.signingPrivateKey, WireFormat.PUBLIC_MESSAGE, content, ctx)
+        val signature = signatureOverride ?: Framing.sign(signingKey ?: state.signingPrivateKey, WireFormat.PUBLIC_MESSAGE, content, ctx)
         val tag = membershipTag ?: Framing.membershipTag(state.epochSecrets.membershipKey, content, ctx, signature, confirmationTag)
         return MlsMessage.fromPublicMessage(Framing.publicMessage(content, signature, confirmationTag, tag)).toTlsBytes()
     }
@@ -210,6 +212,7 @@ class MaliciousMemberTest {
     private val cases =
         listOf(
             Case("signed by someone else", "signature") { w -> forge(w.alice, inline(), signingKey = Ed25519.generateKeyPair().privateKey) },
+            Case("no signature", "signature missing") { w -> forge(w.alice, inline(), signatureOverride = ByteArray(0)) },
             Case("claims another member's leaf", "signature") { w -> forge(w.alice, inline(), senderLeaf = w.bob.leafIndex) },
             Case("sender leaf off the end of the tree", "leaf index") { w -> forge(w.alice, inline(), senderLeaf = 99) },
             Case("wrong epoch", "epoch") { w -> forge(w.alice, inline(), epoch = w.alice.epoch + 1) },
