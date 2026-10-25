@@ -30,18 +30,18 @@ import com.vitorpamplona.mls.crypto.MlsCryptoProvider
  * They are only ever ADVERTISED: a GREASE value never appears as a proposal,
  * credential or ciphersuite in use, and a receiver ignores them.
  */
-object Grease {
+public object Grease {
     /** 0x0A0A, 0x1A1A, … 0xEAEA. */
-    val VALUES: List<Int> = (0 until 15).map { 0x0A0A + it * 0x1010 }
+    public val VALUES: List<Int> = (0 until 15).map { 0x0A0A + it * 0x1010 }
 
-    fun isGrease(value: Int): Boolean = value in VALUES
+    public fun isGrease(value: Int): Boolean = value in VALUES
 
     /**
      * [capabilities] with one random GREASE value added to its ciphersuites,
      * extensions, proposals and credentials — unless it already carries some,
      * so a leaf that is rebuilt keeps the values it advertised.
      */
-    fun addTo(capabilities: Capabilities): Capabilities {
+    public fun addTo(capabilities: Capabilities): Capabilities {
         if ((capabilities.ciphersuites + capabilities.extensions + capabilities.proposals + capabilities.credentials).any(::isGrease)) return capabilities
 
         fun pick() = VALUES[(MlsCryptoProvider.randomBytes(1)[0].toInt() and 0xFF) % VALUES.size]

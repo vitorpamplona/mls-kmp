@@ -35,21 +35,21 @@ import com.vitorpamplona.mls.messages.UpdatePath
  * level that is filtered out takes no part in any of the three, which is
  * what lets two implementations agree whenever a subtree is blank.
  */
-object TreeKem {
+public object TreeKem {
     /** Fresh key material for a committer's direct path. */
-    class GeneratedPath(
+    public class GeneratedPath(
         /** The sender's filtered direct path, leaf-ward first. */
-        val filteredPath: List<Int>,
+        public val filteredPath: List<Int>,
         /** path_secret[i] for filteredPath[i]. */
-        val pathSecrets: List<ByteArray>,
+        public val pathSecrets: List<ByteArray>,
         /** HPKE key pairs for filteredPath[i]: (private, public). */
-        val nodeKeys: List<Pair<ByteArray, ByteArray>>,
-        val commitSecret: ByteArray,
+        public val nodeKeys: List<Pair<ByteArray, ByteArray>>,
+        public val commitSecret: ByteArray,
     ) {
-        fun privateKeysByNode(): Map<Int, ByteArray> = filteredPath.zip(nodeKeys).associate { (node, kp) -> node to kp.first }
+        public fun privateKeysByNode(): Map<Int, ByteArray> = filteredPath.zip(nodeKeys).associate { (node, kp) -> node to kp.first }
 
         /** The path secret a joiner at [leafIndex] needs: the one at its lowest common ancestor with the sender. */
-        fun pathSecretFor(
+        public fun pathSecretFor(
             tree: RatchetTree,
             senderLeafIndex: Int,
             leafIndex: Int,
@@ -60,28 +60,28 @@ object TreeKem {
     }
 
     /** Recovered path secrets after decrypting someone else's UpdatePath. */
-    class DecryptedPath(
+    public class DecryptedPath(
         /** The filtered-path nodes whose private keys we now hold, with those keys. */
-        val nodePrivateKeys: Map<Int, ByteArray>,
-        val commitSecret: ByteArray,
+        public val nodePrivateKeys: Map<Int, ByteArray>,
+        public val commitSecret: ByteArray,
     )
 
-    fun nodeKeyPair(pathSecret: ByteArray): Pair<ByteArray, ByteArray> {
+    public fun nodeKeyPair(pathSecret: ByteArray): Pair<ByteArray, ByteArray> {
         val nodeSecret = MlsCryptoProvider.deriveSecret(pathSecret, "node")
         val kp = Hpke.deriveKeyPair(nodeSecret).also { nodeSecret.fill(0) }
         return kp.privateKey to kp.publicKey
     }
 
-    fun nextPathSecret(pathSecret: ByteArray): ByteArray = MlsCryptoProvider.deriveSecret(pathSecret, "path")
+    public fun nextPathSecret(pathSecret: ByteArray): ByteArray = MlsCryptoProvider.deriveSecret(pathSecret, "path")
 
     /** The child of [parentNode] that does NOT contain [leafIndex]: the copath node at that level. */
-    fun copathChild(
+    public fun copathChild(
         parentNode: Int,
         leafIndex: Int,
     ): Int = if (BinaryTree.leafToNode(leafIndex) < parentNode) BinaryTree.right(parentNode) else BinaryTree.left(parentNode)
 
     /** Whether [nodeIndex] is [subtreeRoot] or one of its descendants. */
-    fun isInSubtree(
+    public fun isInSubtree(
         subtreeRoot: Int,
         nodeIndex: Int,
     ): Boolean {
@@ -96,7 +96,7 @@ object TreeKem {
      * With an empty filtered path (the sender is alone) the commit secret is
      * the starting secret itself, which is what openmls derives.
      */
-    fun generate(
+    public fun generate(
         tree: RatchetTree,
         senderLeafIndex: Int,
         firstPathSecret: ByteArray = MlsCryptoProvider.randomBytes(MlsCryptoProvider.HASH_OUTPUT_LENGTH),
@@ -122,7 +122,7 @@ object TreeKem {
      *
      * @return the parent_hash the sender's leaf must carry.
      */
-    fun mergePathKeys(
+    public fun mergePathKeys(
         tree: RatchetTree,
         senderLeafIndex: Int,
         publicKeys: List<ByteArray>,
@@ -161,7 +161,7 @@ object TreeKem {
         return MlsCryptoProvider.hash(encodeParentHashInput(parent.encryptionKey, parent.parentHash, siblingHash))
     }
 
-    fun encodeParentHashInput(
+    public fun encodeParentHashInput(
         encryptionKey: ByteArray,
         parentHash: ByteArray,
         originalSiblingTreeHash: ByteArray,
@@ -179,7 +179,7 @@ object TreeKem {
      * The copath resolution each UpdatePath node is encrypted to, with the
      * leaves added by the same commit removed (RFC 9420 §7.5).
      */
-    fun copathResolutions(
+    public fun copathResolutions(
         tree: RatchetTree,
         senderLeafIndex: Int,
         excludedLeaves: Set<Int>,
@@ -191,7 +191,7 @@ object TreeKem {
     }
 
     /** HPKE-encrypt each path secret to its copath resolution under [groupContext] (§7.6). */
-    fun encryptPathSecrets(
+    public fun encryptPathSecrets(
         tree: RatchetTree,
         senderLeafIndex: Int,
         generated: GeneratedPath,
@@ -229,7 +229,7 @@ object TreeKem {
      * sender published (step 6), so a sender cannot hand different members
      * secrets that disagree with the tree.
      */
-    fun decryptPathSecrets(
+    public fun decryptPathSecrets(
         tree: RatchetTree,
         senderLeafIndex: Int,
         myLeafIndex: Int,
@@ -291,7 +291,7 @@ object TreeKem {
      * and ratchets up the sender's filtered path. Each derived public key must
      * match the tree (RFC 9420 §12.4.3.1).
      */
-    fun keysFromWelcomePathSecret(
+    public fun keysFromWelcomePathSecret(
         tree: RatchetTree,
         senderLeafIndex: Int,
         myLeafIndex: Int,
@@ -317,7 +317,7 @@ object TreeKem {
     }
 
     /** Whether [privateKey] is the private half of the key currently at [nodeIndex]. */
-    fun holdsKeyFor(
+    public fun holdsKeyFor(
         tree: RatchetTree,
         nodeIndex: Int,
         privateKey: ByteArray,

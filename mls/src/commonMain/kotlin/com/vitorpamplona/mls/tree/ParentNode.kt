@@ -40,7 +40,7 @@ import com.vitorpamplona.mls.codec.TlsWriter
  * } ParentNode;
  * ```
  */
-data class ParentNode(
+public data class ParentNode(
     val encryptionKey: ByteArray,
     val parentHash: ByteArray,
     val unmergedLeaves: List<Int>,
@@ -71,8 +71,8 @@ data class ParentNode(
         return result
     }
 
-    companion object {
-        fun decodeTls(reader: TlsReader): ParentNode {
+    public companion object {
+        public fun decodeTls(reader: TlsReader): ParentNode {
             val encryptionKey = reader.readOpaqueVarInt()
             val parentHash = reader.readOpaqueVarInt()
             val ulBytes = reader.readOpaqueVarInt()

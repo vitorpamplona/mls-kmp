@@ -128,7 +128,7 @@ internal fun constantTimeEquals(
     return result == 0
 }
 
-class MlsGroup private constructor(
+public class MlsGroup private constructor(
     private var groupContext: GroupContext,
     private val tree: RatchetTree,
     private var myLeafIndex: Int,
@@ -191,12 +191,12 @@ class MlsGroup private constructor(
      * they were minted for rather than against whatever day the suite happens to run.
      */
     @InternalMlsApi
-    var clock: () -> Long = TimeUtils::now
+    public var clock: () -> Long = TimeUtils::now
 
-    val groupId: ByteArray get() = groupContext.groupId
-    val epoch: Long get() = groupContext.epoch
-    val leafIndex: Int get() = myLeafIndex
-    val extensions: List<com.vitorpamplona.mls.tree.Extension> get() = groupContext.extensions
+    public val groupId: ByteArray get() = groupContext.groupId
+    public val epoch: Long get() = groupContext.epoch
+    public val leafIndex: Int get() = myLeafIndex
+    public val extensions: List<com.vitorpamplona.mls.tree.Extension> get() = groupContext.extensions
 
     /**
      * True while our own leaf is still live in the tree.
@@ -211,7 +211,7 @@ class MlsGroup private constructor(
      * Once a commit removes us this stays false even when the same commit
      * adds someone else into the leaf we held.
      */
-    fun isLocalMember(): Boolean = !removedFromGroup && myLeafIndex in 0 until tree.leafCount && tree.getLeaf(myLeafIndex) != null
+    public fun isLocalMember(): Boolean = !removedFromGroup && myLeafIndex in 0 until tree.leafCount && tree.getLeaf(myLeafIndex) != null
 
     /** Set when a commit removed our leaf; the slot may since hold another member. */
     private var removedFromGroup: Boolean = false
@@ -223,7 +223,7 @@ class MlsGroup private constructor(
      * gives the policy — Marmot's "only admins may change group extensions"
      * gate runs in `MlsGroupManager`, before any commit is staged.
      */
-    fun view(): GroupView =
+    public fun view(): GroupView =
         GroupView(
             extensions = groupContext.extensions,
             leafCount = tree.leafCount,
@@ -239,7 +239,7 @@ class MlsGroup private constructor(
      * `authenticatedContentBytes` we capture for ProposalRef matching).
      */
     @InternalMlsApi
-    fun pendingProposalsSnapshot(): List<PendingProposal> = pendingProposals.toList()
+    public fun pendingProposalsSnapshot(): List<PendingProposal> = pendingProposals.toList()
 
     /**
      * Whether any proposal is staged and waiting for a Commit.
@@ -250,7 +250,7 @@ class MlsGroup private constructor(
      * member sits here until an authorized member commits it — and until then
      * the leaver is still in the tree and still reading the group.
      */
-    fun hasPendingProposals(): Boolean = pendingProposals.isNotEmpty()
+    public fun hasPendingProposals(): Boolean = pendingProposals.isNotEmpty()
 
     /**
      * The GroupContext extension list as it stands. Test-only: callers
@@ -259,7 +259,7 @@ class MlsGroup private constructor(
      * distinction the wire format does make.
      */
     @InternalMlsApi
-    fun groupContextExtensionsSnapshot(): List<Extension> = groupContext.extensions.toList()
+    public fun groupContextExtensionsSnapshot(): List<Extension> = groupContext.extensions.toList()
 
     private fun allMembersSupportExtension(extensionType: Int): Boolean = (0 until tree.leafCount).all { i -> tree.getLeaf(i)?.let { extensionType in it.capabilities.extensions } ?: true }
 
@@ -270,7 +270,7 @@ class MlsGroup private constructor(
      * exercising [verifyTreeParentHashesForJoin] in tests.
      */
     @InternalMlsApi
-    fun exportTreeBytes(): ByteArray {
+    public fun exportTreeBytes(): ByteArray {
         val w = TlsWriter()
         tree.encodeTls(w)
         return w.toByteArray()
@@ -279,7 +279,7 @@ class MlsGroup private constructor(
     // --- Member identity ---
 
     /** Raw BasicCredential identity bytes of the member at the given leaf, or null. */
-    fun memberIdentity(leafIndex: Int): ByteArray? = (tree.getLeaf(leafIndex)?.credential as? Credential.Basic)?.identity
+    public fun memberIdentity(leafIndex: Int): ByteArray? = (tree.getLeaf(leafIndex)?.credential as? Credential.Basic)?.identity
 
     /**
      * Lowercase hex OF THE CREDENTIAL BYTES at [leafIndex], or null.
@@ -295,10 +295,10 @@ class MlsGroup private constructor(
      * because a function that guessed which encoding a credential used would
      * be worse than one that says plainly what it does.
      */
-    fun memberIdentityHex(leafIndex: Int): String? = memberIdentity(leafIndex)?.let { Hex.encode(it) }
+    public fun memberIdentityHex(leafIndex: Int): String? = memberIdentity(leafIndex)?.let { Hex.encode(it) }
 
     /** Lowercase hex of the local member's BasicCredential identity, or null. */
-    fun myIdentityHex(): String? = memberIdentityHex(myLeafIndex)
+    public fun myIdentityHex(): String? = memberIdentityHex(myLeafIndex)
 
     /**
      * Account identities holding at least one current member leaf, as hex.
@@ -306,7 +306,7 @@ class MlsGroup private constructor(
      * A set of ACCOUNTS, not leaves: one account may hold several leaves (one
      * per device), and every binding that asks this question means the account.
      */
-    fun currentMemberIdentities(): Set<String> = (0 until tree.leafCount).mapNotNullTo(mutableSetOf()) { memberIdentityHex(it) }
+    public fun currentMemberIdentities(): Set<String> = (0 until tree.leafCount).mapNotNullTo(mutableSetOf()) { memberIdentityHex(it) }
 
     // --- State Persistence ---
 
@@ -318,7 +318,7 @@ class MlsGroup private constructor(
      * epoch transition (commit, processCommit, processWelcome) to ensure
      * the group can be restored after an app restart.
      */
-    fun saveState(): MlsGroupState {
+    public fun saveState(): MlsGroupState {
         val treeWriter = TlsWriter()
         tree.encodeTls(treeWriter)
 
@@ -374,7 +374,7 @@ class MlsGroup private constructor(
      * Null before this leaf has sent anything at the current epoch: there is no
      * position yet, and the full state already says so.
      */
-    fun exportOwnSenderRatchet(): OwnSenderRatchet? {
+    public fun exportOwnSenderRatchet(): OwnSenderRatchet? {
         val state = secretTree.exportSenderStates()[myLeafIndex] ?: return null
         return OwnSenderRatchet(
             epoch = epoch,
@@ -405,7 +405,7 @@ class MlsGroup private constructor(
      *
      * @return true when the position moved.
      */
-    fun restoreOwnSenderRatchet(record: OwnSenderRatchet): Boolean {
+    public fun restoreOwnSenderRatchet(record: OwnSenderRatchet): Boolean {
         if (record.epoch != epoch || record.leafIndex != myLeafIndex) return false
         if (!constantTimeEquals(record.treeBinder, OwnSenderRatchet.binderFor(epochSecrets.encryptionSecret))) return false
 
@@ -582,7 +582,7 @@ class MlsGroup private constructor(
     }
 
     /** Receiver data of the retained former epochs, oldest first. */
-    fun retainedEpochs(): List<RetainedEpochReceiverData> = retainedEpochs.toList()
+    public fun retainedEpochs(): List<RetainedEpochReceiverData> = retainedEpochs.toList()
 
     /**
      * Extract retained epoch secrets for late-message decryption.
@@ -590,7 +590,7 @@ class MlsGroup private constructor(
      * Call this BEFORE an epoch transition to capture the outgoing epoch's
      * decryption secrets. These are kept in a bounded window by [MlsGroupManager].
      */
-    fun retainedSecrets(): RetainedEpochSecrets =
+    public fun retainedSecrets(): RetainedEpochSecrets =
         RetainedEpochSecrets(
             epoch = epoch,
             senderDataSecret = epochSecrets.senderDataSecret,
@@ -599,7 +599,7 @@ class MlsGroup private constructor(
             exporterSecret = epochSecrets.exporterSecret,
         )
 
-    val memberCount: Int
+    public val memberCount: Int
         get() {
             var count = 0
             for (i in 0 until tree.leafCount) {
@@ -616,17 +616,17 @@ class MlsGroup private constructor(
      * group the committer creates (joined with a resumption PSK of usage
      * `reinit`, see [proposeResumptionPsk]).
      */
-    var reInitPending: Proposal.ReInit? = null
+    public var reInitPending: Proposal.ReInit? = null
         private set
 
     /** The epoch authenticator (RFC 9420 §8.7), for out-of-band comparison between members. */
-    val epochAuthenticator: ByteArray get() = epochSecrets.epochAuthenticator.copyOf()
+    public val epochAuthenticator: ByteArray get() = epochSecrets.epochAuthenticator.copyOf()
 
     /**
      * Register an external pre-shared key (RFC 9420 §8.4) under [pskId], for
      * PreSharedKey proposals and Welcomes that name it.
      */
-    fun registerPsk(
+    public fun registerPsk(
         pskId: ByteArray,
         psk: ByteArray,
     ) {
@@ -638,7 +638,7 @@ class MlsGroup private constructor(
      * [groupId] (a ReInit or branch predecessor). This group's own former
      * epochs are remembered automatically.
      */
-    fun registerResumptionPsk(
+    public fun registerResumptionPsk(
         groupId: ByteArray,
         epoch: Long,
         psk: ByteArray,
@@ -647,7 +647,7 @@ class MlsGroup private constructor(
     }
 
     /** The `resumption_psk` of the current epoch, which a ReInit or branch successor group names. */
-    val resumptionPsk: ByteArray get() = epochSecrets.resumptionPsk.copyOf()
+    public val resumptionPsk: ByteArray get() = epochSecrets.resumptionPsk.copyOf()
 
     /** The secret value of [id], or null when this group cannot supply it. */
     private fun resolvePsk(id: PreSharedKeyId): ByteArray? =
@@ -676,7 +676,7 @@ class MlsGroup private constructor(
     /**
      * Get the list of members (leaf index -> LeafNode).
      */
-    fun members(): List<Pair<Int, LeafNode>> {
+    public fun members(): List<Pair<Int, LeafNode>> {
         val result = mutableListOf<Pair<Int, LeafNode>>()
         for (i in 0 until tree.leafCount) {
             val leaf = tree.getLeaf(i)
@@ -694,7 +694,7 @@ class MlsGroup private constructor(
      * ignored, kept for source compatibility; prefer the companion
      * [MlsGroup.Companion.createKeyPackage], which needs no group.
      */
-    fun createKeyPackage(
+    public fun createKeyPackage(
         identity: ByteArray,
         signingKey: ByteArray,
         /**
@@ -720,7 +720,7 @@ class MlsGroup private constructor(
     /**
      * Create an Add proposal for a new member.
      */
-    fun proposeAdd(keyPackageBytes: ByteArray): Proposal.Add {
+    public fun proposeAdd(keyPackageBytes: ByteArray): Proposal.Add {
         val reader = TlsReader(keyPackageBytes)
         val kp = MlsKeyPackage.decodeTls(reader)
         reader.requireFullyConsumed("KeyPackage")
@@ -734,7 +734,7 @@ class MlsGroup private constructor(
     /**
      * Create a Remove proposal.
      */
-    fun proposeRemove(targetLeafIndex: Int): Proposal.Remove {
+    public fun proposeRemove(targetLeafIndex: Int): Proposal.Remove {
         require(targetLeafIndex != myLeafIndex) { "Use SelfRemove to remove yourself, not Remove" }
         require(targetLeafIndex in 0 until tree.leafCount && tree.getLeaf(targetLeafIndex) != null) {
             "Cannot remove blank leaf at index $targetLeafIndex"
@@ -753,7 +753,7 @@ class MlsGroup private constructor(
      * than on arrival turns a commit every peer would refuse into a local
      * error.
      */
-    fun proposeSelfRemove(): Proposal.SelfRemove {
+    public fun proposeSelfRemove(): Proposal.SelfRemove {
         policy.authorizeSelfRemove(view())
         val proposal = Proposal.SelfRemove()
         pendingProposals.add(PendingProposal(proposal, myLeafIndex))
@@ -772,7 +772,7 @@ class MlsGroup private constructor(
      *
      * @return the Update proposal (already queued for the next commit)
      */
-    fun proposeSigningKeyRotation(): Proposal.Update {
+    public fun proposeSigningKeyRotation(): Proposal.Update {
         val newSigKp = Ed25519.generateKeyPair()
         val newEncKp = X25519.generateKeyPair()
 
@@ -827,7 +827,7 @@ class MlsGroup private constructor(
      * Commit. Pass the extensions to keep, not only the changed one: whatever is
      * not passed is no longer on the leaf.
      */
-    fun advertiseInNextCommit(
+    public fun advertiseInNextCommit(
         capabilities: Capabilities,
         leafExtensions: List<Extension>,
     ) {
@@ -848,14 +848,14 @@ class MlsGroup private constructor(
      * Create a GroupContextExtensions proposal to update the group's extensions.
      * Used for changing group metadata (name, description, etc.) via MIP-01.
      */
-    fun proposeGroupContextExtensions(extensions: List<Extension>): Proposal.GroupContextExtensions {
+    public fun proposeGroupContextExtensions(extensions: List<Extension>): Proposal.GroupContextExtensions {
         val proposal = Proposal.GroupContextExtensions(extensions)
         pendingProposals.add(PendingProposal(proposal, myLeafIndex))
         return proposal
     }
 
     /** The GroupContext `app_data_dictionary`, empty when the group carries none. */
-    fun appDataDictionary(): AppDataDictionary = AppDataDictionary.fromExtensionsOrEmpty(groupContext.extensions)
+    public fun appDataDictionary(): AppDataDictionary = AppDataDictionary.fromExtensionsOrEmpty(groupContext.extensions)
 
     /**
      * Propose setting one GroupContext app component to [data].
@@ -868,7 +868,7 @@ class MlsGroup private constructor(
      * satisfy every component's validation rules — is layered on top and is
      * not enforced here.
      */
-    fun proposeAppDataUpdate(
+    public fun proposeAppDataUpdate(
         componentId: Int,
         data: ByteArray,
     ): Proposal.AppDataUpdate {
@@ -878,7 +878,7 @@ class MlsGroup private constructor(
     }
 
     /** Propose dropping one GroupContext app component entirely. */
-    fun proposeAppDataRemoval(componentId: Int): Proposal.AppDataUpdate {
+    public fun proposeAppDataRemoval(componentId: Int): Proposal.AppDataUpdate {
         val proposal = Proposal.AppDataUpdate.remove(componentId)
         pendingProposals.add(PendingProposal(proposal, myLeafIndex))
         return proposal
@@ -888,7 +888,7 @@ class MlsGroup private constructor(
      * Create a PSK proposal to include a pre-shared key in the next epoch.
      * The PSK must be registered via registerPsk() before committing.
      */
-    fun proposePsk(
+    public fun proposePsk(
         pskId: ByteArray,
         pskNonce: ByteArray = MlsCryptoProvider.randomBytes(MlsCryptoProvider.HASH_OUTPUT_LENGTH),
     ): Proposal.Psk {
@@ -903,7 +903,7 @@ class MlsGroup private constructor(
      * only takes usage `application`; `reinit` and `branch` belong to the
      * first commit of a successor group.
      */
-    fun proposeResumptionPsk(
+    public fun proposeResumptionPsk(
         pskEpoch: Long,
         pskGroupId: ByteArray = groupId,
         usage: Int = PreSharedKeyId.USAGE_APPLICATION,
@@ -919,7 +919,7 @@ class MlsGroup private constructor(
      * [Proposal.Custom]). Every member must list [proposalType] in its leaf
      * capabilities, or the commit carrying it is invalid.
      */
-    fun proposeCustom(
+    public fun proposeCustom(
         proposalType: Int,
         data: ByteArray,
     ): Proposal.Custom {
@@ -933,7 +933,7 @@ class MlsGroup private constructor(
      * After the commit containing this proposal is processed, the group enters
      * a reinitialization state and a new group must be created.
      */
-    fun proposeReInit(
+    public fun proposeReInit(
         newGroupId: ByteArray = MlsCryptoProvider.randomBytes(32),
         newVersion: Int = 1,
         newCipherSuite: Int = 1,
@@ -947,9 +947,9 @@ class MlsGroup private constructor(
     // --- Successor groups (RFC 9420 §11) ---
 
     /** What creating a successor group produced: the new group, and the commit that took it to epoch 1. */
-    class SuccessorGroup(
-        val group: MlsGroup,
-        val commit: CommitResult,
+    public class SuccessorGroup(
+        public val group: MlsGroup,
+        public val commit: CommitResult,
     )
 
     /**
@@ -961,7 +961,7 @@ class MlsGroup private constructor(
      * The new group's first commit carries this group's final resumption PSK
      * with usage `reinit`, which ties the two groups' key schedules together.
      */
-    fun reinit(
+    public fun reinit(
         keyPackages: List<ByteArray>,
         includeRatchetTreeInWelcome: Boolean = true,
     ): SuccessorGroup {
@@ -976,7 +976,7 @@ class MlsGroup private constructor(
      * Branch a new group off this one (RFC 9420 §11.3) with a subset of its
      * members, whose [keyPackages] are given. This group carries on unchanged.
      */
-    fun branch(
+    public fun branch(
         keyPackages: List<ByteArray>,
         newGroupId: ByteArray = MlsCryptoProvider.randomBytes(32),
         extensions: List<Extension> = groupContext.extensions,
@@ -994,7 +994,7 @@ class MlsGroup private constructor(
      * The members outside [ownPartition]: the ones a fork left on the other
      * side, whom [recoverForkByReadding] removes and re-adds.
      */
-    fun forkComplement(ownPartition: Collection<Int>): List<Pair<Int, LeafNode>> {
+    public fun forkComplement(ownPartition: Collection<Int>): List<Pair<Int, LeafNode>> {
         val members = members()
         val occupied = members.map { it.first }.toSet()
         require(ownPartition.all { it in occupied }) { "Every leaf in the partition must be a member" }
@@ -1014,7 +1014,7 @@ class MlsGroup private constructor(
      * application's knowledge of who is on which side. Nothing changes if
      * building the commit fails.
      */
-    fun recoverForkByReadding(
+    public fun recoverForkByReadding(
         ownPartition: Collection<Int>,
         keyPackages: List<ByteArray>,
         includeRatchetTreeInWelcome: Boolean = true,
@@ -1042,7 +1042,7 @@ class MlsGroup private constructor(
      * partitions. This group carries on unchanged; leave it once the new one
      * is running.
      */
-    fun reboot(
+    public fun reboot(
         keyPackages: List<ByteArray>,
         newGroupId: ByteArray = MlsCryptoProvider.randomBytes(32),
         extensions: List<Extension> = groupContext.extensions,
@@ -1050,7 +1050,7 @@ class MlsGroup private constructor(
     ): SuccessorGroup = createSuccessor(newGroupId, extensions, usage = null, keyPackages, includeRatchetTreeInWelcome)
 
     /** The members [reboot] has to re-invite: everyone but us. */
-    fun rebootMembers(): List<Pair<Int, LeafNode>> = members().filter { it.first != myLeafIndex }
+    public fun rebootMembers(): List<Pair<Int, LeafNode>> = members().filter { it.first != myLeafIndex }
 
     /** A new group seeded from this one; [usage] names the resumption PSK linking them, null for none. */
     private fun createSuccessor(
@@ -1136,7 +1136,7 @@ class MlsGroup private constructor(
     private var pendingCommit: StagedCommit? = null
 
     /** Whether [stageCommit] built a commit that is waiting for [mergePendingCommit] or [clearPendingCommit]. */
-    val hasPendingCommit: Boolean get() = pendingCommit != null
+    public val hasPendingCommit: Boolean get() = pendingCommit != null
 
     /**
      * Create a Commit of every pending proposal and apply it at once.
@@ -1154,7 +1154,7 @@ class MlsGroup private constructor(
      *   tree delivered out of band (see [processWelcome]).
      * @param paddingLength zero bytes to pad a PrivateMessage commit with.
      */
-    fun commit(
+    public fun commit(
         authenticatedData: ByteArray = ByteArray(0),
         wireFormat: WireFormat = policy.wireFormatPolicy.outgoing,
         includeRatchetTreeInWelcome: Boolean = true,
@@ -1178,7 +1178,7 @@ class MlsGroup private constructor(
      *
      * Nothing changes if building the commit fails.
      */
-    fun stageCommit(
+    public fun stageCommit(
         authenticatedData: ByteArray = ByteArray(0),
         wireFormat: WireFormat = policy.wireFormatPolicy.outgoing,
         includeRatchetTreeInWelcome: Boolean = true,
@@ -1199,7 +1199,7 @@ class MlsGroup private constructor(
     }
 
     /** Move to the epoch the staged commit creates. */
-    fun mergePendingCommit() {
+    public fun mergePendingCommit() {
         val staged = checkNotNull(pendingCommit) { "No staged commit to merge" }
         check(epoch == staged.fromEpoch) { "The staged commit was built at epoch ${staged.fromEpoch}, the group is at $epoch" }
         // The epoch we leave is retained as it stands NOW, not as it stood when
@@ -1214,7 +1214,7 @@ class MlsGroup private constructor(
     }
 
     /** Forget the staged commit; the group stays at its current epoch. */
-    fun clearPendingCommit() {
+    public fun clearPendingCommit() {
         pendingCommit = null
     }
 
@@ -1730,7 +1730,7 @@ class MlsGroup private constructor(
      * `authenticated_data` (RFC 9420 §6.3.2). It is bound to the message by the
      * AEAD and the signature, and returned by [decrypt].
      */
-    fun encrypt(
+    public fun encrypt(
         plaintext: ByteArray,
         /**
          * MLS `authenticated_data`: authenticated but NOT encrypted.
@@ -1787,7 +1787,7 @@ class MlsGroup private constructor(
      *
      * @return the MLSMessage bytes to deliver to the group.
      */
-    fun proposalMessage(
+    public fun proposalMessage(
         proposal: Proposal,
         wireFormat: WireFormat = policy.wireFormatPolicy.outgoing,
         authenticatedData: ByteArray = ByteArray(0),
@@ -1857,13 +1857,13 @@ class MlsGroup private constructor(
      * [proposalMessage] with [WireFormat.PRIVATE_MESSAGE].
      */
     @InternalMlsApi
-    fun encryptProposalAsPrivateMessage(proposal: Proposal): ByteArray = proposalMessage(proposal, WireFormat.PRIVATE_MESSAGE)
+    public fun encryptProposalAsPrivateMessage(proposal: Proposal): ByteArray = proposalMessage(proposal, WireFormat.PRIVATE_MESSAGE)
 
     /**
      * Decrypt an application message from a PrivateMessage.
      * Returns null if decryption fails (e.g., corrupted message, wrong epoch).
      */
-    fun decryptOrNull(messageBytes: ByteArray): DecryptedMessage? =
+    public fun decryptOrNull(messageBytes: ByteArray): DecryptedMessage? =
         try {
             decrypt(messageBytes)
         } catch (_: Exception) {
@@ -1940,7 +1940,7 @@ class MlsGroup private constructor(
      * generation opens only once. Handshake messages from a former epoch are
      * refused, as is an epoch no longer retained.
      */
-    fun decryptFormerEpoch(messageBytes: ByteArray): DecryptedMessage {
+    public fun decryptFormerEpoch(messageBytes: ByteArray): DecryptedMessage {
         requireMessageSize(policy, messageBytes)
         val mlsMsg = MlsMessage.decodeTls(TlsReader(messageBytes))
         require(mlsMsg.wireFormat == WireFormat.PRIVATE_MESSAGE) { "Expected PrivateMessage" }
@@ -1989,7 +1989,7 @@ class MlsGroup private constructor(
     }
 
     /** Exporter secrets of the retained former epochs, by epoch, for keys an application derives per epoch. */
-    fun formerExporterSecrets(): Map<Long, ByteArray> = retainedEpochs.associate { it.epoch to it.exporterSecret }
+    public fun formerExporterSecrets(): Map<Long, ByteArray> = retainedEpochs.associate { it.epoch to it.exporterSecret }
 
     private fun decodePrivateMessage(mlsMsg: MlsMessage): PrivateMessage {
         val reader = TlsReader(mlsMsg.payload)
@@ -2010,7 +2010,7 @@ class MlsGroup private constructor(
      *
      * @throws IllegalArgumentException if the message format is invalid or decryption fails
      */
-    fun decrypt(messageBytes: ByteArray): DecryptedMessage = decryptAndStage(messageBytes).first
+    public fun decrypt(messageBytes: ByteArray): DecryptedMessage = decryptAndStage(messageBytes).first
 
     /** [decrypt], plus the pool entry a proposal was staged as. */
     private fun decryptAndStage(messageBytes: ByteArray): Pair<DecryptedMessage, PendingProposal?> {
@@ -2066,7 +2066,7 @@ class MlsGroup private constructor(
      * commits are applied atomically — on any failure the group is left
      * exactly as it was. An echo of our own staged commit merges it.
      */
-    fun processMessage(messageBytes: ByteArray): ProcessedMessage {
+    public fun processMessage(messageBytes: ByteArray): ProcessedMessage {
         requireMessageSize(policy, messageBytes)
         val mlsMsg = MlsMessage.decodeTls(TlsReader(messageBytes))
         if (mergeIfOwnStagedCommit(messageBytes) != null) {
@@ -2135,7 +2135,7 @@ class MlsGroup private constructor(
      * Verifies the RFC 9420 §6.2 membership_tag of a member's commit, then
      * applies it atomically. An echo of our own staged commit merges it.
      */
-    fun processFramedCommit(framedCommitBytes: ByteArray) {
+    public fun processFramedCommit(framedCommitBytes: ByteArray) {
         requireMessageSize(policy, framedCommitBytes)
         val mlsMessage = MlsMessage.decodeTls(TlsReader(framedCommitBytes))
         require(mlsMessage.wireFormat == WireFormat.PUBLIC_MESSAGE) {
@@ -2178,7 +2178,7 @@ class MlsGroup private constructor(
      * @param wireFormat the wire format the commit arrived in
      * @param authenticatedData the commit's `authenticated_data`
      */
-    fun processCommit(
+    public fun processCommit(
         commitBytes: ByteArray,
         senderLeafIndex: Int,
         confirmationTag: ByteArray,
@@ -2439,7 +2439,7 @@ class MlsGroup private constructor(
      * own Add. Each is validated as RFC 9420 §12.1 describes and offered to
      * [MlsGroupPolicy.authorizeProposal] before it joins the pending pool.
      */
-    fun receivePublicMessageProposal(pubMsg: PublicMessage) {
+    public fun receivePublicMessageProposal(pubMsg: PublicMessage) {
         require(pubMsg.contentType == ContentType.PROPOSAL) {
             "Expected PublicMessage with content_type == PROPOSAL, got ${pubMsg.contentType}"
         }
@@ -2593,9 +2593,9 @@ class MlsGroup private constructor(
     }
 
     /** One entry of the `external_senders` GroupContext extension. */
-    class ExternalSender(
-        val signatureKey: ByteArray,
-        val credential: Credential,
+    public class ExternalSender(
+        public val signatureKey: ByteArray,
+        public val credential: Credential,
     )
     // --- Exporter ---
 
@@ -2607,7 +2607,7 @@ class MlsGroup private constructor(
      * [MlsGroupPolicy.commitExporter], which is how the engine reaches it
      * without naming any one binding.
      */
-    fun exporterSecret(
+    public fun exporterSecret(
         label: String,
         context: ByteArray,
         length: Int,
@@ -2621,7 +2621,7 @@ class MlsGroup private constructor(
      *
      * external_priv, external_pub = KEM.DeriveKeyPair(external_secret)
      */
-    fun externalPub(): ByteArray {
+    public fun externalPub(): ByteArray {
         val kp = Hpke.deriveKeyPair(epochSecrets.externalSecret)
         return kp.publicKey
     }
@@ -2630,7 +2630,7 @@ class MlsGroup private constructor(
      * Get the GroupInfo for publishing (needed by external joiners).
      * Includes the ratchet tree and the `external_pub` extension.
      */
-    fun groupInfo(): GroupInfo = signedGroupInfo(includeRatchetTree = true, includeExternalPub = true)
+    public fun groupInfo(): GroupInfo = signedGroupInfo(includeRatchetTree = true, includeExternalPub = true)
 
     /**
      * This epoch's GroupInfo as an MLSMessage (wire format `mls_group_info`),
@@ -2638,7 +2638,7 @@ class MlsGroup private constructor(
      *
      * @param includeRatchetTree false when joiners get the tree out of band.
      */
-    fun groupInfoMessage(includeRatchetTree: Boolean = true): ByteArray = MlsMessage(wireFormat = WireFormat.GROUP_INFO, payload = signedGroupInfo(includeRatchetTree, includeExternalPub = true).toTlsBytes()).toTlsBytes()
+    public fun groupInfoMessage(includeRatchetTree: Boolean = true): ByteArray = MlsMessage(wireFormat = WireFormat.GROUP_INFO, payload = signedGroupInfo(includeRatchetTree, includeExternalPub = true).toTlsBytes()).toTlsBytes()
 
     /**
      * RFC 9420 §12.4.3: GroupInfo signed by us, whose confirmation_tag is the
@@ -2687,7 +2687,7 @@ class MlsGroup private constructor(
      * [proposals], resolved from this group's PSKs. Zeros when there are none.
      */
     @InternalMlsApi
-    fun computePskSecret(proposals: List<Proposal>): ByteArray = KeySchedule.pskSecret(proposals.filterIsInstance<Proposal.Psk>().map { it.psk to requirePsk(it.psk) })
+    public fun computePskSecret(proposals: List<Proposal>): ByteArray = KeySchedule.pskSecret(proposals.filterIsInstance<Proposal.Psk>().map { it.psk to requirePsk(it.psk) })
 
     /**
      * Verify the membership_tag on a PublicMessage (RFC 9420 Section 6.2).
@@ -2698,7 +2698,7 @@ class MlsGroup private constructor(
      * @param membershipTag the received membership_tag to verify
      * @return true if the tag is valid
      */
-    fun verifyMembershipTag(
+    public fun verifyMembershipTag(
         authenticatedContentBytes: ByteArray,
         membershipTag: ByteArray,
     ): Boolean {
@@ -2716,7 +2716,7 @@ class MlsGroup private constructor(
      * tried by several competing commits, and judging authorization must not
      * advance the state being judged against.
      */
-    fun resolveCommitProposals(pubMsg: PublicMessage): List<PendingProposal>? {
+    public fun resolveCommitProposals(pubMsg: PublicMessage): List<PendingProposal>? {
         val commit =
             try {
                 Commit.decodeTls(TlsReader(pubMsg.content))
@@ -2748,7 +2748,7 @@ class MlsGroup private constructor(
      * authentication has already established that this state IS the commit's
      * candidate parent.
      */
-    fun isCommitAuthorized(pubMsg: PublicMessage): Boolean {
+    public fun isCommitAuthorized(pubMsg: PublicMessage): Boolean {
         val proposals = resolveCommitProposals(pubMsg) ?: return false
         return try {
             policy.authorizeCommit(view(), proposals, pubMsg.sender.leafIndex)
@@ -2767,7 +2767,7 @@ class MlsGroup private constructor(
      * active admin, so one an ordinary member could also have made stays
      * ordinary even when an admin happened to send it.
      */
-    fun isSelfOnlyCommit(pubMsg: PublicMessage): Boolean {
+    public fun isSelfOnlyCommit(pubMsg: PublicMessage): Boolean {
         val proposals = resolveCommitProposals(pubMsg) ?: return false
         if (proposals.isEmpty()) return false
         val committer = pubMsg.sender.leafIndex
@@ -2786,7 +2786,7 @@ class MlsGroup private constructor(
      * isn't a member or the message was tampered with. Returns false for
      * either case; callers should reject the commit before advancing state.
      */
-    fun verifyPublicMessageCommitMembershipTag(pubMsg: PublicMessage): Boolean {
+    public fun verifyPublicMessageCommitMembershipTag(pubMsg: PublicMessage): Boolean {
         val membershipTag = pubMsg.membershipTag ?: return false
         if (membershipTag.isEmpty()) return false
         val confirmationTag = pubMsg.confirmationTag ?: return false
@@ -2965,7 +2965,7 @@ class MlsGroup private constructor(
         ).toTlsBytes()
     }
 
-    companion object {
+    public companion object {
         private const val MAX_SENT_KEYS = 10_000
         private const val MAX_SENT_PROPOSAL_MESSAGES = 256
 
@@ -3022,7 +3022,7 @@ class MlsGroup private constructor(
         // (0x0002 is ratchet_tree — putting it here makes GroupContext
         // unreadable to OpenMLS/MDK, which type-validates extensions by
         // context.)
-        const val REQUIRED_CAPABILITIES_EXTENSION_TYPE = 0x0003
+        public const val REQUIRED_CAPABILITIES_EXTENSION_TYPE: Int = 0x0003
 
         // RFC 9420 §13.3 IANA registry: 0x0004 is external_pub.
         // (0x0003 is required_capabilities — using it here makes
@@ -3045,17 +3045,17 @@ class MlsGroup private constructor(
         private val DEFAULT_EXTENSION_TYPES = GroupValidation.DEFAULT_EXTENSION_TYPES
 
         /** MLS self_remove proposal type (MIP-00 / MIP-03). */
-        const val SELF_REMOVE_PROPOSAL_TYPE = 0x000A
+        public const val SELF_REMOVE_PROPOSAL_TYPE: Int = 0x000A
 
         /** MLS extensions draft `app_data_update` proposal type. */
-        const val APP_DATA_UPDATE_PROPOSAL_TYPE = 0x0008
+        public const val APP_DATA_UPDATE_PROPOSAL_TYPE: Int = 0x0008
 
         /**
          * How many former epochs [decryptFormerEpoch] can still read. Each one
          * keeps that epoch's decryption secrets, so this is a forward-secrecy
          * trade (RFC 9420 §15.2); 4 matches ts-mls's `retainKeysForEpochs`.
          */
-        const val RETAIN_EPOCHS = 4
+        public const val RETAIN_EPOCHS: Int = 4
 
         /** How far back a fresh KeyPackage LeafNode's `not_before` is set. */
         private const val LIFETIME_SKEW_SECONDS = 3_600L
@@ -3075,7 +3075,7 @@ class MlsGroup private constructor(
          * member of the group MUST advertise in their leaf [Capabilities].
          */
         @InternalMlsApi
-        data class RequiredCapabilities(
+        public data class RequiredCapabilities(
             val extensions: List<Int>,
             val proposals: List<Int>,
             val credentials: List<Int>,
@@ -3087,7 +3087,7 @@ class MlsGroup private constructor(
          * peers may omit it; treat missing as "no restriction").
          */
         @InternalMlsApi
-        fun findRequiredCapabilities(extensions: List<Extension>): RequiredCapabilities? {
+        public fun findRequiredCapabilities(extensions: List<Extension>): RequiredCapabilities? {
             val ext = extensions.find { it.extensionType == REQUIRED_CAPABILITIES_EXTENSION_TYPE } ?: return null
             val r = TlsReader(ext.extensionData)
 
@@ -3115,7 +3115,7 @@ class MlsGroup private constructor(
          * an interop break against another implementation is one log line.
          */
         @InternalMlsApi
-        fun requireCapabilitiesMeetRequirements(
+        public fun requireCapabilitiesMeetRequirements(
             caps: Capabilities,
             req: RequiredCapabilities,
             who: String,
@@ -3168,7 +3168,7 @@ class MlsGroup private constructor(
          * it.
          */
         @InternalMlsApi
-        fun verifyTreeParentHashesForJoin(tree: RatchetTree): String? {
+        public fun verifyTreeParentHashesForJoin(tree: RatchetTree): String? {
             if (tree.leafCount == 0) return null
             for (parentIdx in tree.parentNodeIndices()) {
                 val key = tree.parentEncryptionKeyOf(parentIdx) ?: continue
@@ -3209,7 +3209,7 @@ class MlsGroup private constructor(
         /**
          * Create a new MLS group with a single member (the creator).
          */
-        fun create(
+        public fun create(
             identity: ByteArray,
             signingKey: ByteArray? = null,
             initialExtensions: List<Extension> = emptyList(),
@@ -3322,7 +3322,7 @@ class MlsGroup private constructor(
          *   secret: external PSKs the application provisioned, or the resumption
          *   PSK of a predecessor group (ReInit, branch)
          */
-        fun processWelcome(
+        public fun processWelcome(
             welcomeBytes: ByteArray,
             bundle: KeyPackageBundle,
             policy: MlsGroupPolicy = MlsGroupPolicy.Permissive,
@@ -3335,7 +3335,7 @@ class MlsGroup private constructor(
          * of joining: the [StagedWelcome] shows the group — its members, who
          * added us, its extensions — and [StagedWelcome.join] becomes a member.
          */
-        fun stageWelcome(
+        public fun stageWelcome(
             welcomeBytes: ByteArray,
             bundle: KeyPackageBundle,
             policy: MlsGroupPolicy = MlsGroupPolicy.Permissive,
@@ -3356,7 +3356,7 @@ class MlsGroup private constructor(
          * and holds only members of [predecessor]. Members are compared by
          * credential.
          */
-        fun joinSuccessor(
+        public fun joinSuccessor(
             welcomeBytes: ByteArray,
             bundle: KeyPackageBundle,
             predecessor: MlsGroup,
@@ -3526,7 +3526,7 @@ class MlsGroup private constructor(
          * @param lifetime the leaf's lifetime; null uses 84 days, backdated an
          *   hour for clock skew
          */
-        fun createKeyPackage(
+        public fun createKeyPackage(
             identity: ByteArray,
             policy: MlsGroupPolicy = MlsGroupPolicy.Permissive,
             leafSignatureKeyPair: Ed25519KeyPair? = null,
@@ -3657,7 +3657,7 @@ class MlsGroup private constructor(
          *   wire-ready PublicMessage envelope. Existing group members consume
          *   the framed bytes via [MlsGroup.processFramedCommit].
          */
-        fun externalJoin(
+        public fun externalJoin(
             groupInfoBytes: ByteArray,
             identity: ByteArray,
             signingKey: ByteArray? = null,
@@ -3749,7 +3749,7 @@ class MlsGroup private constructor(
          * or senders we never decrypted) simply re-derive from generation 0 on
          * first use — safe, because those messages were already processed.
          */
-        fun restore(
+        public fun restore(
             state: MlsGroupState,
             policy: MlsGroupPolicy = MlsGroupPolicy.Permissive,
         ): MlsGroup = restore(state, policy, observer = false)
@@ -3964,7 +3964,7 @@ class MlsGroup private constructor(
      * [CommitResult.preCommitExporterSecret] is the key the outer kind:445
      * MUST be encrypted with (RFC 9420 §12.4 + MDK parity).
      */
-    fun addMember(keyPackageBytes: ByteArray): CommitResult = addMembers(listOf(keyPackageBytes))
+    public fun addMember(keyPackageBytes: ByteArray): CommitResult = addMembers(listOf(keyPackageBytes))
 
     /**
      * Add several members in ONE commit.
@@ -3979,7 +3979,7 @@ class MlsGroup private constructor(
      * this way, which is why a group it creates with two invitees sits at epoch
      * 1 while ours used to reach epoch 2.
      */
-    fun addMembers(keyPackagesBytes: List<ByteArray>): CommitResult {
+    public fun addMembers(keyPackagesBytes: List<ByteArray>): CommitResult {
         require(keyPackagesBytes.isNotEmpty()) { "addMembers needs at least one KeyPackage" }
         keyPackagesBytes.forEach { proposeAdd(it) }
         return commit()
@@ -3990,7 +3990,7 @@ class MlsGroup private constructor(
      * Creates and applies a Commit with a Remove proposal. See [addMember]
      * for the pre-commit exporter key contract on the returned [CommitResult].
      */
-    fun removeMember(targetLeafIndex: Int): CommitResult {
+    public fun removeMember(targetLeafIndex: Int): CommitResult {
         proposeRemove(targetLeafIndex)
         return commit()
     }
@@ -4005,7 +4005,7 @@ class MlsGroup private constructor(
      * the epoch's [MlsGroupPolicy.commitExporter] secret, the key a binding
      * outer-encrypts this message under.
      */
-    fun buildSelfRemoveProposalMessage(): Pair<ByteArray, ByteArray> {
+    public fun buildSelfRemoveProposalMessage(): Pair<ByteArray, ByteArray> {
         policy.authorizeSelfRemove(view())
         val preCommitExporterSecret =
             policy.commitExporter?.let { exporterSecret(it.label, it.context, it.length) } ?: ByteArray(0)
@@ -4019,7 +4019,7 @@ class MlsGroup private constructor(
  * [senderLeafIndex] is a leaf index for a member sender and an index into
  * the `external_senders` extension for an external one.
  */
-data class PendingProposal(
+public data class PendingProposal(
     val proposal: Proposal,
     val senderLeafIndex: Int,
     /**
@@ -4033,13 +4033,13 @@ data class PendingProposal(
     val senderType: SenderType = SenderType.MEMBER,
 ) {
     /** Whether the member at [leafIndex] sent this proposal. */
-    fun isFrom(leafIndex: Int): Boolean = senderType == SenderType.MEMBER && senderLeafIndex == leafIndex
+    public fun isFrom(leafIndex: Int): Boolean = senderType == SenderType.MEMBER && senderLeafIndex == leafIndex
 
     /** Its RFC 9420 §5.2 ProposalRef, hashed once; null for one never sent. */
     val proposalRef: ByteArray? by lazy { authenticatedContentBytes?.let { Framing.proposalRef(it) } }
 }
 
-data class DecryptedMessage(
+public data class DecryptedMessage(
     val senderLeafIndex: Int,
     val contentType: ContentType,
     val content: ByteArray,
@@ -4073,28 +4073,28 @@ data class DecryptedMessage(
 }
 
 /** What [MlsGroup.processMessage] did with a message. */
-sealed class ProcessedMessage {
+public sealed class ProcessedMessage {
     /** An application message, decrypted and authenticated. */
-    class Application(
-        val message: DecryptedMessage,
+    public class Application(
+        public val message: DecryptedMessage,
     ) : ProcessedMessage()
 
     /** A standalone proposal, now waiting in the pending pool under [proposalRef]. */
-    class StagedProposal(
-        val proposal: Proposal,
-        val sender: Sender,
-        val proposalRef: ByteArray,
+    public class StagedProposal(
+        public val proposal: Proposal,
+        public val sender: Sender,
+        public val proposalRef: ByteArray,
     ) : ProcessedMessage()
 
     /**
      * A commit, applied: the group is now at [epoch]. [removedSelf] means the
      * commit removed us — the group can no longer be used.
      */
-    class AppliedCommit(
-        val sender: Sender,
-        val epoch: Long,
-        val removedSelf: Boolean,
+    public class AppliedCommit(
+        public val sender: Sender,
+        public val epoch: Long,
+        public val removedSelf: Boolean,
         /** What the commit applied, each with its sender; [Proposal.Custom] ones are the application's to act on. */
-        val proposals: List<PendingProposal> = emptyList(),
+        public val proposals: List<PendingProposal> = emptyList(),
     ) : ProcessedMessage()
 }

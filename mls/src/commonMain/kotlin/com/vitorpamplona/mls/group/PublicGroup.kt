@@ -47,24 +47,24 @@ import com.vitorpamplona.mls.tree.LeafNode
  *
  * Not thread-safe, like [MlsGroup]: one thread at a time per view.
  */
-class PublicGroup private constructor(
+public class PublicGroup private constructor(
     private val group: MlsGroup,
 ) {
-    val groupId: ByteArray get() = group.groupId.copyOf()
+    public val groupId: ByteArray get() = group.groupId.copyOf()
 
-    val epoch: Long get() = group.epoch
+    public val epoch: Long get() = group.epoch
 
     /** The GroupContext extensions. */
-    val extensions: List<Extension> get() = group.groupContextExtensionsSnapshot()
+    public val extensions: List<Extension> get() = group.groupContextExtensionsSnapshot()
 
     /** The occupied leaves, by leaf index. */
-    fun members(): List<Pair<Int, LeafNode>> = group.members()
+    public fun members(): List<Pair<Int, LeafNode>> = group.members()
 
     /** The ratchet tree, TLS-encoded: what a joiner needs when the GroupInfo leaves it out. */
-    fun exportTreeBytes(): ByteArray = group.exportTreeBytes()
+    public fun exportTreeBytes(): ByteArray = group.exportTreeBytes()
 
     /** Proposals sent by reference this epoch, waiting for a commit. */
-    fun pendingProposals(): List<PendingProposal> = group.pendingProposalsSnapshot()
+    public fun pendingProposals(): List<PendingProposal> = group.pendingProposalsSnapshot()
 
     /**
      * Check and apply a PublicMessage proposal or commit. Throws, leaving the
@@ -74,7 +74,7 @@ class PublicGroup private constructor(
      * [ProcessedMessage.AppliedCommit.removedSelf] is always false: the view
      * has no leaf to lose.
      */
-    fun processMessage(messageBytes: ByteArray): ProcessedMessage {
+    public fun processMessage(messageBytes: ByteArray): ProcessedMessage {
         // The header alone says the wire format (version, then wire_format); the
         // engine decodes the rest after its size check.
         require(messageBytes.size >= 4) { "Not an MLSMessage" }
@@ -90,23 +90,23 @@ class PublicGroup private constructor(
      * Snapshot for [restore]. It holds no secrets — a PublicGroup has none —
      * but the same [MlsGroupState] format members use.
      */
-    fun saveState(): MlsGroupState = group.saveState()
+    public fun saveState(): MlsGroupState = group.saveState()
 
-    companion object {
+    public companion object {
         /**
          * Start following the group [groupInfoBytes] describes (bare or as an
          * MLSMessage). Its signature and its whole tree are checked
          * (RFC 9420 §12.4.3.1); [ratchetTree] supplies the tree when the
          * GroupInfo leaves it out.
          */
-        fun fromGroupInfo(
+        public fun fromGroupInfo(
             groupInfoBytes: ByteArray,
             policy: MlsGroupPolicy = MlsGroupPolicy.Permissive,
             ratchetTree: ByteArray? = null,
         ): PublicGroup = PublicGroup(MlsGroup.observe(groupInfoBytes, policy, ratchetTree))
 
         /** A PublicGroup from [saveState]. Supply the policy it ran under. */
-        fun restore(
+        public fun restore(
             state: MlsGroupState,
             policy: MlsGroupPolicy = MlsGroupPolicy.Permissive,
         ): PublicGroup = PublicGroup(MlsGroup.restore(state, policy, observer = true))

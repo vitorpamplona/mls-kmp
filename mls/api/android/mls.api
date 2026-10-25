@@ -1,0 +1,1893 @@
+public abstract interface annotation class com/vitorpamplona/mls/InternalMlsApi : java/lang/annotation/Annotation {
+}
+
+public final class com/vitorpamplona/mls/codec/TlsReader {
+	public static final field Companion Lcom/vitorpamplona/mls/codec/TlsReader$Companion;
+	public static final field MAX_OPAQUE_SIZE I
+	public fun <init> ([BII)V
+	public synthetic fun <init> ([BIIILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun getHasRemaining ()Z
+	public final fun getRemaining ()I
+	public final fun readBytes (I)[B
+	public final fun readCapturing (Lkotlin/jvm/functions/Function1;)Lkotlin/Pair;
+	public final fun readCount (I)I
+	public static synthetic fun readCount$default (Lcom/vitorpamplona/mls/codec/TlsReader;IILjava/lang/Object;)I
+	public final fun readIndex ()I
+	public final fun readOpaque1 ()[B
+	public final fun readOpaque2 ()[B
+	public final fun readOpaque4 ()[B
+	public final fun readOpaqueVarInt ()[B
+	public final fun readOptional (Lkotlin/jvm/functions/Function1;)Ljava/lang/Object;
+	public final fun readUint16 ()I
+	public final fun readUint32 ()J
+	public final fun readUint64 ()J
+	public final fun readUint8 ()I
+	public final fun readVarInt ()I
+	public final fun readVector1 (Lkotlin/jvm/functions/Function1;)Ljava/util/List;
+	public final fun readVector2 (Lkotlin/jvm/functions/Function1;)Ljava/util/List;
+	public final fun readVector4 (Lkotlin/jvm/functions/Function1;)Ljava/util/List;
+	public final fun readVectorVarInt (Lkotlin/jvm/functions/Function1;)Ljava/util/List;
+	public final fun requireFullyConsumed (Ljava/lang/String;)V
+	public final fun subReader (I)Lcom/vitorpamplona/mls/codec/TlsReader;
+}
+
+public final class com/vitorpamplona/mls/codec/TlsReader$Companion {
+}
+
+public abstract interface class com/vitorpamplona/mls/codec/TlsSerializable {
+	public abstract fun encodeTls (Lcom/vitorpamplona/mls/codec/TlsWriter;)V
+	public fun toTlsBytes ()[B
+}
+
+public final class com/vitorpamplona/mls/codec/TlsSerializable$DefaultImpls {
+	public static fun toTlsBytes (Lcom/vitorpamplona/mls/codec/TlsSerializable;)[B
+}
+
+public final class com/vitorpamplona/mls/codec/TlsWriter {
+	public fun <init> ()V
+	public fun <init> (I)V
+	public synthetic fun <init> (IILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun getSize ()I
+	public final fun putBytes ([B)V
+	public final fun putOpaque1 ([B)V
+	public final fun putOpaque2 ([B)V
+	public final fun putOpaque4 ([B)V
+	public final fun putOpaqueVarInt ([B)V
+	public final fun putOptional (Lcom/vitorpamplona/mls/codec/TlsSerializable;)V
+	public final fun putStruct (Lcom/vitorpamplona/mls/codec/TlsSerializable;)V
+	public final fun putUint16 (I)V
+	public final fun putUint32 (J)V
+	public final fun putUint64 (J)V
+	public final fun putUint8 (I)V
+	public final fun putVarInt (I)V
+	public final fun putVector1 (Ljava/util/List;)V
+	public final fun putVector2 (Ljava/util/List;)V
+	public final fun putVector4 (Ljava/util/List;)V
+	public final fun putVectorVarInt (Ljava/util/List;)V
+	public final fun toByteArray ()[B
+}
+
+public final class com/vitorpamplona/mls/components/AppDataDictionary : com/vitorpamplona/mls/codec/TlsSerializable {
+	public static final field Companion Lcom/vitorpamplona/mls/components/AppDataDictionary$Companion;
+	public static final field EXTENSION_TYPE I
+	public fun <init> (Ljava/util/Collection;)V
+	public final fun contains (I)Z
+	public fun encodeTls (Lcom/vitorpamplona/mls/codec/TlsWriter;)V
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun get (I)[B
+	public final fun getComponentIds ()Ljava/util/List;
+	public final fun getEntries ()Ljava/util/List;
+	public fun hashCode ()I
+	public final fun isEmpty ()Z
+	public final fun toBytes ()[B
+	public final fun toExtension ()Lcom/vitorpamplona/mls/tree/Extension;
+	public fun toString ()Ljava/lang/String;
+	public fun toTlsBytes ()[B
+	public final fun with (I[B)Lcom/vitorpamplona/mls/components/AppDataDictionary;
+	public final fun without (I)Lcom/vitorpamplona/mls/components/AppDataDictionary;
+}
+
+public final class com/vitorpamplona/mls/components/AppDataDictionary$Companion {
+	public final fun decode ([B)Lcom/vitorpamplona/mls/components/AppDataDictionary;
+	public final fun decodeTls (Lcom/vitorpamplona/mls/codec/TlsReader;)Lcom/vitorpamplona/mls/components/AppDataDictionary;
+	public final fun fromExtensions (Ljava/util/List;)Lcom/vitorpamplona/mls/components/AppDataDictionary;
+	public final fun fromExtensionsOrEmpty (Ljava/util/List;)Lcom/vitorpamplona/mls/components/AppDataDictionary;
+	public final fun getEMPTY ()Lcom/vitorpamplona/mls/components/AppDataDictionary;
+}
+
+public final class com/vitorpamplona/mls/components/ComponentData : com/vitorpamplona/mls/codec/TlsSerializable {
+	public static final field Companion Lcom/vitorpamplona/mls/components/ComponentData$Companion;
+	public fun <init> (I[B)V
+	public final fun component1 ()I
+	public final fun component2 ()[B
+	public final fun copy (I[B)Lcom/vitorpamplona/mls/components/ComponentData;
+	public static synthetic fun copy$default (Lcom/vitorpamplona/mls/components/ComponentData;I[BILjava/lang/Object;)Lcom/vitorpamplona/mls/components/ComponentData;
+	public fun encodeTls (Lcom/vitorpamplona/mls/codec/TlsWriter;)V
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getComponentId ()I
+	public final fun getData ()[B
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+	public fun toTlsBytes ()[B
+}
+
+public final class com/vitorpamplona/mls/components/ComponentData$Companion {
+	public final fun decodeTls (Lcom/vitorpamplona/mls/codec/TlsReader;)Lcom/vitorpamplona/mls/components/ComponentData;
+}
+
+public final class com/vitorpamplona/mls/components/ComponentsList {
+	public static final field APP_COMPONENTS_ID I
+	public static final field INSTANCE Lcom/vitorpamplona/mls/components/ComponentsList;
+	public static final field LAST_RESORT_KEY_PACKAGE_ID I
+	public static final field SAFE_AAD_ID I
+	public final fun decode ([B)Ljava/util/List;
+	public final fun encode (Ljava/util/Collection;)[B
+	public final fun supportedOrRequired (Lcom/vitorpamplona/mls/components/AppDataDictionary;)Ljava/util/List;
+}
+
+public final class com/vitorpamplona/mls/crypto/Hpke {
+	public static final field INSTANCE Lcom/vitorpamplona/mls/crypto/Hpke;
+	public final fun deriveKeyPair ([B)Lcom/vitorpamplona/crypto/curve25519/X25519KeyPair;
+	public final fun open ([B[B[B[B[B)[B
+	public final fun seal ([B[B[B[B)Lcom/vitorpamplona/mls/crypto/HpkeCiphertext;
+	public final fun setupBaseRExport ([B[B[B)Lcom/vitorpamplona/mls/crypto/HpkeExportContext;
+	public final fun setupBaseSExport ([B[B)Lkotlin/Pair;
+}
+
+public final class com/vitorpamplona/mls/crypto/HpkeCiphertext : com/vitorpamplona/mls/codec/TlsSerializable {
+	public static final field Companion Lcom/vitorpamplona/mls/crypto/HpkeCiphertext$Companion;
+	public fun <init> ([B[B)V
+	public final fun component1 ()[B
+	public final fun component2 ()[B
+	public final fun copy ([B[B)Lcom/vitorpamplona/mls/crypto/HpkeCiphertext;
+	public static synthetic fun copy$default (Lcom/vitorpamplona/mls/crypto/HpkeCiphertext;[B[BILjava/lang/Object;)Lcom/vitorpamplona/mls/crypto/HpkeCiphertext;
+	public fun encodeTls (Lcom/vitorpamplona/mls/codec/TlsWriter;)V
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getCiphertext ()[B
+	public final fun getKemOutput ()[B
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+	public fun toTlsBytes ()[B
+}
+
+public final class com/vitorpamplona/mls/crypto/HpkeCiphertext$Companion {
+	public final fun decodeTls (Lcom/vitorpamplona/mls/codec/TlsReader;)Lcom/vitorpamplona/mls/crypto/HpkeCiphertext;
+}
+
+public final class com/vitorpamplona/mls/crypto/HpkeExportContext {
+	public fun <init> ([B)V
+	public final fun export ([BI)[B
+}
+
+public final class com/vitorpamplona/mls/crypto/MlsCryptoProvider {
+	public static final field AEAD_KEY_LENGTH I
+	public static final field AEAD_NONCE_LENGTH I
+	public static final field HASH_OUTPUT_LENGTH I
+	public static final field INSTANCE Lcom/vitorpamplona/mls/crypto/MlsCryptoProvider;
+	public static final field KEM_PUBLIC_KEY_LENGTH I
+	public static final field KEM_SECRET_KEY_LENGTH I
+	public static final field KEM_SECRET_LENGTH I
+	public static final field SIGNATURE_PUBLIC_KEY_LENGTH I
+	public static final field SIGNATURE_SECRET_KEY_LENGTH I
+	public final fun aeadDecrypt ([B[B[B[B)[B
+	public final fun aeadEncrypt ([B[B[B[B)[B
+	public final fun decryptWithLabel ([BLjava/lang/String;[B[B[B)[B
+	public final fun deriveSecret ([BLjava/lang/String;)[B
+	public final fun encryptWithLabel ([BLjava/lang/String;[B[B)Lcom/vitorpamplona/mls/crypto/HpkeCiphertext;
+	public final fun expandWithLabel ([BLjava/lang/String;[BI)[B
+	public final fun expandWithLabelRaw ([B[B[BI)[B
+	public final fun hash ([B)[B
+	public final fun hkdfExpand ([B[BI)[B
+	public final fun hkdfExtract ([B[B)[B
+	public final fun randomBytes (I)[B
+	public final fun refHash (Ljava/lang/String;[B)[B
+	public final fun signWithLabel ([BLjava/lang/String;[B)[B
+	public final fun verifyWithLabel ([BLjava/lang/String;[B[B)Z
+}
+
+public final class com/vitorpamplona/mls/framing/ContentType : java/lang/Enum {
+	public static final field APPLICATION Lcom/vitorpamplona/mls/framing/ContentType;
+	public static final field COMMIT Lcom/vitorpamplona/mls/framing/ContentType;
+	public static final field Companion Lcom/vitorpamplona/mls/framing/ContentType$Companion;
+	public static final field PROPOSAL Lcom/vitorpamplona/mls/framing/ContentType;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public final fun getValue ()I
+	public static fun valueOf (Ljava/lang/String;)Lcom/vitorpamplona/mls/framing/ContentType;
+	public static fun values ()[Lcom/vitorpamplona/mls/framing/ContentType;
+}
+
+public final class com/vitorpamplona/mls/framing/ContentType$Companion {
+	public final fun fromValue (I)Lcom/vitorpamplona/mls/framing/ContentType;
+}
+
+public final class com/vitorpamplona/mls/framing/FramedContent : com/vitorpamplona/mls/codec/TlsSerializable {
+	public fun <init> ([BJLcom/vitorpamplona/mls/framing/Sender;[BLcom/vitorpamplona/mls/framing/ContentType;[B)V
+	public final fun commit ()Lcom/vitorpamplona/mls/messages/Commit;
+	public fun encodeTls (Lcom/vitorpamplona/mls/codec/TlsWriter;)V
+	public final fun getAuthenticatedData ()[B
+	public final fun getBody ()[B
+	public final fun getContentType ()Lcom/vitorpamplona/mls/framing/ContentType;
+	public final fun getEpoch ()J
+	public final fun getGroupId ()[B
+	public final fun getSender ()Lcom/vitorpamplona/mls/framing/Sender;
+	public final fun proposal ()Lcom/vitorpamplona/mls/messages/Proposal;
+	public fun toTlsBytes ()[B
+}
+
+public final class com/vitorpamplona/mls/framing/FramedContentTbs : com/vitorpamplona/mls/codec/TlsSerializable {
+	public fun <init> (ILcom/vitorpamplona/mls/framing/WireFormat;[BJLcom/vitorpamplona/mls/framing/Sender;[BLcom/vitorpamplona/mls/framing/ContentType;[B[B)V
+	public synthetic fun <init> (ILcom/vitorpamplona/mls/framing/WireFormat;[BJLcom/vitorpamplona/mls/framing/Sender;[BLcom/vitorpamplona/mls/framing/ContentType;[B[BILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()I
+	public final fun component2 ()Lcom/vitorpamplona/mls/framing/WireFormat;
+	public final fun component3 ()[B
+	public final fun component4 ()J
+	public final fun component5 ()Lcom/vitorpamplona/mls/framing/Sender;
+	public final fun component6 ()[B
+	public final fun component7 ()Lcom/vitorpamplona/mls/framing/ContentType;
+	public final fun component8 ()[B
+	public final fun component9 ()[B
+	public final fun copy (ILcom/vitorpamplona/mls/framing/WireFormat;[BJLcom/vitorpamplona/mls/framing/Sender;[BLcom/vitorpamplona/mls/framing/ContentType;[B[B)Lcom/vitorpamplona/mls/framing/FramedContentTbs;
+	public static synthetic fun copy$default (Lcom/vitorpamplona/mls/framing/FramedContentTbs;ILcom/vitorpamplona/mls/framing/WireFormat;[BJLcom/vitorpamplona/mls/framing/Sender;[BLcom/vitorpamplona/mls/framing/ContentType;[B[BILjava/lang/Object;)Lcom/vitorpamplona/mls/framing/FramedContentTbs;
+	public fun encodeTls (Lcom/vitorpamplona/mls/codec/TlsWriter;)V
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getAuthenticatedData ()[B
+	public final fun getContent ()[B
+	public final fun getContentType ()Lcom/vitorpamplona/mls/framing/ContentType;
+	public final fun getEpoch ()J
+	public final fun getGroupContext ()[B
+	public final fun getGroupId ()[B
+	public final fun getSender ()Lcom/vitorpamplona/mls/framing/Sender;
+	public final fun getVersion ()I
+	public final fun getWireFormat ()Lcom/vitorpamplona/mls/framing/WireFormat;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+	public fun toTlsBytes ()[B
+}
+
+public final class com/vitorpamplona/mls/framing/Framing {
+	public static final field INSTANCE Lcom/vitorpamplona/mls/framing/Framing;
+	public static final field PROPOSAL_REF_LABEL Ljava/lang/String;
+	public final fun authenticatedContent (Lcom/vitorpamplona/mls/framing/WireFormat;Lcom/vitorpamplona/mls/framing/FramedContent;[B[B)[B
+	public static synthetic fun authenticatedContent$default (Lcom/vitorpamplona/mls/framing/Framing;Lcom/vitorpamplona/mls/framing/WireFormat;Lcom/vitorpamplona/mls/framing/FramedContent;[B[BILjava/lang/Object;)[B
+	public final fun confirmedTranscriptHashInput (Lcom/vitorpamplona/mls/framing/WireFormat;Lcom/vitorpamplona/mls/framing/FramedContent;[B)[B
+	public final fun encodeAuthData (Lcom/vitorpamplona/mls/codec/TlsWriter;Lcom/vitorpamplona/mls/framing/ContentType;[B[B)V
+	public final fun membershipTag ([BLcom/vitorpamplona/mls/framing/FramedContent;[B[B[B)[B
+	public final fun proposalRef ([B)[B
+	public final fun publicMessage (Lcom/vitorpamplona/mls/framing/FramedContent;[B[B[B)Lcom/vitorpamplona/mls/framing/PublicMessage;
+	public final fun senderSignsGroupContext (Lcom/vitorpamplona/mls/framing/Sender;)Z
+	public final fun sign ([BLcom/vitorpamplona/mls/framing/WireFormat;Lcom/vitorpamplona/mls/framing/FramedContent;[B)[B
+	public final fun tbs (Lcom/vitorpamplona/mls/framing/WireFormat;Lcom/vitorpamplona/mls/framing/FramedContent;[B)[B
+	public final fun verify ([BLcom/vitorpamplona/mls/framing/WireFormat;Lcom/vitorpamplona/mls/framing/FramedContent;[B[B)Z
+}
+
+public final class com/vitorpamplona/mls/framing/FramingKt {
+	public static final fun framedContent (Lcom/vitorpamplona/mls/framing/PublicMessage;)Lcom/vitorpamplona/mls/framing/FramedContent;
+}
+
+public final class com/vitorpamplona/mls/framing/MlsMessage : com/vitorpamplona/mls/codec/TlsSerializable {
+	public static final field Companion Lcom/vitorpamplona/mls/framing/MlsMessage$Companion;
+	public static final field MLS_VERSION_10 I
+	public fun <init> (ILcom/vitorpamplona/mls/framing/WireFormat;[B)V
+	public synthetic fun <init> (ILcom/vitorpamplona/mls/framing/WireFormat;[BILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()I
+	public final fun component2 ()Lcom/vitorpamplona/mls/framing/WireFormat;
+	public final fun component3 ()[B
+	public final fun copy (ILcom/vitorpamplona/mls/framing/WireFormat;[B)Lcom/vitorpamplona/mls/framing/MlsMessage;
+	public static synthetic fun copy$default (Lcom/vitorpamplona/mls/framing/MlsMessage;ILcom/vitorpamplona/mls/framing/WireFormat;[BILjava/lang/Object;)Lcom/vitorpamplona/mls/framing/MlsMessage;
+	public fun encodeTls (Lcom/vitorpamplona/mls/codec/TlsWriter;)V
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getPayload ()[B
+	public final fun getVersion ()I
+	public final fun getWireFormat ()Lcom/vitorpamplona/mls/framing/WireFormat;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+	public fun toTlsBytes ()[B
+}
+
+public final class com/vitorpamplona/mls/framing/MlsMessage$Companion {
+	public final fun decodeTls (Lcom/vitorpamplona/mls/codec/TlsReader;)Lcom/vitorpamplona/mls/framing/MlsMessage;
+	public final fun fromPrivateMessage (Lcom/vitorpamplona/mls/framing/PrivateMessage;)Lcom/vitorpamplona/mls/framing/MlsMessage;
+	public final fun fromPublicMessage (Lcom/vitorpamplona/mls/framing/PublicMessage;)Lcom/vitorpamplona/mls/framing/MlsMessage;
+}
+
+public final class com/vitorpamplona/mls/framing/PrivateMessage : com/vitorpamplona/mls/codec/TlsSerializable {
+	public static final field Companion Lcom/vitorpamplona/mls/framing/PrivateMessage$Companion;
+	public static final field MAX_AAD_BYTES I
+	public fun <init> ([BJLcom/vitorpamplona/mls/framing/ContentType;[B[B[B)V
+	public final fun component1 ()[B
+	public final fun component2 ()J
+	public final fun component3 ()Lcom/vitorpamplona/mls/framing/ContentType;
+	public final fun component4 ()[B
+	public final fun component5 ()[B
+	public final fun component6 ()[B
+	public final fun copy ([BJLcom/vitorpamplona/mls/framing/ContentType;[B[B[B)Lcom/vitorpamplona/mls/framing/PrivateMessage;
+	public static synthetic fun copy$default (Lcom/vitorpamplona/mls/framing/PrivateMessage;[BJLcom/vitorpamplona/mls/framing/ContentType;[B[B[BILjava/lang/Object;)Lcom/vitorpamplona/mls/framing/PrivateMessage;
+	public fun encodeTls (Lcom/vitorpamplona/mls/codec/TlsWriter;)V
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getAuthenticatedData ()[B
+	public final fun getCiphertext ()[B
+	public final fun getContentType ()Lcom/vitorpamplona/mls/framing/ContentType;
+	public final fun getEncryptedSenderData ()[B
+	public final fun getEpoch ()J
+	public final fun getGroupId ()[B
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+	public fun toTlsBytes ()[B
+}
+
+public final class com/vitorpamplona/mls/framing/PrivateMessage$Companion {
+	public final fun decodeTls (Lcom/vitorpamplona/mls/codec/TlsReader;)Lcom/vitorpamplona/mls/framing/PrivateMessage;
+}
+
+public final class com/vitorpamplona/mls/framing/PrivateMessageCodec {
+	public static final field INSTANCE Lcom/vitorpamplona/mls/framing/PrivateMessageCodec;
+	public static final field REUSE_GUARD_LENGTH I
+	public final fun openContent (Lcom/vitorpamplona/mls/framing/PrivateMessage;Lcom/vitorpamplona/mls/framing/PrivateMessageCodec$SenderData;Lcom/vitorpamplona/mls/schedule/KeyNonceGeneration;)Lcom/vitorpamplona/mls/framing/PrivateMessageCodec$Opened;
+	public final fun openSenderData (Lcom/vitorpamplona/mls/framing/PrivateMessage;[B)Lcom/vitorpamplona/mls/framing/PrivateMessageCodec$SenderData;
+	public final fun seal (Lcom/vitorpamplona/mls/framing/FramedContent;[B[BLcom/vitorpamplona/mls/schedule/KeyNonceGeneration;[BI)Lcom/vitorpamplona/mls/framing/PrivateMessage;
+	public static synthetic fun seal$default (Lcom/vitorpamplona/mls/framing/PrivateMessageCodec;Lcom/vitorpamplona/mls/framing/FramedContent;[B[BLcom/vitorpamplona/mls/schedule/KeyNonceGeneration;[BIILjava/lang/Object;)Lcom/vitorpamplona/mls/framing/PrivateMessage;
+}
+
+public final class com/vitorpamplona/mls/framing/PrivateMessageCodec$Opened {
+	public fun <init> (Lcom/vitorpamplona/mls/framing/FramedContent;[B[B)V
+	public final fun getConfirmationTag ()[B
+	public final fun getContent ()Lcom/vitorpamplona/mls/framing/FramedContent;
+	public final fun getSignature ()[B
+}
+
+public final class com/vitorpamplona/mls/framing/PrivateMessageCodec$SenderData {
+	public fun <init> (II[B)V
+	public final fun getGeneration ()I
+	public final fun getLeafIndex ()I
+	public final fun getReuseGuard ()[B
+}
+
+public final class com/vitorpamplona/mls/framing/PublicMessage : com/vitorpamplona/mls/codec/TlsSerializable {
+	public static final field Companion Lcom/vitorpamplona/mls/framing/PublicMessage$Companion;
+	public static final field MAX_AUTHENTICATED_DATA_BYTES I
+	public fun <init> ([BJLcom/vitorpamplona/mls/framing/Sender;[BLcom/vitorpamplona/mls/framing/ContentType;[B[B[B[B)V
+	public synthetic fun <init> ([BJLcom/vitorpamplona/mls/framing/Sender;[BLcom/vitorpamplona/mls/framing/ContentType;[B[B[B[BILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()[B
+	public final fun component2 ()J
+	public final fun component3 ()Lcom/vitorpamplona/mls/framing/Sender;
+	public final fun component4 ()[B
+	public final fun component5 ()Lcom/vitorpamplona/mls/framing/ContentType;
+	public final fun component6 ()[B
+	public final fun component7 ()[B
+	public final fun component8 ()[B
+	public final fun component9 ()[B
+	public final fun copy ([BJLcom/vitorpamplona/mls/framing/Sender;[BLcom/vitorpamplona/mls/framing/ContentType;[B[B[B[B)Lcom/vitorpamplona/mls/framing/PublicMessage;
+	public static synthetic fun copy$default (Lcom/vitorpamplona/mls/framing/PublicMessage;[BJLcom/vitorpamplona/mls/framing/Sender;[BLcom/vitorpamplona/mls/framing/ContentType;[B[B[B[BILjava/lang/Object;)Lcom/vitorpamplona/mls/framing/PublicMessage;
+	public fun encodeTls (Lcom/vitorpamplona/mls/codec/TlsWriter;)V
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getAuthenticatedData ()[B
+	public final fun getConfirmationTag ()[B
+	public final fun getContent ()[B
+	public final fun getContentType ()Lcom/vitorpamplona/mls/framing/ContentType;
+	public final fun getEpoch ()J
+	public final fun getGroupId ()[B
+	public final fun getMembershipTag ()[B
+	public final fun getSender ()Lcom/vitorpamplona/mls/framing/Sender;
+	public final fun getSignature ()[B
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+	public fun toTlsBytes ()[B
+}
+
+public final class com/vitorpamplona/mls/framing/PublicMessage$Companion {
+	public final fun decodeTls (Lcom/vitorpamplona/mls/codec/TlsReader;)Lcom/vitorpamplona/mls/framing/PublicMessage;
+}
+
+public final class com/vitorpamplona/mls/framing/Sender {
+	public fun <init> (Lcom/vitorpamplona/mls/framing/SenderType;I)V
+	public synthetic fun <init> (Lcom/vitorpamplona/mls/framing/SenderType;IILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Lcom/vitorpamplona/mls/framing/SenderType;
+	public final fun component2 ()I
+	public final fun copy (Lcom/vitorpamplona/mls/framing/SenderType;I)Lcom/vitorpamplona/mls/framing/Sender;
+	public static synthetic fun copy$default (Lcom/vitorpamplona/mls/framing/Sender;Lcom/vitorpamplona/mls/framing/SenderType;IILjava/lang/Object;)Lcom/vitorpamplona/mls/framing/Sender;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getLeafIndex ()I
+	public final fun getSenderType ()Lcom/vitorpamplona/mls/framing/SenderType;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/vitorpamplona/mls/framing/SenderType : java/lang/Enum {
+	public static final field Companion Lcom/vitorpamplona/mls/framing/SenderType$Companion;
+	public static final field EXTERNAL Lcom/vitorpamplona/mls/framing/SenderType;
+	public static final field MEMBER Lcom/vitorpamplona/mls/framing/SenderType;
+	public static final field NEW_MEMBER_COMMIT Lcom/vitorpamplona/mls/framing/SenderType;
+	public static final field NEW_MEMBER_PROPOSAL Lcom/vitorpamplona/mls/framing/SenderType;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public final fun getValue ()I
+	public static fun valueOf (Ljava/lang/String;)Lcom/vitorpamplona/mls/framing/SenderType;
+	public static fun values ()[Lcom/vitorpamplona/mls/framing/SenderType;
+}
+
+public final class com/vitorpamplona/mls/framing/SenderType$Companion {
+	public final fun fromValue (I)Lcom/vitorpamplona/mls/framing/SenderType;
+}
+
+public final class com/vitorpamplona/mls/framing/WireFormat : java/lang/Enum {
+	public static final field Companion Lcom/vitorpamplona/mls/framing/WireFormat$Companion;
+	public static final field GROUP_INFO Lcom/vitorpamplona/mls/framing/WireFormat;
+	public static final field KEY_PACKAGE Lcom/vitorpamplona/mls/framing/WireFormat;
+	public static final field PRIVATE_MESSAGE Lcom/vitorpamplona/mls/framing/WireFormat;
+	public static final field PUBLIC_MESSAGE Lcom/vitorpamplona/mls/framing/WireFormat;
+	public static final field WELCOME Lcom/vitorpamplona/mls/framing/WireFormat;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public final fun getValue ()I
+	public static fun valueOf (Ljava/lang/String;)Lcom/vitorpamplona/mls/framing/WireFormat;
+	public static fun values ()[Lcom/vitorpamplona/mls/framing/WireFormat;
+}
+
+public final class com/vitorpamplona/mls/framing/WireFormat$Companion {
+	public final fun fromValue (I)Lcom/vitorpamplona/mls/framing/WireFormat;
+}
+
+public final class com/vitorpamplona/mls/group/DecryptedMessage {
+	public fun <init> (ILcom/vitorpamplona/mls/framing/ContentType;[BJ[B)V
+	public synthetic fun <init> (ILcom/vitorpamplona/mls/framing/ContentType;[BJ[BILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()I
+	public final fun component2 ()Lcom/vitorpamplona/mls/framing/ContentType;
+	public final fun component3 ()[B
+	public final fun component4 ()J
+	public final fun component5 ()[B
+	public final fun copy (ILcom/vitorpamplona/mls/framing/ContentType;[BJ[B)Lcom/vitorpamplona/mls/group/DecryptedMessage;
+	public static synthetic fun copy$default (Lcom/vitorpamplona/mls/group/DecryptedMessage;ILcom/vitorpamplona/mls/framing/ContentType;[BJ[BILjava/lang/Object;)Lcom/vitorpamplona/mls/group/DecryptedMessage;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getAuthenticatedData ()[B
+	public final fun getContent ()[B
+	public final fun getContentType ()Lcom/vitorpamplona/mls/framing/ContentType;
+	public final fun getEpoch ()J
+	public final fun getSenderLeafIndex ()I
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/vitorpamplona/mls/group/GroupView {
+	public fun <init> (Ljava/util/List;IILkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;)V
+	public final fun getExtensions ()Ljava/util/List;
+	public final fun getLeafCount ()I
+	public final fun getMyLeafIndex ()I
+	public final fun leafCapabilities (I)Lcom/vitorpamplona/mls/tree/Capabilities;
+	public final fun memberIdentityHex (I)Ljava/lang/String;
+}
+
+public final class com/vitorpamplona/mls/group/MlsExporterLabel {
+	public fun <init> (Ljava/lang/String;[BI)V
+	public final fun getContext ()[B
+	public final fun getLabel ()Ljava/lang/String;
+	public final fun getLength ()I
+}
+
+public final class com/vitorpamplona/mls/group/MlsGroup {
+	public static final field APP_DATA_UPDATE_PROPOSAL_TYPE I
+	public static final field Companion Lcom/vitorpamplona/mls/group/MlsGroup$Companion;
+	public static final field REQUIRED_CAPABILITIES_EXTENSION_TYPE I
+	public static final field RETAIN_EPOCHS I
+	public static final field SELF_REMOVE_PROPOSAL_TYPE I
+	public final fun addMember ([B)Lcom/vitorpamplona/mls/messages/CommitResult;
+	public final fun addMembers (Ljava/util/List;)Lcom/vitorpamplona/mls/messages/CommitResult;
+	public final fun advertiseInNextCommit (Lcom/vitorpamplona/mls/tree/Capabilities;Ljava/util/List;)V
+	public final fun appDataDictionary ()Lcom/vitorpamplona/mls/components/AppDataDictionary;
+	public final fun branch (Ljava/util/List;[BLjava/util/List;Z)Lcom/vitorpamplona/mls/group/MlsGroup$SuccessorGroup;
+	public static synthetic fun branch$default (Lcom/vitorpamplona/mls/group/MlsGroup;Ljava/util/List;[BLjava/util/List;ZILjava/lang/Object;)Lcom/vitorpamplona/mls/group/MlsGroup$SuccessorGroup;
+	public final fun buildSelfRemoveProposalMessage ()Lkotlin/Pair;
+	public final fun clearPendingCommit ()V
+	public final fun commit ([BLcom/vitorpamplona/mls/framing/WireFormat;ZI)Lcom/vitorpamplona/mls/messages/CommitResult;
+	public static synthetic fun commit$default (Lcom/vitorpamplona/mls/group/MlsGroup;[BLcom/vitorpamplona/mls/framing/WireFormat;ZIILjava/lang/Object;)Lcom/vitorpamplona/mls/messages/CommitResult;
+	public final fun computePskSecret (Ljava/util/List;)[B
+	public final fun createKeyPackage ([B[BLcom/vitorpamplona/crypto/curve25519/Ed25519KeyPair;Ljava/util/List;Lcom/vitorpamplona/mls/tree/Capabilities;Ljava/util/List;Lcom/vitorpamplona/mls/tree/Lifetime;)Lcom/vitorpamplona/mls/messages/KeyPackageBundle;
+	public static synthetic fun createKeyPackage$default (Lcom/vitorpamplona/mls/group/MlsGroup;[B[BLcom/vitorpamplona/crypto/curve25519/Ed25519KeyPair;Ljava/util/List;Lcom/vitorpamplona/mls/tree/Capabilities;Ljava/util/List;Lcom/vitorpamplona/mls/tree/Lifetime;ILjava/lang/Object;)Lcom/vitorpamplona/mls/messages/KeyPackageBundle;
+	public final fun currentMemberIdentities ()Ljava/util/Set;
+	public final fun decrypt ([B)Lcom/vitorpamplona/mls/group/DecryptedMessage;
+	public final fun decryptFormerEpoch ([B)Lcom/vitorpamplona/mls/group/DecryptedMessage;
+	public final fun decryptOrNull ([B)Lcom/vitorpamplona/mls/group/DecryptedMessage;
+	public final fun encrypt ([B[BI)[B
+	public static synthetic fun encrypt$default (Lcom/vitorpamplona/mls/group/MlsGroup;[B[BIILjava/lang/Object;)[B
+	public final fun encryptProposalAsPrivateMessage (Lcom/vitorpamplona/mls/messages/Proposal;)[B
+	public final fun exportOwnSenderRatchet ()Lcom/vitorpamplona/mls/group/OwnSenderRatchet;
+	public final fun exportTreeBytes ()[B
+	public final fun exporterSecret (Ljava/lang/String;[BI)[B
+	public final fun externalPub ()[B
+	public final fun forkComplement (Ljava/util/Collection;)Ljava/util/List;
+	public final fun formerExporterSecrets ()Ljava/util/Map;
+	public final fun getClock ()Lkotlin/jvm/functions/Function0;
+	public final fun getEpoch ()J
+	public final fun getEpochAuthenticator ()[B
+	public final fun getExtensions ()Ljava/util/List;
+	public final fun getGroupId ()[B
+	public final fun getHasPendingCommit ()Z
+	public final fun getLeafIndex ()I
+	public final fun getMemberCount ()I
+	public final fun getReInitPending ()Lcom/vitorpamplona/mls/messages/Proposal$ReInit;
+	public final fun getResumptionPsk ()[B
+	public final fun groupContextExtensionsSnapshot ()Ljava/util/List;
+	public final fun groupInfo ()Lcom/vitorpamplona/mls/messages/GroupInfo;
+	public final fun groupInfoMessage (Z)[B
+	public static synthetic fun groupInfoMessage$default (Lcom/vitorpamplona/mls/group/MlsGroup;ZILjava/lang/Object;)[B
+	public final fun hasPendingProposals ()Z
+	public final fun isCommitAuthorized (Lcom/vitorpamplona/mls/framing/PublicMessage;)Z
+	public final fun isLocalMember ()Z
+	public final fun isSelfOnlyCommit (Lcom/vitorpamplona/mls/framing/PublicMessage;)Z
+	public final fun memberIdentity (I)[B
+	public final fun memberIdentityHex (I)Ljava/lang/String;
+	public final fun members ()Ljava/util/List;
+	public final fun mergePendingCommit ()V
+	public final fun myIdentityHex ()Ljava/lang/String;
+	public final fun pendingProposalsSnapshot ()Ljava/util/List;
+	public final fun processCommit ([BI[B[BLcom/vitorpamplona/mls/framing/WireFormat;[B)V
+	public static synthetic fun processCommit$default (Lcom/vitorpamplona/mls/group/MlsGroup;[BI[B[BLcom/vitorpamplona/mls/framing/WireFormat;[BILjava/lang/Object;)V
+	public final fun processFramedCommit ([B)V
+	public final fun processMessage ([B)Lcom/vitorpamplona/mls/group/ProcessedMessage;
+	public final fun proposalMessage (Lcom/vitorpamplona/mls/messages/Proposal;Lcom/vitorpamplona/mls/framing/WireFormat;[BI)[B
+	public static synthetic fun proposalMessage$default (Lcom/vitorpamplona/mls/group/MlsGroup;Lcom/vitorpamplona/mls/messages/Proposal;Lcom/vitorpamplona/mls/framing/WireFormat;[BIILjava/lang/Object;)[B
+	public final fun proposeAdd ([B)Lcom/vitorpamplona/mls/messages/Proposal$Add;
+	public final fun proposeAppDataRemoval (I)Lcom/vitorpamplona/mls/messages/Proposal$AppDataUpdate;
+	public final fun proposeAppDataUpdate (I[B)Lcom/vitorpamplona/mls/messages/Proposal$AppDataUpdate;
+	public final fun proposeCustom (I[B)Lcom/vitorpamplona/mls/messages/Proposal$Custom;
+	public final fun proposeGroupContextExtensions (Ljava/util/List;)Lcom/vitorpamplona/mls/messages/Proposal$GroupContextExtensions;
+	public final fun proposePsk ([B[B)Lcom/vitorpamplona/mls/messages/Proposal$Psk;
+	public static synthetic fun proposePsk$default (Lcom/vitorpamplona/mls/group/MlsGroup;[B[BILjava/lang/Object;)Lcom/vitorpamplona/mls/messages/Proposal$Psk;
+	public final fun proposeReInit ([BIILjava/util/List;)Lcom/vitorpamplona/mls/messages/Proposal$ReInit;
+	public static synthetic fun proposeReInit$default (Lcom/vitorpamplona/mls/group/MlsGroup;[BIILjava/util/List;ILjava/lang/Object;)Lcom/vitorpamplona/mls/messages/Proposal$ReInit;
+	public final fun proposeRemove (I)Lcom/vitorpamplona/mls/messages/Proposal$Remove;
+	public final fun proposeResumptionPsk (J[BI[B)Lcom/vitorpamplona/mls/messages/Proposal$Psk;
+	public static synthetic fun proposeResumptionPsk$default (Lcom/vitorpamplona/mls/group/MlsGroup;J[BI[BILjava/lang/Object;)Lcom/vitorpamplona/mls/messages/Proposal$Psk;
+	public final fun proposeSelfRemove ()Lcom/vitorpamplona/mls/messages/Proposal$SelfRemove;
+	public final fun proposeSigningKeyRotation ()Lcom/vitorpamplona/mls/messages/Proposal$Update;
+	public final fun reboot (Ljava/util/List;[BLjava/util/List;Z)Lcom/vitorpamplona/mls/group/MlsGroup$SuccessorGroup;
+	public static synthetic fun reboot$default (Lcom/vitorpamplona/mls/group/MlsGroup;Ljava/util/List;[BLjava/util/List;ZILjava/lang/Object;)Lcom/vitorpamplona/mls/group/MlsGroup$SuccessorGroup;
+	public final fun rebootMembers ()Ljava/util/List;
+	public final fun receivePublicMessageProposal (Lcom/vitorpamplona/mls/framing/PublicMessage;)V
+	public final fun recoverForkByReadding (Ljava/util/Collection;Ljava/util/List;Z)Lcom/vitorpamplona/mls/messages/CommitResult;
+	public static synthetic fun recoverForkByReadding$default (Lcom/vitorpamplona/mls/group/MlsGroup;Ljava/util/Collection;Ljava/util/List;ZILjava/lang/Object;)Lcom/vitorpamplona/mls/messages/CommitResult;
+	public final fun registerPsk ([B[B)V
+	public final fun registerResumptionPsk ([BJ[B)V
+	public final fun reinit (Ljava/util/List;Z)Lcom/vitorpamplona/mls/group/MlsGroup$SuccessorGroup;
+	public static synthetic fun reinit$default (Lcom/vitorpamplona/mls/group/MlsGroup;Ljava/util/List;ZILjava/lang/Object;)Lcom/vitorpamplona/mls/group/MlsGroup$SuccessorGroup;
+	public final fun removeMember (I)Lcom/vitorpamplona/mls/messages/CommitResult;
+	public final fun resolveCommitProposals (Lcom/vitorpamplona/mls/framing/PublicMessage;)Ljava/util/List;
+	public final fun restoreOwnSenderRatchet (Lcom/vitorpamplona/mls/group/OwnSenderRatchet;)Z
+	public final fun retainedEpochs ()Ljava/util/List;
+	public final fun retainedSecrets ()Lcom/vitorpamplona/mls/group/RetainedEpochSecrets;
+	public final fun saveState ()Lcom/vitorpamplona/mls/group/MlsGroupState;
+	public final fun setClock (Lkotlin/jvm/functions/Function0;)V
+	public final fun stageCommit ([BLcom/vitorpamplona/mls/framing/WireFormat;ZI)Lcom/vitorpamplona/mls/messages/CommitResult;
+	public static synthetic fun stageCommit$default (Lcom/vitorpamplona/mls/group/MlsGroup;[BLcom/vitorpamplona/mls/framing/WireFormat;ZIILjava/lang/Object;)Lcom/vitorpamplona/mls/messages/CommitResult;
+	public final fun verifyMembershipTag ([B[B)Z
+	public final fun verifyPublicMessageCommitMembershipTag (Lcom/vitorpamplona/mls/framing/PublicMessage;)Z
+	public final fun view ()Lcom/vitorpamplona/mls/group/GroupView;
+}
+
+public final class com/vitorpamplona/mls/group/MlsGroup$Companion {
+	public final fun create ([B[BLjava/util/List;Ljava/util/List;Lcom/vitorpamplona/mls/group/MlsGroupPolicy;Lcom/vitorpamplona/mls/tree/Capabilities;Lcom/vitorpamplona/mls/tree/Extension;[B)Lcom/vitorpamplona/mls/group/MlsGroup;
+	public static synthetic fun create$default (Lcom/vitorpamplona/mls/group/MlsGroup$Companion;[B[BLjava/util/List;Ljava/util/List;Lcom/vitorpamplona/mls/group/MlsGroupPolicy;Lcom/vitorpamplona/mls/tree/Capabilities;Lcom/vitorpamplona/mls/tree/Extension;[BILjava/lang/Object;)Lcom/vitorpamplona/mls/group/MlsGroup;
+	public final fun createKeyPackage ([BLcom/vitorpamplona/mls/group/MlsGroupPolicy;Lcom/vitorpamplona/crypto/curve25519/Ed25519KeyPair;Ljava/util/List;Lcom/vitorpamplona/mls/tree/Capabilities;Ljava/util/List;Lcom/vitorpamplona/mls/tree/Lifetime;)Lcom/vitorpamplona/mls/messages/KeyPackageBundle;
+	public static synthetic fun createKeyPackage$default (Lcom/vitorpamplona/mls/group/MlsGroup$Companion;[BLcom/vitorpamplona/mls/group/MlsGroupPolicy;Lcom/vitorpamplona/crypto/curve25519/Ed25519KeyPair;Ljava/util/List;Lcom/vitorpamplona/mls/tree/Capabilities;Ljava/util/List;Lcom/vitorpamplona/mls/tree/Lifetime;ILjava/lang/Object;)Lcom/vitorpamplona/mls/messages/KeyPackageBundle;
+	public final fun externalJoin ([B[B[BLcom/vitorpamplona/mls/group/MlsGroupPolicy;Lcom/vitorpamplona/mls/tree/Capabilities;Ljava/util/List;[BLjava/lang/Integer;Ljava/util/List;[B)Lcom/vitorpamplona/mls/messages/ExternalJoinResult;
+	public static synthetic fun externalJoin$default (Lcom/vitorpamplona/mls/group/MlsGroup$Companion;[B[B[BLcom/vitorpamplona/mls/group/MlsGroupPolicy;Lcom/vitorpamplona/mls/tree/Capabilities;Ljava/util/List;[BLjava/lang/Integer;Ljava/util/List;[BILjava/lang/Object;)Lcom/vitorpamplona/mls/messages/ExternalJoinResult;
+	public final fun findRequiredCapabilities (Ljava/util/List;)Lcom/vitorpamplona/mls/group/MlsGroup$Companion$RequiredCapabilities;
+	public final fun joinSuccessor ([BLcom/vitorpamplona/mls/messages/KeyPackageBundle;Lcom/vitorpamplona/mls/group/MlsGroup;Lcom/vitorpamplona/mls/group/MlsGroupPolicy;[B)Lcom/vitorpamplona/mls/group/MlsGroup;
+	public static synthetic fun joinSuccessor$default (Lcom/vitorpamplona/mls/group/MlsGroup$Companion;[BLcom/vitorpamplona/mls/messages/KeyPackageBundle;Lcom/vitorpamplona/mls/group/MlsGroup;Lcom/vitorpamplona/mls/group/MlsGroupPolicy;[BILjava/lang/Object;)Lcom/vitorpamplona/mls/group/MlsGroup;
+	public final fun processWelcome ([BLcom/vitorpamplona/mls/messages/KeyPackageBundle;Lcom/vitorpamplona/mls/group/MlsGroupPolicy;[BLkotlin/jvm/functions/Function1;)Lcom/vitorpamplona/mls/group/MlsGroup;
+	public static synthetic fun processWelcome$default (Lcom/vitorpamplona/mls/group/MlsGroup$Companion;[BLcom/vitorpamplona/mls/messages/KeyPackageBundle;Lcom/vitorpamplona/mls/group/MlsGroupPolicy;[BLkotlin/jvm/functions/Function1;ILjava/lang/Object;)Lcom/vitorpamplona/mls/group/MlsGroup;
+	public final fun requireCapabilitiesMeetRequirements (Lcom/vitorpamplona/mls/tree/Capabilities;Lcom/vitorpamplona/mls/group/MlsGroup$Companion$RequiredCapabilities;Ljava/lang/String;)V
+	public final fun restore (Lcom/vitorpamplona/mls/group/MlsGroupState;Lcom/vitorpamplona/mls/group/MlsGroupPolicy;)Lcom/vitorpamplona/mls/group/MlsGroup;
+	public static synthetic fun restore$default (Lcom/vitorpamplona/mls/group/MlsGroup$Companion;Lcom/vitorpamplona/mls/group/MlsGroupState;Lcom/vitorpamplona/mls/group/MlsGroupPolicy;ILjava/lang/Object;)Lcom/vitorpamplona/mls/group/MlsGroup;
+	public final fun stageWelcome ([BLcom/vitorpamplona/mls/messages/KeyPackageBundle;Lcom/vitorpamplona/mls/group/MlsGroupPolicy;[BLkotlin/jvm/functions/Function1;)Lcom/vitorpamplona/mls/group/StagedWelcome;
+	public static synthetic fun stageWelcome$default (Lcom/vitorpamplona/mls/group/MlsGroup$Companion;[BLcom/vitorpamplona/mls/messages/KeyPackageBundle;Lcom/vitorpamplona/mls/group/MlsGroupPolicy;[BLkotlin/jvm/functions/Function1;ILjava/lang/Object;)Lcom/vitorpamplona/mls/group/StagedWelcome;
+	public final fun verifyTreeParentHashesForJoin (Lcom/vitorpamplona/mls/tree/RatchetTree;)Ljava/lang/String;
+}
+
+public final class com/vitorpamplona/mls/group/MlsGroup$Companion$RequiredCapabilities {
+	public fun <init> (Ljava/util/List;Ljava/util/List;Ljava/util/List;)V
+	public final fun component1 ()Ljava/util/List;
+	public final fun component2 ()Ljava/util/List;
+	public final fun component3 ()Ljava/util/List;
+	public final fun copy (Ljava/util/List;Ljava/util/List;Ljava/util/List;)Lcom/vitorpamplona/mls/group/MlsGroup$Companion$RequiredCapabilities;
+	public static synthetic fun copy$default (Lcom/vitorpamplona/mls/group/MlsGroup$Companion$RequiredCapabilities;Ljava/util/List;Ljava/util/List;Ljava/util/List;ILjava/lang/Object;)Lcom/vitorpamplona/mls/group/MlsGroup$Companion$RequiredCapabilities;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getCredentials ()Ljava/util/List;
+	public final fun getExtensions ()Ljava/util/List;
+	public final fun getProposals ()Ljava/util/List;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/vitorpamplona/mls/group/MlsGroup$ExternalSender {
+	public fun <init> ([BLcom/vitorpamplona/mls/tree/Credential;)V
+	public final fun getCredential ()Lcom/vitorpamplona/mls/tree/Credential;
+	public final fun getSignatureKey ()[B
+}
+
+public final class com/vitorpamplona/mls/group/MlsGroup$SuccessorGroup {
+	public fun <init> (Lcom/vitorpamplona/mls/group/MlsGroup;Lcom/vitorpamplona/mls/messages/CommitResult;)V
+	public final fun getCommit ()Lcom/vitorpamplona/mls/messages/CommitResult;
+	public final fun getGroup ()Lcom/vitorpamplona/mls/group/MlsGroup;
+}
+
+public abstract interface class com/vitorpamplona/mls/group/MlsGroupPolicy {
+	public static final field Companion Lcom/vitorpamplona/mls/group/MlsGroupPolicy$Companion;
+	public static final field DEFAULT_MAX_MESSAGE_SIZE I
+	public fun authorizeCommit (Lcom/vitorpamplona/mls/group/GroupView;Ljava/util/List;I)V
+	public fun authorizeExternalCommit (Lcom/vitorpamplona/mls/group/GroupView;Lcom/vitorpamplona/mls/tree/LeafNode;Lcom/vitorpamplona/mls/tree/LeafNode;)V
+	public fun authorizeProposal (Lcom/vitorpamplona/mls/group/GroupView;Lcom/vitorpamplona/mls/group/PendingProposal;)V
+	public fun authorizeSelfRemove (Lcom/vitorpamplona/mls/group/GroupView;)V
+	public fun getCommitExporter ()Lcom/vitorpamplona/mls/group/MlsExporterLabel;
+	public fun getDefaultLeafCapabilities ()Lcom/vitorpamplona/mls/tree/Capabilities;
+	public fun getDefaultRequiredCapabilities ()Lcom/vitorpamplona/mls/tree/Extension;
+	public fun getGreaseCapabilities ()Z
+	public fun getKnownExtensionTypes ()Ljava/util/Set;
+	public fun getMaxForwardRatchetDistance ()I
+	public fun getMaxMessageSize ()I
+	public fun getOutOfOrderTolerance ()I
+	public fun getWireFormatPolicy ()Lcom/vitorpamplona/mls/group/WireFormatPolicy;
+	public fun validateCredential (Lcom/vitorpamplona/mls/tree/Credential;[B)V
+	public fun validateCredentialSuccession (Lcom/vitorpamplona/mls/tree/Credential;Lcom/vitorpamplona/mls/tree/Credential;)V
+	public fun validateJoin (Lcom/vitorpamplona/mls/group/GroupView;)V
+}
+
+public final class com/vitorpamplona/mls/group/MlsGroupPolicy$Companion {
+	public static final field DEFAULT_MAX_MESSAGE_SIZE I
+	public final fun getPermissive ()Lcom/vitorpamplona/mls/group/MlsGroupPolicy;
+}
+
+public final class com/vitorpamplona/mls/group/MlsGroupPolicy$DefaultImpls {
+	public static fun authorizeCommit (Lcom/vitorpamplona/mls/group/MlsGroupPolicy;Lcom/vitorpamplona/mls/group/GroupView;Ljava/util/List;I)V
+	public static fun authorizeExternalCommit (Lcom/vitorpamplona/mls/group/MlsGroupPolicy;Lcom/vitorpamplona/mls/group/GroupView;Lcom/vitorpamplona/mls/tree/LeafNode;Lcom/vitorpamplona/mls/tree/LeafNode;)V
+	public static fun authorizeProposal (Lcom/vitorpamplona/mls/group/MlsGroupPolicy;Lcom/vitorpamplona/mls/group/GroupView;Lcom/vitorpamplona/mls/group/PendingProposal;)V
+	public static fun authorizeSelfRemove (Lcom/vitorpamplona/mls/group/MlsGroupPolicy;Lcom/vitorpamplona/mls/group/GroupView;)V
+	public static fun getCommitExporter (Lcom/vitorpamplona/mls/group/MlsGroupPolicy;)Lcom/vitorpamplona/mls/group/MlsExporterLabel;
+	public static fun getDefaultLeafCapabilities (Lcom/vitorpamplona/mls/group/MlsGroupPolicy;)Lcom/vitorpamplona/mls/tree/Capabilities;
+	public static fun getDefaultRequiredCapabilities (Lcom/vitorpamplona/mls/group/MlsGroupPolicy;)Lcom/vitorpamplona/mls/tree/Extension;
+	public static fun getGreaseCapabilities (Lcom/vitorpamplona/mls/group/MlsGroupPolicy;)Z
+	public static fun getKnownExtensionTypes (Lcom/vitorpamplona/mls/group/MlsGroupPolicy;)Ljava/util/Set;
+	public static fun getMaxForwardRatchetDistance (Lcom/vitorpamplona/mls/group/MlsGroupPolicy;)I
+	public static fun getMaxMessageSize (Lcom/vitorpamplona/mls/group/MlsGroupPolicy;)I
+	public static fun getOutOfOrderTolerance (Lcom/vitorpamplona/mls/group/MlsGroupPolicy;)I
+	public static fun getWireFormatPolicy (Lcom/vitorpamplona/mls/group/MlsGroupPolicy;)Lcom/vitorpamplona/mls/group/WireFormatPolicy;
+	public static fun validateCredential (Lcom/vitorpamplona/mls/group/MlsGroupPolicy;Lcom/vitorpamplona/mls/tree/Credential;[B)V
+	public static fun validateCredentialSuccession (Lcom/vitorpamplona/mls/group/MlsGroupPolicy;Lcom/vitorpamplona/mls/tree/Credential;Lcom/vitorpamplona/mls/tree/Credential;)V
+	public static fun validateJoin (Lcom/vitorpamplona/mls/group/MlsGroupPolicy;Lcom/vitorpamplona/mls/group/GroupView;)V
+}
+
+public final class com/vitorpamplona/mls/group/MlsGroupState {
+	public static final field Companion Lcom/vitorpamplona/mls/group/MlsGroupState$Companion;
+	public fun <init> (Lcom/vitorpamplona/mls/messages/GroupContext;[BILcom/vitorpamplona/mls/schedule/EpochSecrets;[B[B[B[B[BLjava/util/Map;Ljava/util/Map;Ljava/util/List;Ljava/util/Map;Ljava/util/Map;Ljava/util/List;Ljava/util/Map;Ljava/util/Map;Ljava/util/List;Lcom/vitorpamplona/mls/messages/Proposal$ReInit;ZLcom/vitorpamplona/mls/group/StagedCommitState;[B[BLkotlin/Pair;)V
+	public synthetic fun <init> (Lcom/vitorpamplona/mls/messages/GroupContext;[BILcom/vitorpamplona/mls/schedule/EpochSecrets;[B[B[B[B[BLjava/util/Map;Ljava/util/Map;Ljava/util/List;Ljava/util/Map;Ljava/util/Map;Ljava/util/List;Ljava/util/Map;Ljava/util/Map;Ljava/util/List;Lcom/vitorpamplona/mls/messages/Proposal$ReInit;ZLcom/vitorpamplona/mls/group/StagedCommitState;[B[BLkotlin/Pair;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Lcom/vitorpamplona/mls/messages/GroupContext;
+	public final fun component10 ()Ljava/util/Map;
+	public final fun component11 ()Ljava/util/Map;
+	public final fun component12 ()Ljava/util/List;
+	public final fun component13 ()Ljava/util/Map;
+	public final fun component14 ()Ljava/util/Map;
+	public final fun component15 ()Ljava/util/List;
+	public final fun component16 ()Ljava/util/Map;
+	public final fun component17 ()Ljava/util/Map;
+	public final fun component18 ()Ljava/util/List;
+	public final fun component19 ()Lcom/vitorpamplona/mls/messages/Proposal$ReInit;
+	public final fun component2 ()[B
+	public final fun component20 ()Z
+	public final fun component21 ()Lcom/vitorpamplona/mls/group/StagedCommitState;
+	public final fun component22 ()[B
+	public final fun component23 ()[B
+	public final fun component24 ()Lkotlin/Pair;
+	public final fun component3 ()I
+	public final fun component4 ()Lcom/vitorpamplona/mls/schedule/EpochSecrets;
+	public final fun component5 ()[B
+	public final fun component6 ()[B
+	public final fun component7 ()[B
+	public final fun component8 ()[B
+	public final fun component9 ()[B
+	public final fun copy (Lcom/vitorpamplona/mls/messages/GroupContext;[BILcom/vitorpamplona/mls/schedule/EpochSecrets;[B[B[B[B[BLjava/util/Map;Ljava/util/Map;Ljava/util/List;Ljava/util/Map;Ljava/util/Map;Ljava/util/List;Ljava/util/Map;Ljava/util/Map;Ljava/util/List;Lcom/vitorpamplona/mls/messages/Proposal$ReInit;ZLcom/vitorpamplona/mls/group/StagedCommitState;[B[BLkotlin/Pair;)Lcom/vitorpamplona/mls/group/MlsGroupState;
+	public static synthetic fun copy$default (Lcom/vitorpamplona/mls/group/MlsGroupState;Lcom/vitorpamplona/mls/messages/GroupContext;[BILcom/vitorpamplona/mls/schedule/EpochSecrets;[B[B[B[B[BLjava/util/Map;Ljava/util/Map;Ljava/util/List;Ljava/util/Map;Ljava/util/Map;Ljava/util/List;Ljava/util/Map;Ljava/util/Map;Ljava/util/List;Lcom/vitorpamplona/mls/messages/Proposal$ReInit;ZLcom/vitorpamplona/mls/group/StagedCommitState;[B[BLkotlin/Pair;ILjava/lang/Object;)Lcom/vitorpamplona/mls/group/MlsGroupState;
+	public final fun encodeTls ()[B
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getEncryptionPrivateKey ()[B
+	public final fun getEncryptionSecret ()[B
+	public final fun getEpochSecrets ()Lcom/vitorpamplona/mls/schedule/EpochSecrets;
+	public final fun getGroupContext ()Lcom/vitorpamplona/mls/messages/GroupContext;
+	public final fun getInitSecret ()[B
+	public final fun getInterimTranscriptHash ()[B
+	public final fun getMyLeafIndex ()I
+	public final fun getNodeSecrets ()Ljava/util/Map;
+	public final fun getPathPrivateKeys ()Ljava/util/Map;
+	public final fun getPendingCommit ()Lcom/vitorpamplona/mls/group/StagedCommitState;
+	public final fun getPendingEncryptionKey ()[B
+	public final fun getPendingLeafAdvertisement ()Lkotlin/Pair;
+	public final fun getPendingProposals ()Ljava/util/List;
+	public final fun getPendingSigningKey ()[B
+	public final fun getPendingUpdateKeys ()Ljava/util/List;
+	public final fun getReInitPending ()Lcom/vitorpamplona/mls/messages/Proposal$ReInit;
+	public final fun getRemovedFromGroup ()Z
+	public final fun getResumptionPsks ()Ljava/util/Map;
+	public final fun getRetainedEpochs ()Ljava/util/List;
+	public final fun getSenderRatchetStates ()Ljava/util/Map;
+	public final fun getSigningPrivateKey ()[B
+	public final fun getSkippedApplicationSecrets ()Ljava/util/Map;
+	public final fun getSkippedHandshakeSecrets ()Ljava/util/Map;
+	public final fun getTreeBytes ()[B
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/vitorpamplona/mls/group/MlsGroupState$Companion {
+	public final fun decodeTls ([B)Lcom/vitorpamplona/mls/group/MlsGroupState;
+}
+
+public final class com/vitorpamplona/mls/group/OwnSenderRatchet {
+	public static final field Companion Lcom/vitorpamplona/mls/group/OwnSenderRatchet$Companion;
+	public fun <init> (JI[B[BI[BI)V
+	public final fun component1 ()J
+	public final fun component2 ()I
+	public final fun component3 ()[B
+	public final fun component4 ()[B
+	public final fun component5 ()I
+	public final fun component6 ()[B
+	public final fun component7 ()I
+	public final fun copy (JI[B[BI[BI)Lcom/vitorpamplona/mls/group/OwnSenderRatchet;
+	public static synthetic fun copy$default (Lcom/vitorpamplona/mls/group/OwnSenderRatchet;JI[B[BI[BIILjava/lang/Object;)Lcom/vitorpamplona/mls/group/OwnSenderRatchet;
+	public final fun encodeTls ()[B
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getApplicationGeneration ()I
+	public final fun getApplicationSecret ()[B
+	public final fun getEpoch ()J
+	public final fun getHandshakeGeneration ()I
+	public final fun getHandshakeSecret ()[B
+	public final fun getLeafIndex ()I
+	public final fun getTreeBinder ()[B
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/vitorpamplona/mls/group/OwnSenderRatchet$Companion {
+	public final fun binderFor ([B)[B
+	public final fun decodeTls ([B)Lcom/vitorpamplona/mls/group/OwnSenderRatchet;
+	public final fun decodeTlsOrNull ([B)Lcom/vitorpamplona/mls/group/OwnSenderRatchet;
+}
+
+public final class com/vitorpamplona/mls/group/PendingProposal {
+	public fun <init> (Lcom/vitorpamplona/mls/messages/Proposal;I[BLcom/vitorpamplona/mls/framing/SenderType;)V
+	public synthetic fun <init> (Lcom/vitorpamplona/mls/messages/Proposal;I[BLcom/vitorpamplona/mls/framing/SenderType;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Lcom/vitorpamplona/mls/messages/Proposal;
+	public final fun component2 ()I
+	public final fun component3 ()[B
+	public final fun component4 ()Lcom/vitorpamplona/mls/framing/SenderType;
+	public final fun copy (Lcom/vitorpamplona/mls/messages/Proposal;I[BLcom/vitorpamplona/mls/framing/SenderType;)Lcom/vitorpamplona/mls/group/PendingProposal;
+	public static synthetic fun copy$default (Lcom/vitorpamplona/mls/group/PendingProposal;Lcom/vitorpamplona/mls/messages/Proposal;I[BLcom/vitorpamplona/mls/framing/SenderType;ILjava/lang/Object;)Lcom/vitorpamplona/mls/group/PendingProposal;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getAuthenticatedContentBytes ()[B
+	public final fun getProposal ()Lcom/vitorpamplona/mls/messages/Proposal;
+	public final fun getProposalRef ()[B
+	public final fun getSenderLeafIndex ()I
+	public final fun getSenderType ()Lcom/vitorpamplona/mls/framing/SenderType;
+	public fun hashCode ()I
+	public final fun isFrom (I)Z
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/vitorpamplona/mls/group/PendingUpdateKeys {
+	public fun <init> ([B[B[B)V
+	public final fun getEncryptionKey ()[B
+	public final fun getEncryptionPrivateKey ()[B
+	public final fun getSignaturePrivateKey ()[B
+}
+
+public abstract class com/vitorpamplona/mls/group/ProcessedMessage {
+}
+
+public final class com/vitorpamplona/mls/group/ProcessedMessage$Application : com/vitorpamplona/mls/group/ProcessedMessage {
+	public fun <init> (Lcom/vitorpamplona/mls/group/DecryptedMessage;)V
+	public final fun getMessage ()Lcom/vitorpamplona/mls/group/DecryptedMessage;
+}
+
+public final class com/vitorpamplona/mls/group/ProcessedMessage$AppliedCommit : com/vitorpamplona/mls/group/ProcessedMessage {
+	public fun <init> (Lcom/vitorpamplona/mls/framing/Sender;JZLjava/util/List;)V
+	public synthetic fun <init> (Lcom/vitorpamplona/mls/framing/Sender;JZLjava/util/List;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun getEpoch ()J
+	public final fun getProposals ()Ljava/util/List;
+	public final fun getRemovedSelf ()Z
+	public final fun getSender ()Lcom/vitorpamplona/mls/framing/Sender;
+}
+
+public final class com/vitorpamplona/mls/group/ProcessedMessage$StagedProposal : com/vitorpamplona/mls/group/ProcessedMessage {
+	public fun <init> (Lcom/vitorpamplona/mls/messages/Proposal;Lcom/vitorpamplona/mls/framing/Sender;[B)V
+	public final fun getProposal ()Lcom/vitorpamplona/mls/messages/Proposal;
+	public final fun getProposalRef ()[B
+	public final fun getSender ()Lcom/vitorpamplona/mls/framing/Sender;
+}
+
+public final class com/vitorpamplona/mls/group/PublicGroup {
+	public static final field Companion Lcom/vitorpamplona/mls/group/PublicGroup$Companion;
+	public final fun exportTreeBytes ()[B
+	public final fun getEpoch ()J
+	public final fun getExtensions ()Ljava/util/List;
+	public final fun getGroupId ()[B
+	public final fun members ()Ljava/util/List;
+	public final fun pendingProposals ()Ljava/util/List;
+	public final fun processMessage ([B)Lcom/vitorpamplona/mls/group/ProcessedMessage;
+	public final fun saveState ()Lcom/vitorpamplona/mls/group/MlsGroupState;
+}
+
+public final class com/vitorpamplona/mls/group/PublicGroup$Companion {
+	public final fun fromGroupInfo ([BLcom/vitorpamplona/mls/group/MlsGroupPolicy;[B)Lcom/vitorpamplona/mls/group/PublicGroup;
+	public static synthetic fun fromGroupInfo$default (Lcom/vitorpamplona/mls/group/PublicGroup$Companion;[BLcom/vitorpamplona/mls/group/MlsGroupPolicy;[BILjava/lang/Object;)Lcom/vitorpamplona/mls/group/PublicGroup;
+	public final fun restore (Lcom/vitorpamplona/mls/group/MlsGroupState;Lcom/vitorpamplona/mls/group/MlsGroupPolicy;)Lcom/vitorpamplona/mls/group/PublicGroup;
+	public static synthetic fun restore$default (Lcom/vitorpamplona/mls/group/PublicGroup$Companion;Lcom/vitorpamplona/mls/group/MlsGroupState;Lcom/vitorpamplona/mls/group/MlsGroupPolicy;ILjava/lang/Object;)Lcom/vitorpamplona/mls/group/PublicGroup;
+}
+
+public final class com/vitorpamplona/mls/group/RetainedEpochReceiverData {
+	public static final field Companion Lcom/vitorpamplona/mls/group/RetainedEpochReceiverData$Companion;
+	public fun <init> (J[B[B[B[BLcom/vitorpamplona/mls/messages/GroupContext;[BLjava/util/Map;Ljava/util/Map;Ljava/util/Map;)V
+	public synthetic fun <init> (J[B[B[B[BLcom/vitorpamplona/mls/messages/GroupContext;[BLjava/util/Map;Ljava/util/Map;Ljava/util/Map;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()J
+	public final fun component10 ()Ljava/util/Map;
+	public final fun component2 ()[B
+	public final fun component3 ()[B
+	public final fun component4 ()[B
+	public final fun component5 ()[B
+	public final fun component6 ()Lcom/vitorpamplona/mls/messages/GroupContext;
+	public final fun component7 ()[B
+	public final fun component8 ()Ljava/util/Map;
+	public final fun component9 ()Ljava/util/Map;
+	public final fun copy (J[B[B[B[BLcom/vitorpamplona/mls/messages/GroupContext;[BLjava/util/Map;Ljava/util/Map;Ljava/util/Map;)Lcom/vitorpamplona/mls/group/RetainedEpochReceiverData;
+	public static synthetic fun copy$default (Lcom/vitorpamplona/mls/group/RetainedEpochReceiverData;J[B[B[B[BLcom/vitorpamplona/mls/messages/GroupContext;[BLjava/util/Map;Ljava/util/Map;Ljava/util/Map;ILjava/lang/Object;)Lcom/vitorpamplona/mls/group/RetainedEpochReceiverData;
+	public final fun encodeTls (Lcom/vitorpamplona/mls/codec/TlsWriter;)V
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getEncryptionSecret ()[B
+	public final fun getEpoch ()J
+	public final fun getExporterSecret ()[B
+	public final fun getGroupContext ()Lcom/vitorpamplona/mls/messages/GroupContext;
+	public final fun getNodeSecrets ()Ljava/util/Map;
+	public final fun getResumptionPsk ()[B
+	public final fun getSenderDataSecret ()[B
+	public final fun getSenderRatchetStates ()Ljava/util/Map;
+	public final fun getSkippedApplicationSecrets ()Ljava/util/Map;
+	public final fun getTreeBytes ()[B
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/vitorpamplona/mls/group/RetainedEpochReceiverData$Companion {
+	public final fun decodeTls (Lcom/vitorpamplona/mls/codec/TlsReader;)Lcom/vitorpamplona/mls/group/RetainedEpochReceiverData;
+}
+
+public final class com/vitorpamplona/mls/group/RetainedEpochSecrets {
+	public static final field Companion Lcom/vitorpamplona/mls/group/RetainedEpochSecrets$Companion;
+	public fun <init> (J[B[BI[B)V
+	public synthetic fun <init> (J[B[BI[BILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()J
+	public final fun component2 ()[B
+	public final fun component3 ()[B
+	public final fun component4 ()I
+	public final fun component5 ()[B
+	public final fun copy (J[B[BI[B)Lcom/vitorpamplona/mls/group/RetainedEpochSecrets;
+	public static synthetic fun copy$default (Lcom/vitorpamplona/mls/group/RetainedEpochSecrets;J[B[BI[BILjava/lang/Object;)Lcom/vitorpamplona/mls/group/RetainedEpochSecrets;
+	public final fun encodeTls (Lcom/vitorpamplona/mls/codec/TlsWriter;)V
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getEncryptionSecret ()[B
+	public final fun getEpoch ()J
+	public final fun getExporterSecret ()[B
+	public final fun getLeafCount ()I
+	public final fun getSenderDataSecret ()[B
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/vitorpamplona/mls/group/RetainedEpochSecrets$Companion {
+	public final fun decodeTls (Lcom/vitorpamplona/mls/codec/TlsReader;)Lcom/vitorpamplona/mls/group/RetainedEpochSecrets;
+}
+
+public final class com/vitorpamplona/mls/group/StagedCommitState {
+	public fun <init> (JLcom/vitorpamplona/mls/messages/CommitResult;Lcom/vitorpamplona/mls/group/MlsGroupState;)V
+	public final fun getAfter ()Lcom/vitorpamplona/mls/group/MlsGroupState;
+	public final fun getFromEpoch ()J
+	public final fun getResult ()Lcom/vitorpamplona/mls/messages/CommitResult;
+}
+
+public final class com/vitorpamplona/mls/group/StagedWelcome {
+	public final fun getEpoch ()J
+	public final fun getExtensions ()Ljava/util/List;
+	public final fun getGroupId ()[B
+	public final fun getLeafIndex ()I
+	public final fun getPsks ()Ljava/util/List;
+	public final fun getWelcomer ()Lcom/vitorpamplona/mls/tree/LeafNode;
+	public final fun getWelcomerLeafIndex ()I
+	public final fun join ()Lcom/vitorpamplona/mls/group/MlsGroup;
+	public final fun members ()Ljava/util/List;
+}
+
+public final class com/vitorpamplona/mls/group/WireFormatPolicy {
+	public static final field Companion Lcom/vitorpamplona/mls/group/WireFormatPolicy$Companion;
+	public fun <init> (Lcom/vitorpamplona/mls/framing/WireFormat;Lcom/vitorpamplona/mls/group/WireFormatPolicy$Incoming;)V
+	public final fun accepts (Lcom/vitorpamplona/mls/framing/WireFormat;)Z
+	public final fun component1 ()Lcom/vitorpamplona/mls/framing/WireFormat;
+	public final fun component2 ()Lcom/vitorpamplona/mls/group/WireFormatPolicy$Incoming;
+	public final fun copy (Lcom/vitorpamplona/mls/framing/WireFormat;Lcom/vitorpamplona/mls/group/WireFormatPolicy$Incoming;)Lcom/vitorpamplona/mls/group/WireFormatPolicy;
+	public static synthetic fun copy$default (Lcom/vitorpamplona/mls/group/WireFormatPolicy;Lcom/vitorpamplona/mls/framing/WireFormat;Lcom/vitorpamplona/mls/group/WireFormatPolicy$Incoming;ILjava/lang/Object;)Lcom/vitorpamplona/mls/group/WireFormatPolicy;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getIncoming ()Lcom/vitorpamplona/mls/group/WireFormatPolicy$Incoming;
+	public final fun getOutgoing ()Lcom/vitorpamplona/mls/framing/WireFormat;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/vitorpamplona/mls/group/WireFormatPolicy$Companion {
+	public final fun getMIXED_CIPHERTEXT ()Lcom/vitorpamplona/mls/group/WireFormatPolicy;
+	public final fun getMIXED_PLAINTEXT ()Lcom/vitorpamplona/mls/group/WireFormatPolicy;
+	public final fun getPURE_CIPHERTEXT ()Lcom/vitorpamplona/mls/group/WireFormatPolicy;
+	public final fun getPURE_PLAINTEXT ()Lcom/vitorpamplona/mls/group/WireFormatPolicy;
+}
+
+public final class com/vitorpamplona/mls/group/WireFormatPolicy$Incoming : java/lang/Enum {
+	public static final field MIXED Lcom/vitorpamplona/mls/group/WireFormatPolicy$Incoming;
+	public static final field PRIVATE_ONLY Lcom/vitorpamplona/mls/group/WireFormatPolicy$Incoming;
+	public static final field PUBLIC_ONLY Lcom/vitorpamplona/mls/group/WireFormatPolicy$Incoming;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lcom/vitorpamplona/mls/group/WireFormatPolicy$Incoming;
+	public static fun values ()[Lcom/vitorpamplona/mls/group/WireFormatPolicy$Incoming;
+}
+
+public final class com/vitorpamplona/mls/messages/Commit : com/vitorpamplona/mls/codec/TlsSerializable {
+	public static final field Companion Lcom/vitorpamplona/mls/messages/Commit$Companion;
+	public fun <init> (Ljava/util/List;Lcom/vitorpamplona/mls/messages/UpdatePath;)V
+	public final fun component1 ()Ljava/util/List;
+	public final fun component2 ()Lcom/vitorpamplona/mls/messages/UpdatePath;
+	public final fun copy (Ljava/util/List;Lcom/vitorpamplona/mls/messages/UpdatePath;)Lcom/vitorpamplona/mls/messages/Commit;
+	public static synthetic fun copy$default (Lcom/vitorpamplona/mls/messages/Commit;Ljava/util/List;Lcom/vitorpamplona/mls/messages/UpdatePath;ILjava/lang/Object;)Lcom/vitorpamplona/mls/messages/Commit;
+	public fun encodeTls (Lcom/vitorpamplona/mls/codec/TlsWriter;)V
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getProposals ()Ljava/util/List;
+	public final fun getUpdatePath ()Lcom/vitorpamplona/mls/messages/UpdatePath;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+	public fun toTlsBytes ()[B
+}
+
+public final class com/vitorpamplona/mls/messages/Commit$Companion {
+	public final fun decodeTls (Lcom/vitorpamplona/mls/codec/TlsReader;)Lcom/vitorpamplona/mls/messages/Commit;
+}
+
+public final class com/vitorpamplona/mls/messages/CommitResult {
+	public fun <init> ([B[B[B[B[B)V
+	public synthetic fun <init> ([B[B[B[B[BILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()[B
+	public final fun component2 ()[B
+	public final fun component3 ()[B
+	public final fun component4 ()[B
+	public final fun component5 ()[B
+	public final fun copy ([B[B[B[B[B)Lcom/vitorpamplona/mls/messages/CommitResult;
+	public static synthetic fun copy$default (Lcom/vitorpamplona/mls/messages/CommitResult;[B[B[B[B[BILjava/lang/Object;)Lcom/vitorpamplona/mls/messages/CommitResult;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getCommitBytes ()[B
+	public final fun getFramedCommitBytes ()[B
+	public final fun getGroupInfoBytes ()[B
+	public final fun getPreCommitExporterSecret ()[B
+	public final fun getWelcomeBytes ()[B
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/vitorpamplona/mls/messages/EncryptedGroupSecrets : com/vitorpamplona/mls/codec/TlsSerializable {
+	public static final field Companion Lcom/vitorpamplona/mls/messages/EncryptedGroupSecrets$Companion;
+	public fun <init> ([BLcom/vitorpamplona/mls/crypto/HpkeCiphertext;)V
+	public final fun component1 ()[B
+	public final fun component2 ()Lcom/vitorpamplona/mls/crypto/HpkeCiphertext;
+	public final fun copy ([BLcom/vitorpamplona/mls/crypto/HpkeCiphertext;)Lcom/vitorpamplona/mls/messages/EncryptedGroupSecrets;
+	public static synthetic fun copy$default (Lcom/vitorpamplona/mls/messages/EncryptedGroupSecrets;[BLcom/vitorpamplona/mls/crypto/HpkeCiphertext;ILjava/lang/Object;)Lcom/vitorpamplona/mls/messages/EncryptedGroupSecrets;
+	public fun encodeTls (Lcom/vitorpamplona/mls/codec/TlsWriter;)V
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getEncryptedGroupSecrets ()Lcom/vitorpamplona/mls/crypto/HpkeCiphertext;
+	public final fun getNewMember ()[B
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+	public fun toTlsBytes ()[B
+}
+
+public final class com/vitorpamplona/mls/messages/EncryptedGroupSecrets$Companion {
+	public final fun decodeTls (Lcom/vitorpamplona/mls/codec/TlsReader;)Lcom/vitorpamplona/mls/messages/EncryptedGroupSecrets;
+}
+
+public final class com/vitorpamplona/mls/messages/ExternalJoinResult {
+	public fun <init> (Lcom/vitorpamplona/mls/group/MlsGroup;[B[B)V
+	public final fun component1 ()Lcom/vitorpamplona/mls/group/MlsGroup;
+	public final fun component2 ()[B
+	public final fun component3 ()[B
+	public final fun copy (Lcom/vitorpamplona/mls/group/MlsGroup;[B[B)Lcom/vitorpamplona/mls/messages/ExternalJoinResult;
+	public static synthetic fun copy$default (Lcom/vitorpamplona/mls/messages/ExternalJoinResult;Lcom/vitorpamplona/mls/group/MlsGroup;[B[BILjava/lang/Object;)Lcom/vitorpamplona/mls/messages/ExternalJoinResult;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getCommitBytes ()[B
+	public final fun getFramedCommitBytes ()[B
+	public final fun getGroup ()Lcom/vitorpamplona/mls/group/MlsGroup;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/vitorpamplona/mls/messages/GroupContext : com/vitorpamplona/mls/codec/TlsSerializable {
+	public static final field Companion Lcom/vitorpamplona/mls/messages/GroupContext$Companion;
+	public fun <init> (II[BJ[B[BLjava/util/List;)V
+	public synthetic fun <init> (II[BJ[B[BLjava/util/List;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()I
+	public final fun component2 ()I
+	public final fun component3 ()[B
+	public final fun component4 ()J
+	public final fun component5 ()[B
+	public final fun component6 ()[B
+	public final fun component7 ()Ljava/util/List;
+	public final fun copy (II[BJ[B[BLjava/util/List;)Lcom/vitorpamplona/mls/messages/GroupContext;
+	public static synthetic fun copy$default (Lcom/vitorpamplona/mls/messages/GroupContext;II[BJ[B[BLjava/util/List;ILjava/lang/Object;)Lcom/vitorpamplona/mls/messages/GroupContext;
+	public fun encodeTls (Lcom/vitorpamplona/mls/codec/TlsWriter;)V
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getCipherSuite ()I
+	public final fun getConfirmedTranscriptHash ()[B
+	public final fun getEpoch ()J
+	public final fun getExtensions ()Ljava/util/List;
+	public final fun getGroupId ()[B
+	public final fun getTreeHash ()[B
+	public final fun getVersion ()I
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+	public fun toTlsBytes ()[B
+}
+
+public final class com/vitorpamplona/mls/messages/GroupContext$Companion {
+	public final fun decodeTls (Lcom/vitorpamplona/mls/codec/TlsReader;)Lcom/vitorpamplona/mls/messages/GroupContext;
+}
+
+public final class com/vitorpamplona/mls/messages/GroupInfo : com/vitorpamplona/mls/codec/TlsSerializable {
+	public static final field Companion Lcom/vitorpamplona/mls/messages/GroupInfo$Companion;
+	public fun <init> (Lcom/vitorpamplona/mls/messages/GroupContext;Ljava/util/List;[BI[B)V
+	public final fun component1 ()Lcom/vitorpamplona/mls/messages/GroupContext;
+	public final fun component2 ()Ljava/util/List;
+	public final fun component3 ()[B
+	public final fun component4 ()I
+	public final fun component5 ()[B
+	public final fun copy (Lcom/vitorpamplona/mls/messages/GroupContext;Ljava/util/List;[BI[B)Lcom/vitorpamplona/mls/messages/GroupInfo;
+	public static synthetic fun copy$default (Lcom/vitorpamplona/mls/messages/GroupInfo;Lcom/vitorpamplona/mls/messages/GroupContext;Ljava/util/List;[BI[BILjava/lang/Object;)Lcom/vitorpamplona/mls/messages/GroupInfo;
+	public final fun encodeTbs ()[B
+	public fun encodeTls (Lcom/vitorpamplona/mls/codec/TlsWriter;)V
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getConfirmationTag ()[B
+	public final fun getExtensions ()Ljava/util/List;
+	public final fun getGroupContext ()Lcom/vitorpamplona/mls/messages/GroupContext;
+	public final fun getSignature ()[B
+	public final fun getSigner ()I
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+	public fun toTlsBytes ()[B
+	public final fun verifySignature ([B)Z
+}
+
+public final class com/vitorpamplona/mls/messages/GroupInfo$Companion {
+	public final fun decodeTls (Lcom/vitorpamplona/mls/codec/TlsReader;)Lcom/vitorpamplona/mls/messages/GroupInfo;
+}
+
+public final class com/vitorpamplona/mls/messages/GroupSecrets : com/vitorpamplona/mls/codec/TlsSerializable {
+	public static final field Companion Lcom/vitorpamplona/mls/messages/GroupSecrets$Companion;
+	public fun <init> ([B[BLjava/util/List;)V
+	public synthetic fun <init> ([B[BLjava/util/List;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()[B
+	public final fun component2 ()[B
+	public final fun component3 ()Ljava/util/List;
+	public final fun copy ([B[BLjava/util/List;)Lcom/vitorpamplona/mls/messages/GroupSecrets;
+	public static synthetic fun copy$default (Lcom/vitorpamplona/mls/messages/GroupSecrets;[B[BLjava/util/List;ILjava/lang/Object;)Lcom/vitorpamplona/mls/messages/GroupSecrets;
+	public fun encodeTls (Lcom/vitorpamplona/mls/codec/TlsWriter;)V
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getJoinerSecret ()[B
+	public final fun getPathSecret ()[B
+	public final fun getPsks ()Ljava/util/List;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+	public fun toTlsBytes ()[B
+}
+
+public final class com/vitorpamplona/mls/messages/GroupSecrets$Companion {
+	public final fun decodeTls (Lcom/vitorpamplona/mls/codec/TlsReader;)Lcom/vitorpamplona/mls/messages/GroupSecrets;
+}
+
+public final class com/vitorpamplona/mls/messages/KeyPackageBundle {
+	public fun <init> (Lcom/vitorpamplona/mls/messages/MlsKeyPackage;[B[B[B)V
+	public final fun component1 ()Lcom/vitorpamplona/mls/messages/MlsKeyPackage;
+	public final fun component2 ()[B
+	public final fun component3 ()[B
+	public final fun component4 ()[B
+	public final fun copy (Lcom/vitorpamplona/mls/messages/MlsKeyPackage;[B[B[B)Lcom/vitorpamplona/mls/messages/KeyPackageBundle;
+	public static synthetic fun copy$default (Lcom/vitorpamplona/mls/messages/KeyPackageBundle;Lcom/vitorpamplona/mls/messages/MlsKeyPackage;[B[B[BILjava/lang/Object;)Lcom/vitorpamplona/mls/messages/KeyPackageBundle;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getEncryptionPrivateKey ()[B
+	public final fun getInitPrivateKey ()[B
+	public final fun getKeyPackage ()Lcom/vitorpamplona/mls/messages/MlsKeyPackage;
+	public final fun getSignaturePrivateKey ()[B
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/vitorpamplona/mls/messages/KeyPackageBundleCodec {
+	public static final field INSTANCE Lcom/vitorpamplona/mls/messages/KeyPackageBundleCodec;
+	public static final field VERSION I
+	public final fun decode ([B)Lcom/vitorpamplona/mls/messages/KeyPackageBundle;
+	public final fun encode (Lcom/vitorpamplona/mls/messages/KeyPackageBundle;)[B
+}
+
+public final class com/vitorpamplona/mls/messages/MlsKeyPackage : com/vitorpamplona/mls/codec/TlsSerializable {
+	public static final field Companion Lcom/vitorpamplona/mls/messages/MlsKeyPackage$Companion;
+	public static final field LAST_RESORT_EXTENSION_TYPE I
+	public fun <init> (II[BLcom/vitorpamplona/mls/tree/LeafNode;Ljava/util/List;[B)V
+	public synthetic fun <init> (II[BLcom/vitorpamplona/mls/tree/LeafNode;Ljava/util/List;[BILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()I
+	public final fun component2 ()I
+	public final fun component3 ()[B
+	public final fun component4 ()Lcom/vitorpamplona/mls/tree/LeafNode;
+	public final fun component5 ()Ljava/util/List;
+	public final fun component6 ()[B
+	public final fun copy (II[BLcom/vitorpamplona/mls/tree/LeafNode;Ljava/util/List;[B)Lcom/vitorpamplona/mls/messages/MlsKeyPackage;
+	public static synthetic fun copy$default (Lcom/vitorpamplona/mls/messages/MlsKeyPackage;II[BLcom/vitorpamplona/mls/tree/LeafNode;Ljava/util/List;[BILjava/lang/Object;)Lcom/vitorpamplona/mls/messages/MlsKeyPackage;
+	public final fun encodeTbs ()[B
+	public fun encodeTls (Lcom/vitorpamplona/mls/codec/TlsWriter;)V
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getCipherSuite ()I
+	public final fun getExtensions ()Ljava/util/List;
+	public final fun getInitKey ()[B
+	public final fun getLeafNode ()Lcom/vitorpamplona/mls/tree/LeafNode;
+	public final fun getSignature ()[B
+	public final fun getVersion ()I
+	public fun hashCode ()I
+	public final fun isLastResort ()Z
+	public final fun reference ()[B
+	public fun toString ()Ljava/lang/String;
+	public fun toTlsBytes ()[B
+	public final fun verifySignature ()Z
+}
+
+public final class com/vitorpamplona/mls/messages/MlsKeyPackage$Companion {
+	public final fun decodeTls (Lcom/vitorpamplona/mls/codec/TlsReader;)Lcom/vitorpamplona/mls/messages/MlsKeyPackage;
+}
+
+public abstract class com/vitorpamplona/mls/messages/PreSharedKeyId : com/vitorpamplona/mls/codec/TlsSerializable {
+	public static final field Companion Lcom/vitorpamplona/mls/messages/PreSharedKeyId$Companion;
+	public static final field TYPE_EXTERNAL I
+	public static final field TYPE_RESUMPTION I
+	public static final field USAGE_APPLICATION I
+	public static final field USAGE_BRANCH I
+	public static final field USAGE_REINIT I
+	public abstract fun getPskNonce ()[B
+	public abstract fun getPskType ()I
+	public final fun identityKey ()Ljava/lang/String;
+	public fun toTlsBytes ()[B
+}
+
+public final class com/vitorpamplona/mls/messages/PreSharedKeyId$Companion {
+	public final fun decodeTls (Lcom/vitorpamplona/mls/codec/TlsReader;)Lcom/vitorpamplona/mls/messages/PreSharedKeyId;
+}
+
+public final class com/vitorpamplona/mls/messages/PreSharedKeyId$External : com/vitorpamplona/mls/messages/PreSharedKeyId {
+	public fun <init> ([B[B)V
+	public fun encodeTls (Lcom/vitorpamplona/mls/codec/TlsWriter;)V
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getPskId ()[B
+	public fun getPskNonce ()[B
+	public fun getPskType ()I
+	public fun hashCode ()I
+}
+
+public final class com/vitorpamplona/mls/messages/PreSharedKeyId$Resumption : com/vitorpamplona/mls/messages/PreSharedKeyId {
+	public fun <init> (I[BJ[B)V
+	public fun encodeTls (Lcom/vitorpamplona/mls/codec/TlsWriter;)V
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getPskEpoch ()J
+	public final fun getPskGroupId ()[B
+	public fun getPskNonce ()[B
+	public fun getPskType ()I
+	public final fun getUsage ()I
+	public fun hashCode ()I
+}
+
+public abstract class com/vitorpamplona/mls/messages/Proposal : com/vitorpamplona/mls/codec/TlsSerializable {
+	public static final field Companion Lcom/vitorpamplona/mls/messages/Proposal$Companion;
+	public abstract fun getProposalType ()Lcom/vitorpamplona/mls/messages/ProposalType;
+	public fun getProposalTypeValue ()I
+	public fun toTlsBytes ()[B
+}
+
+public final class com/vitorpamplona/mls/messages/Proposal$Add : com/vitorpamplona/mls/messages/Proposal {
+	public fun <init> (Lcom/vitorpamplona/mls/messages/MlsKeyPackage;)V
+	public final fun component1 ()Lcom/vitorpamplona/mls/messages/MlsKeyPackage;
+	public final fun copy (Lcom/vitorpamplona/mls/messages/MlsKeyPackage;)Lcom/vitorpamplona/mls/messages/Proposal$Add;
+	public static synthetic fun copy$default (Lcom/vitorpamplona/mls/messages/Proposal$Add;Lcom/vitorpamplona/mls/messages/MlsKeyPackage;ILjava/lang/Object;)Lcom/vitorpamplona/mls/messages/Proposal$Add;
+	public fun encodeTls (Lcom/vitorpamplona/mls/codec/TlsWriter;)V
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getKeyPackage ()Lcom/vitorpamplona/mls/messages/MlsKeyPackage;
+	public fun getProposalType ()Lcom/vitorpamplona/mls/messages/ProposalType;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/vitorpamplona/mls/messages/Proposal$AppDataUpdate : com/vitorpamplona/mls/messages/Proposal {
+	public static final field Companion Lcom/vitorpamplona/mls/messages/Proposal$AppDataUpdate$Companion;
+	public fun <init> (ILcom/vitorpamplona/mls/messages/Proposal$AppDataUpdate$Operation;)V
+	public final fun component1 ()I
+	public final fun component2 ()Lcom/vitorpamplona/mls/messages/Proposal$AppDataUpdate$Operation;
+	public final fun copy (ILcom/vitorpamplona/mls/messages/Proposal$AppDataUpdate$Operation;)Lcom/vitorpamplona/mls/messages/Proposal$AppDataUpdate;
+	public static synthetic fun copy$default (Lcom/vitorpamplona/mls/messages/Proposal$AppDataUpdate;ILcom/vitorpamplona/mls/messages/Proposal$AppDataUpdate$Operation;ILjava/lang/Object;)Lcom/vitorpamplona/mls/messages/Proposal$AppDataUpdate;
+	public fun encodeTls (Lcom/vitorpamplona/mls/codec/TlsWriter;)V
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getComponentId ()I
+	public final fun getOperation ()Lcom/vitorpamplona/mls/messages/Proposal$AppDataUpdate$Operation;
+	public fun getProposalType ()Lcom/vitorpamplona/mls/messages/ProposalType;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/vitorpamplona/mls/messages/Proposal$AppDataUpdate$Companion {
+	public final fun remove (I)Lcom/vitorpamplona/mls/messages/Proposal$AppDataUpdate;
+	public final fun update (I[B)Lcom/vitorpamplona/mls/messages/Proposal$AppDataUpdate;
+}
+
+public abstract class com/vitorpamplona/mls/messages/Proposal$AppDataUpdate$Operation {
+	public static final field Companion Lcom/vitorpamplona/mls/messages/Proposal$AppDataUpdate$Operation$Companion;
+	public static final field TYPE_REMOVE I
+	public static final field TYPE_UPDATE I
+}
+
+public final class com/vitorpamplona/mls/messages/Proposal$AppDataUpdate$Operation$Companion {
+}
+
+public final class com/vitorpamplona/mls/messages/Proposal$AppDataUpdate$Operation$Remove : com/vitorpamplona/mls/messages/Proposal$AppDataUpdate$Operation {
+	public static final field INSTANCE Lcom/vitorpamplona/mls/messages/Proposal$AppDataUpdate$Operation$Remove;
+}
+
+public final class com/vitorpamplona/mls/messages/Proposal$AppDataUpdate$Operation$Update : com/vitorpamplona/mls/messages/Proposal$AppDataUpdate$Operation {
+	public fun <init> ([B)V
+	public final fun component1 ()[B
+	public final fun copy ([B)Lcom/vitorpamplona/mls/messages/Proposal$AppDataUpdate$Operation$Update;
+	public static synthetic fun copy$default (Lcom/vitorpamplona/mls/messages/Proposal$AppDataUpdate$Operation$Update;[BILjava/lang/Object;)Lcom/vitorpamplona/mls/messages/Proposal$AppDataUpdate$Operation$Update;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getData ()[B
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/vitorpamplona/mls/messages/Proposal$Companion {
+	public final fun decodeTls (Lcom/vitorpamplona/mls/codec/TlsReader;)Lcom/vitorpamplona/mls/messages/Proposal;
+}
+
+public final class com/vitorpamplona/mls/messages/Proposal$Custom : com/vitorpamplona/mls/messages/Proposal {
+	public fun <init> (I[B)V
+	public fun encodeTls (Lcom/vitorpamplona/mls/codec/TlsWriter;)V
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getData ()[B
+	public fun getProposalType ()Lcom/vitorpamplona/mls/messages/ProposalType;
+	public fun getProposalTypeValue ()I
+	public fun hashCode ()I
+}
+
+public final class com/vitorpamplona/mls/messages/Proposal$ExternalInit : com/vitorpamplona/mls/messages/Proposal {
+	public fun <init> ([B)V
+	public final fun component1 ()[B
+	public final fun copy ([B)Lcom/vitorpamplona/mls/messages/Proposal$ExternalInit;
+	public static synthetic fun copy$default (Lcom/vitorpamplona/mls/messages/Proposal$ExternalInit;[BILjava/lang/Object;)Lcom/vitorpamplona/mls/messages/Proposal$ExternalInit;
+	public fun encodeTls (Lcom/vitorpamplona/mls/codec/TlsWriter;)V
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getKemOutput ()[B
+	public fun getProposalType ()Lcom/vitorpamplona/mls/messages/ProposalType;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/vitorpamplona/mls/messages/Proposal$GroupContextExtensions : com/vitorpamplona/mls/messages/Proposal {
+	public fun <init> (Ljava/util/List;)V
+	public final fun component1 ()Ljava/util/List;
+	public final fun copy (Ljava/util/List;)Lcom/vitorpamplona/mls/messages/Proposal$GroupContextExtensions;
+	public static synthetic fun copy$default (Lcom/vitorpamplona/mls/messages/Proposal$GroupContextExtensions;Ljava/util/List;ILjava/lang/Object;)Lcom/vitorpamplona/mls/messages/Proposal$GroupContextExtensions;
+	public fun encodeTls (Lcom/vitorpamplona/mls/codec/TlsWriter;)V
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getExtensions ()Ljava/util/List;
+	public fun getProposalType ()Lcom/vitorpamplona/mls/messages/ProposalType;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/vitorpamplona/mls/messages/Proposal$Psk : com/vitorpamplona/mls/messages/Proposal {
+	public fun <init> (I[B[B)V
+	public fun <init> (Lcom/vitorpamplona/mls/messages/PreSharedKeyId;)V
+	public fun encodeTls (Lcom/vitorpamplona/mls/codec/TlsWriter;)V
+	public fun equals (Ljava/lang/Object;)Z
+	public fun getProposalType ()Lcom/vitorpamplona/mls/messages/ProposalType;
+	public final fun getPsk ()Lcom/vitorpamplona/mls/messages/PreSharedKeyId;
+	public final fun getPskId ()[B
+	public final fun getPskNonce ()[B
+	public final fun getPskType ()I
+	public fun hashCode ()I
+}
+
+public final class com/vitorpamplona/mls/messages/Proposal$ReInit : com/vitorpamplona/mls/messages/Proposal {
+	public fun <init> ([BIILjava/util/List;)V
+	public final fun component1 ()[B
+	public final fun component2 ()I
+	public final fun component3 ()I
+	public final fun component4 ()Ljava/util/List;
+	public final fun copy ([BIILjava/util/List;)Lcom/vitorpamplona/mls/messages/Proposal$ReInit;
+	public static synthetic fun copy$default (Lcom/vitorpamplona/mls/messages/Proposal$ReInit;[BIILjava/util/List;ILjava/lang/Object;)Lcom/vitorpamplona/mls/messages/Proposal$ReInit;
+	public fun encodeTls (Lcom/vitorpamplona/mls/codec/TlsWriter;)V
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getCipherSuite ()I
+	public final fun getExtensions ()Ljava/util/List;
+	public final fun getGroupId ()[B
+	public fun getProposalType ()Lcom/vitorpamplona/mls/messages/ProposalType;
+	public final fun getVersion ()I
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/vitorpamplona/mls/messages/Proposal$Remove : com/vitorpamplona/mls/messages/Proposal {
+	public fun <init> (I)V
+	public final fun component1 ()I
+	public final fun copy (I)Lcom/vitorpamplona/mls/messages/Proposal$Remove;
+	public static synthetic fun copy$default (Lcom/vitorpamplona/mls/messages/Proposal$Remove;IILjava/lang/Object;)Lcom/vitorpamplona/mls/messages/Proposal$Remove;
+	public fun encodeTls (Lcom/vitorpamplona/mls/codec/TlsWriter;)V
+	public fun equals (Ljava/lang/Object;)Z
+	public fun getProposalType ()Lcom/vitorpamplona/mls/messages/ProposalType;
+	public final fun getRemovedLeafIndex ()I
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/vitorpamplona/mls/messages/Proposal$SelfRemove : com/vitorpamplona/mls/messages/Proposal {
+	public fun <init> ()V
+	public fun encodeTls (Lcom/vitorpamplona/mls/codec/TlsWriter;)V
+	public fun getProposalType ()Lcom/vitorpamplona/mls/messages/ProposalType;
+}
+
+public final class com/vitorpamplona/mls/messages/Proposal$Update : com/vitorpamplona/mls/messages/Proposal {
+	public fun <init> (Lcom/vitorpamplona/mls/tree/LeafNode;)V
+	public final fun component1 ()Lcom/vitorpamplona/mls/tree/LeafNode;
+	public final fun copy (Lcom/vitorpamplona/mls/tree/LeafNode;)Lcom/vitorpamplona/mls/messages/Proposal$Update;
+	public static synthetic fun copy$default (Lcom/vitorpamplona/mls/messages/Proposal$Update;Lcom/vitorpamplona/mls/tree/LeafNode;ILjava/lang/Object;)Lcom/vitorpamplona/mls/messages/Proposal$Update;
+	public fun encodeTls (Lcom/vitorpamplona/mls/codec/TlsWriter;)V
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getLeafNode ()Lcom/vitorpamplona/mls/tree/LeafNode;
+	public fun getProposalType ()Lcom/vitorpamplona/mls/messages/ProposalType;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public abstract class com/vitorpamplona/mls/messages/ProposalOrRef : com/vitorpamplona/mls/codec/TlsSerializable {
+	public static final field Companion Lcom/vitorpamplona/mls/messages/ProposalOrRef$Companion;
+	public fun toTlsBytes ()[B
+}
+
+public final class com/vitorpamplona/mls/messages/ProposalOrRef$Companion {
+	public final fun decodeTls (Lcom/vitorpamplona/mls/codec/TlsReader;)Lcom/vitorpamplona/mls/messages/ProposalOrRef;
+}
+
+public final class com/vitorpamplona/mls/messages/ProposalOrRef$Inline : com/vitorpamplona/mls/messages/ProposalOrRef {
+	public fun <init> (Lcom/vitorpamplona/mls/messages/Proposal;)V
+	public final fun component1 ()Lcom/vitorpamplona/mls/messages/Proposal;
+	public final fun copy (Lcom/vitorpamplona/mls/messages/Proposal;)Lcom/vitorpamplona/mls/messages/ProposalOrRef$Inline;
+	public static synthetic fun copy$default (Lcom/vitorpamplona/mls/messages/ProposalOrRef$Inline;Lcom/vitorpamplona/mls/messages/Proposal;ILjava/lang/Object;)Lcom/vitorpamplona/mls/messages/ProposalOrRef$Inline;
+	public fun encodeTls (Lcom/vitorpamplona/mls/codec/TlsWriter;)V
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getProposal ()Lcom/vitorpamplona/mls/messages/Proposal;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/vitorpamplona/mls/messages/ProposalOrRef$Reference : com/vitorpamplona/mls/messages/ProposalOrRef {
+	public fun <init> ([B)V
+	public final fun component1 ()[B
+	public final fun copy ([B)Lcom/vitorpamplona/mls/messages/ProposalOrRef$Reference;
+	public static synthetic fun copy$default (Lcom/vitorpamplona/mls/messages/ProposalOrRef$Reference;[BILjava/lang/Object;)Lcom/vitorpamplona/mls/messages/ProposalOrRef$Reference;
+	public fun encodeTls (Lcom/vitorpamplona/mls/codec/TlsWriter;)V
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getProposalRef ()[B
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/vitorpamplona/mls/messages/ProposalType : java/lang/Enum {
+	public static final field ADD Lcom/vitorpamplona/mls/messages/ProposalType;
+	public static final field APP_DATA_UPDATE Lcom/vitorpamplona/mls/messages/ProposalType;
+	public static final field CUSTOM Lcom/vitorpamplona/mls/messages/ProposalType;
+	public static final field Companion Lcom/vitorpamplona/mls/messages/ProposalType$Companion;
+	public static final field EXTERNAL_INIT Lcom/vitorpamplona/mls/messages/ProposalType;
+	public static final field GROUP_CONTEXT_EXTENSIONS Lcom/vitorpamplona/mls/messages/ProposalType;
+	public static final field PSK Lcom/vitorpamplona/mls/messages/ProposalType;
+	public static final field REINIT Lcom/vitorpamplona/mls/messages/ProposalType;
+	public static final field REMOVE Lcom/vitorpamplona/mls/messages/ProposalType;
+	public static final field SELF_REMOVE Lcom/vitorpamplona/mls/messages/ProposalType;
+	public static final field UPDATE Lcom/vitorpamplona/mls/messages/ProposalType;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public final fun getValue ()I
+	public static fun valueOf (Ljava/lang/String;)Lcom/vitorpamplona/mls/messages/ProposalType;
+	public static fun values ()[Lcom/vitorpamplona/mls/messages/ProposalType;
+}
+
+public final class com/vitorpamplona/mls/messages/ProposalType$Companion {
+	public final fun fromValue (I)Lcom/vitorpamplona/mls/messages/ProposalType;
+}
+
+public final class com/vitorpamplona/mls/messages/UpdatePath : com/vitorpamplona/mls/codec/TlsSerializable {
+	public static final field Companion Lcom/vitorpamplona/mls/messages/UpdatePath$Companion;
+	public fun <init> (Lcom/vitorpamplona/mls/tree/LeafNode;Ljava/util/List;)V
+	public final fun component1 ()Lcom/vitorpamplona/mls/tree/LeafNode;
+	public final fun component2 ()Ljava/util/List;
+	public final fun copy (Lcom/vitorpamplona/mls/tree/LeafNode;Ljava/util/List;)Lcom/vitorpamplona/mls/messages/UpdatePath;
+	public static synthetic fun copy$default (Lcom/vitorpamplona/mls/messages/UpdatePath;Lcom/vitorpamplona/mls/tree/LeafNode;Ljava/util/List;ILjava/lang/Object;)Lcom/vitorpamplona/mls/messages/UpdatePath;
+	public fun encodeTls (Lcom/vitorpamplona/mls/codec/TlsWriter;)V
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getLeafNode ()Lcom/vitorpamplona/mls/tree/LeafNode;
+	public final fun getNodes ()Ljava/util/List;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+	public fun toTlsBytes ()[B
+}
+
+public final class com/vitorpamplona/mls/messages/UpdatePath$Companion {
+	public final fun decodeTls (Lcom/vitorpamplona/mls/codec/TlsReader;)Lcom/vitorpamplona/mls/messages/UpdatePath;
+}
+
+public final class com/vitorpamplona/mls/messages/Welcome : com/vitorpamplona/mls/codec/TlsSerializable {
+	public static final field Companion Lcom/vitorpamplona/mls/messages/Welcome$Companion;
+	public fun <init> (ILjava/util/List;[B)V
+	public final fun component1 ()I
+	public final fun component2 ()Ljava/util/List;
+	public final fun component3 ()[B
+	public final fun copy (ILjava/util/List;[B)Lcom/vitorpamplona/mls/messages/Welcome;
+	public static synthetic fun copy$default (Lcom/vitorpamplona/mls/messages/Welcome;ILjava/util/List;[BILjava/lang/Object;)Lcom/vitorpamplona/mls/messages/Welcome;
+	public fun encodeTls (Lcom/vitorpamplona/mls/codec/TlsWriter;)V
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getCipherSuite ()I
+	public final fun getEncryptedGroupInfo ()[B
+	public final fun getSecrets ()Ljava/util/List;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+	public fun toTlsBytes ()[B
+}
+
+public final class com/vitorpamplona/mls/messages/Welcome$Companion {
+	public final fun decodeTls (Lcom/vitorpamplona/mls/codec/TlsReader;)Lcom/vitorpamplona/mls/messages/Welcome;
+}
+
+public final class com/vitorpamplona/mls/schedule/EpochSecrets {
+	public fun <init> ([B[B[B[B[B[B[B[B[B[B[B[B)V
+	public final fun component1 ()[B
+	public final fun component10 ()[B
+	public final fun component11 ()[B
+	public final fun component12 ()[B
+	public final fun component2 ()[B
+	public final fun component3 ()[B
+	public final fun component4 ()[B
+	public final fun component5 ()[B
+	public final fun component6 ()[B
+	public final fun component7 ()[B
+	public final fun component8 ()[B
+	public final fun component9 ()[B
+	public final fun copy ([B[B[B[B[B[B[B[B[B[B[B[B)Lcom/vitorpamplona/mls/schedule/EpochSecrets;
+	public static synthetic fun copy$default (Lcom/vitorpamplona/mls/schedule/EpochSecrets;[B[B[B[B[B[B[B[B[B[B[B[BILjava/lang/Object;)Lcom/vitorpamplona/mls/schedule/EpochSecrets;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getConfirmationKey ()[B
+	public final fun getEncryptionSecret ()[B
+	public final fun getEpochAuthenticator ()[B
+	public final fun getEpochSecret ()[B
+	public final fun getExporterSecret ()[B
+	public final fun getExternalSecret ()[B
+	public final fun getInitSecret ()[B
+	public final fun getJoinerSecret ()[B
+	public final fun getMembershipKey ()[B
+	public final fun getResumptionPsk ()[B
+	public final fun getSenderDataSecret ()[B
+	public final fun getWelcomeSecret ()[B
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/vitorpamplona/mls/schedule/KeyNonceGeneration {
+	public fun <init> ([B[BI)V
+	public final fun component1 ()[B
+	public final fun component2 ()[B
+	public final fun component3 ()I
+	public final fun copy ([B[BI)Lcom/vitorpamplona/mls/schedule/KeyNonceGeneration;
+	public static synthetic fun copy$default (Lcom/vitorpamplona/mls/schedule/KeyNonceGeneration;[B[BIILjava/lang/Object;)Lcom/vitorpamplona/mls/schedule/KeyNonceGeneration;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getGeneration ()I
+	public final fun getKey ()[B
+	public final fun getNonce ()[B
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/vitorpamplona/mls/schedule/KeySchedule {
+	public static final field Companion Lcom/vitorpamplona/mls/schedule/KeySchedule$Companion;
+	public fun <init> ([B)V
+	public final fun deriveEpochSecrets ([B[B[B)Lcom/vitorpamplona/mls/schedule/EpochSecrets;
+	public static synthetic fun deriveEpochSecrets$default (Lcom/vitorpamplona/mls/schedule/KeySchedule;[B[B[BILjava/lang/Object;)Lcom/vitorpamplona/mls/schedule/EpochSecrets;
+	public final fun fromJoinerSecret ([B[B)Lcom/vitorpamplona/mls/schedule/EpochSecrets;
+	public static synthetic fun fromJoinerSecret$default (Lcom/vitorpamplona/mls/schedule/KeySchedule;[B[BILjava/lang/Object;)Lcom/vitorpamplona/mls/schedule/EpochSecrets;
+}
+
+public final class com/vitorpamplona/mls/schedule/KeySchedule$Companion {
+	public final fun mlsExporter ([BLjava/lang/String;[BI)[B
+	public final fun mlsExporter ([B[B[BI)[B
+	public final fun pskSecret (Ljava/util/List;)[B
+}
+
+public final class com/vitorpamplona/mls/schedule/SecretTree {
+	public static final field Companion Lcom/vitorpamplona/mls/schedule/SecretTree$Companion;
+	public static final field DEFAULT_MAX_FORWARD_DISTANCE I
+	public static final field DEFAULT_OUT_OF_ORDER_TOLERANCE I
+	public fun <init> ([BIII)V
+	public synthetic fun <init> ([BIIIILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun applicationKeyNonceForGeneration (II)Lcom/vitorpamplona/mls/schedule/KeyNonceGeneration;
+	public final fun exportNodeSecrets ()Ljava/util/Map;
+	public final fun exportSenderStates ()Ljava/util/Map;
+	public final fun exportSkippedApplicationSecrets ()Ljava/util/Map;
+	public final fun exportSkippedHandshakeSecrets ()Ljava/util/Map;
+	public final fun handshakeKeyNonceForGeneration (II)Lcom/vitorpamplona/mls/schedule/KeyNonceGeneration;
+	public final fun importNodeSecrets (Ljava/util/Map;)V
+	public final fun importSenderStates (Ljava/util/Map;)V
+	public final fun importSkippedSecrets (Ljava/util/Map;Ljava/util/Map;)V
+	public final fun nextApplicationKeyNonce (I)Lcom/vitorpamplona/mls/schedule/KeyNonceGeneration;
+	public final fun nextHandshakeKeyNonce (I)Lcom/vitorpamplona/mls/schedule/KeyNonceGeneration;
+}
+
+public final class com/vitorpamplona/mls/schedule/SecretTree$Companion {
+}
+
+public final class com/vitorpamplona/mls/schedule/SenderRatchetState {
+	public fun <init> ([BI[BI)V
+	public final fun component1 ()[B
+	public final fun component2 ()I
+	public final fun component3 ()[B
+	public final fun component4 ()I
+	public final fun copy ([BI[BI)Lcom/vitorpamplona/mls/schedule/SenderRatchetState;
+	public static synthetic fun copy$default (Lcom/vitorpamplona/mls/schedule/SenderRatchetState;[BI[BIILjava/lang/Object;)Lcom/vitorpamplona/mls/schedule/SenderRatchetState;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getApplicationGeneration ()I
+	public final fun getApplicationSecret ()[B
+	public final fun getHandshakeGeneration ()I
+	public final fun getHandshakeSecret ()[B
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/vitorpamplona/mls/schedule/StaleGenerationException : java/lang/IllegalArgumentException {
+	public fun <init> (IILjava/lang/Integer;Ljava/lang/String;)V
+	public final fun getCurrent ()Ljava/lang/Integer;
+	public final fun getGeneration ()I
+	public final fun getLeafIndex ()I
+}
+
+public final class com/vitorpamplona/mls/tree/BinaryTree {
+	public static final field INSTANCE Lcom/vitorpamplona/mls/tree/BinaryTree;
+	public final fun copath (II)Ljava/util/List;
+	public final fun directPath (II)Ljava/util/List;
+	public final fun isLeaf (I)Z
+	public final fun isParent (I)Z
+	public final fun leafToNode (I)I
+	public final fun left (I)I
+	public final fun level (I)I
+	public final fun nodeCount (I)I
+	public final fun nodeToLeaf (I)I
+	public final fun parent (II)I
+	public final fun right (I)I
+	public final fun root (I)I
+	public final fun sibling (II)I
+	public final fun subtreeLeaves (II)Ljava/util/List;
+}
+
+public final class com/vitorpamplona/mls/tree/Capabilities : com/vitorpamplona/mls/codec/TlsSerializable {
+	public static final field Companion Lcom/vitorpamplona/mls/tree/Capabilities$Companion;
+	public fun <init> ()V
+	public fun <init> (Ljava/util/List;Ljava/util/List;Ljava/util/List;Ljava/util/List;Ljava/util/List;)V
+	public synthetic fun <init> (Ljava/util/List;Ljava/util/List;Ljava/util/List;Ljava/util/List;Ljava/util/List;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/util/List;
+	public final fun component2 ()Ljava/util/List;
+	public final fun component3 ()Ljava/util/List;
+	public final fun component4 ()Ljava/util/List;
+	public final fun component5 ()Ljava/util/List;
+	public final fun copy (Ljava/util/List;Ljava/util/List;Ljava/util/List;Ljava/util/List;Ljava/util/List;)Lcom/vitorpamplona/mls/tree/Capabilities;
+	public static synthetic fun copy$default (Lcom/vitorpamplona/mls/tree/Capabilities;Ljava/util/List;Ljava/util/List;Ljava/util/List;Ljava/util/List;Ljava/util/List;ILjava/lang/Object;)Lcom/vitorpamplona/mls/tree/Capabilities;
+	public fun encodeTls (Lcom/vitorpamplona/mls/codec/TlsWriter;)V
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getCiphersuites ()Ljava/util/List;
+	public final fun getCredentials ()Ljava/util/List;
+	public final fun getExtensions ()Ljava/util/List;
+	public final fun getProposals ()Ljava/util/List;
+	public final fun getVersions ()Ljava/util/List;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+	public fun toTlsBytes ()[B
+}
+
+public final class com/vitorpamplona/mls/tree/Capabilities$Companion {
+	public final fun decodeTls (Lcom/vitorpamplona/mls/codec/TlsReader;)Lcom/vitorpamplona/mls/tree/Capabilities;
+}
+
+public abstract class com/vitorpamplona/mls/tree/Credential : com/vitorpamplona/mls/codec/TlsSerializable {
+	public static final field CREDENTIAL_TYPE_BASIC I
+	public static final field CREDENTIAL_TYPE_X509 I
+	public static final field Companion Lcom/vitorpamplona/mls/tree/Credential$Companion;
+	public abstract fun getCredentialType ()I
+	public fun toTlsBytes ()[B
+}
+
+public final class com/vitorpamplona/mls/tree/Credential$Basic : com/vitorpamplona/mls/tree/Credential {
+	public fun <init> ([B)V
+	public final fun component1 ()[B
+	public final fun copy ([B)Lcom/vitorpamplona/mls/tree/Credential$Basic;
+	public static synthetic fun copy$default (Lcom/vitorpamplona/mls/tree/Credential$Basic;[BILjava/lang/Object;)Lcom/vitorpamplona/mls/tree/Credential$Basic;
+	public fun encodeTls (Lcom/vitorpamplona/mls/codec/TlsWriter;)V
+	public fun equals (Ljava/lang/Object;)Z
+	public fun getCredentialType ()I
+	public final fun getIdentity ()[B
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/vitorpamplona/mls/tree/Credential$Companion {
+	public final fun decodeTls (Lcom/vitorpamplona/mls/codec/TlsReader;)Lcom/vitorpamplona/mls/tree/Credential;
+}
+
+public final class com/vitorpamplona/mls/tree/Credential$Custom : com/vitorpamplona/mls/tree/Credential {
+	public fun <init> (I[B)V
+	public fun encodeTls (Lcom/vitorpamplona/mls/codec/TlsWriter;)V
+	public fun equals (Ljava/lang/Object;)Z
+	public fun getCredentialType ()I
+	public final fun getData ()[B
+	public fun hashCode ()I
+}
+
+public final class com/vitorpamplona/mls/tree/Credential$X509 : com/vitorpamplona/mls/tree/Credential {
+	public fun <init> (Ljava/util/List;)V
+	public final fun component1 ()Ljava/util/List;
+	public final fun copy (Ljava/util/List;)Lcom/vitorpamplona/mls/tree/Credential$X509;
+	public static synthetic fun copy$default (Lcom/vitorpamplona/mls/tree/Credential$X509;Ljava/util/List;ILjava/lang/Object;)Lcom/vitorpamplona/mls/tree/Credential$X509;
+	public fun encodeTls (Lcom/vitorpamplona/mls/codec/TlsWriter;)V
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getCertChain ()Ljava/util/List;
+	public fun getCredentialType ()I
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/vitorpamplona/mls/tree/Extension : com/vitorpamplona/mls/codec/TlsSerializable {
+	public static final field Companion Lcom/vitorpamplona/mls/tree/Extension$Companion;
+	public fun <init> (I[B)V
+	public final fun component1 ()I
+	public final fun component2 ()[B
+	public final fun copy (I[B)Lcom/vitorpamplona/mls/tree/Extension;
+	public static synthetic fun copy$default (Lcom/vitorpamplona/mls/tree/Extension;I[BILjava/lang/Object;)Lcom/vitorpamplona/mls/tree/Extension;
+	public fun encodeTls (Lcom/vitorpamplona/mls/codec/TlsWriter;)V
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getExtensionData ()[B
+	public final fun getExtensionType ()I
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+	public fun toTlsBytes ()[B
+}
+
+public final class com/vitorpamplona/mls/tree/Extension$Companion {
+	public final fun decodeTls (Lcom/vitorpamplona/mls/codec/TlsReader;)Lcom/vitorpamplona/mls/tree/Extension;
+}
+
+public final class com/vitorpamplona/mls/tree/Grease {
+	public static final field INSTANCE Lcom/vitorpamplona/mls/tree/Grease;
+	public final fun addTo (Lcom/vitorpamplona/mls/tree/Capabilities;)Lcom/vitorpamplona/mls/tree/Capabilities;
+	public final fun getVALUES ()Ljava/util/List;
+	public final fun isGrease (I)Z
+}
+
+public final class com/vitorpamplona/mls/tree/LeafNode : com/vitorpamplona/mls/codec/TlsSerializable {
+	public static final field Companion Lcom/vitorpamplona/mls/tree/LeafNode$Companion;
+	public fun <init> ([B[BLcom/vitorpamplona/mls/tree/Credential;Lcom/vitorpamplona/mls/tree/Capabilities;Lcom/vitorpamplona/mls/tree/LeafNodeSource;Lcom/vitorpamplona/mls/tree/Lifetime;[BLjava/util/List;[B)V
+	public synthetic fun <init> ([B[BLcom/vitorpamplona/mls/tree/Credential;Lcom/vitorpamplona/mls/tree/Capabilities;Lcom/vitorpamplona/mls/tree/LeafNodeSource;Lcom/vitorpamplona/mls/tree/Lifetime;[BLjava/util/List;[BILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()[B
+	public final fun component2 ()[B
+	public final fun component3 ()Lcom/vitorpamplona/mls/tree/Credential;
+	public final fun component4 ()Lcom/vitorpamplona/mls/tree/Capabilities;
+	public final fun component5 ()Lcom/vitorpamplona/mls/tree/LeafNodeSource;
+	public final fun component6 ()Lcom/vitorpamplona/mls/tree/Lifetime;
+	public final fun component7 ()[B
+	public final fun component8 ()Ljava/util/List;
+	public final fun component9 ()[B
+	public final fun copy ([B[BLcom/vitorpamplona/mls/tree/Credential;Lcom/vitorpamplona/mls/tree/Capabilities;Lcom/vitorpamplona/mls/tree/LeafNodeSource;Lcom/vitorpamplona/mls/tree/Lifetime;[BLjava/util/List;[B)Lcom/vitorpamplona/mls/tree/LeafNode;
+	public static synthetic fun copy$default (Lcom/vitorpamplona/mls/tree/LeafNode;[B[BLcom/vitorpamplona/mls/tree/Credential;Lcom/vitorpamplona/mls/tree/Capabilities;Lcom/vitorpamplona/mls/tree/LeafNodeSource;Lcom/vitorpamplona/mls/tree/Lifetime;[BLjava/util/List;[BILjava/lang/Object;)Lcom/vitorpamplona/mls/tree/LeafNode;
+	public final fun encodeTbs ([BLjava/lang/Integer;)[B
+	public static synthetic fun encodeTbs$default (Lcom/vitorpamplona/mls/tree/LeafNode;[BLjava/lang/Integer;ILjava/lang/Object;)[B
+	public fun encodeTls (Lcom/vitorpamplona/mls/codec/TlsWriter;)V
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getCapabilities ()Lcom/vitorpamplona/mls/tree/Capabilities;
+	public final fun getCredential ()Lcom/vitorpamplona/mls/tree/Credential;
+	public final fun getEncryptionKey ()[B
+	public final fun getExtensions ()Ljava/util/List;
+	public final fun getLeafNodeSource ()Lcom/vitorpamplona/mls/tree/LeafNodeSource;
+	public final fun getLifetime ()Lcom/vitorpamplona/mls/tree/Lifetime;
+	public final fun getParentHash ()[B
+	public final fun getSignature ()[B
+	public final fun getSignatureKey ()[B
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+	public fun toTlsBytes ()[B
+}
+
+public final class com/vitorpamplona/mls/tree/LeafNode$Companion {
+	public final fun decodeTls (Lcom/vitorpamplona/mls/codec/TlsReader;)Lcom/vitorpamplona/mls/tree/LeafNode;
+}
+
+public final class com/vitorpamplona/mls/tree/LeafNodeSource : java/lang/Enum {
+	public static final field COMMIT Lcom/vitorpamplona/mls/tree/LeafNodeSource;
+	public static final field Companion Lcom/vitorpamplona/mls/tree/LeafNodeSource$Companion;
+	public static final field KEY_PACKAGE Lcom/vitorpamplona/mls/tree/LeafNodeSource;
+	public static final field UPDATE Lcom/vitorpamplona/mls/tree/LeafNodeSource;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public final fun getValue ()I
+	public static fun valueOf (Ljava/lang/String;)Lcom/vitorpamplona/mls/tree/LeafNodeSource;
+	public static fun values ()[Lcom/vitorpamplona/mls/tree/LeafNodeSource;
+}
+
+public final class com/vitorpamplona/mls/tree/LeafNodeSource$Companion {
+	public final fun fromValue (I)Lcom/vitorpamplona/mls/tree/LeafNodeSource;
+}
+
+public final class com/vitorpamplona/mls/tree/Lifetime : com/vitorpamplona/mls/codec/TlsSerializable {
+	public static final field Companion Lcom/vitorpamplona/mls/tree/Lifetime$Companion;
+	public fun <init> (JJ)V
+	public final fun component1 ()J
+	public final fun component2 ()J
+	public final fun copy (JJ)Lcom/vitorpamplona/mls/tree/Lifetime;
+	public static synthetic fun copy$default (Lcom/vitorpamplona/mls/tree/Lifetime;JJILjava/lang/Object;)Lcom/vitorpamplona/mls/tree/Lifetime;
+	public fun encodeTls (Lcom/vitorpamplona/mls/codec/TlsWriter;)V
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getNotAfter ()J
+	public final fun getNotBefore ()J
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+	public fun toTlsBytes ()[B
+}
+
+public final class com/vitorpamplona/mls/tree/Lifetime$Companion {
+	public final fun decodeTls (Lcom/vitorpamplona/mls/codec/TlsReader;)Lcom/vitorpamplona/mls/tree/Lifetime;
+}
+
+public final class com/vitorpamplona/mls/tree/ParentNode : com/vitorpamplona/mls/codec/TlsSerializable {
+	public static final field Companion Lcom/vitorpamplona/mls/tree/ParentNode$Companion;
+	public fun <init> ([B[BLjava/util/List;)V
+	public final fun component1 ()[B
+	public final fun component2 ()[B
+	public final fun component3 ()Ljava/util/List;
+	public final fun copy ([B[BLjava/util/List;)Lcom/vitorpamplona/mls/tree/ParentNode;
+	public static synthetic fun copy$default (Lcom/vitorpamplona/mls/tree/ParentNode;[B[BLjava/util/List;ILjava/lang/Object;)Lcom/vitorpamplona/mls/tree/ParentNode;
+	public fun encodeTls (Lcom/vitorpamplona/mls/codec/TlsWriter;)V
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getEncryptionKey ()[B
+	public final fun getParentHash ()[B
+	public final fun getUnmergedLeaves ()Ljava/util/List;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+	public fun toTlsBytes ()[B
+}
+
+public final class com/vitorpamplona/mls/tree/ParentNode$Companion {
+	public final fun decodeTls (Lcom/vitorpamplona/mls/codec/TlsReader;)Lcom/vitorpamplona/mls/tree/ParentNode;
+}
+
+public final class com/vitorpamplona/mls/tree/RatchetTree {
+	public static final field Companion Lcom/vitorpamplona/mls/tree/RatchetTree$Companion;
+	public fun <init> ()V
+	public fun <init> (I)V
+	public synthetic fun <init> (IILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun addLeaf (Lcom/vitorpamplona/mls/tree/LeafNode;)I
+	public final fun encodeTls (Lcom/vitorpamplona/mls/codec/TlsWriter;)V
+	public final fun filteredDirectPath (I)Lkotlin/Pair;
+	public final fun getLeaf (I)Lcom/vitorpamplona/mls/tree/LeafNode;
+	public final fun getLeafCount ()I
+	public final fun getNode (I)Lcom/vitorpamplona/mls/tree/TreeNode;
+	public final fun removeLeaf (I)V
+	public final fun resolution (I)Ljava/util/List;
+	public final fun resolutionExcluding (ILjava/util/Set;)Ljava/util/List;
+	public final fun restoreFrom (Lcom/vitorpamplona/mls/tree/RatchetTree$Snapshot;)V
+	public final fun setLeaf (ILcom/vitorpamplona/mls/tree/LeafNode;)V
+	public final fun setParent (ILcom/vitorpamplona/mls/tree/ParentNode;)V
+	public final fun snapshot ()Lcom/vitorpamplona/mls/tree/RatchetTree$Snapshot;
+	public final fun treeHash ()[B
+	public final fun treeHashWithLeafCount (I)[B
+	public final fun updateLeaf (ILcom/vitorpamplona/mls/tree/LeafNode;)V
+}
+
+public final class com/vitorpamplona/mls/tree/RatchetTree$Companion {
+	public final fun decodeTls (Lcom/vitorpamplona/mls/codec/TlsReader;)Lcom/vitorpamplona/mls/tree/RatchetTree;
+}
+
+public final class com/vitorpamplona/mls/tree/RatchetTree$Snapshot {
+}
+
+public final class com/vitorpamplona/mls/tree/TreeKem {
+	public static final field INSTANCE Lcom/vitorpamplona/mls/tree/TreeKem;
+	public final fun copathChild (II)I
+	public final fun copathResolutions (Lcom/vitorpamplona/mls/tree/RatchetTree;ILjava/util/Set;)Ljava/util/List;
+	public final fun decryptPathSecrets (Lcom/vitorpamplona/mls/tree/RatchetTree;IILcom/vitorpamplona/mls/messages/UpdatePath;Ljava/util/Set;[BLkotlin/jvm/functions/Function1;)Lcom/vitorpamplona/mls/tree/TreeKem$DecryptedPath;
+	public final fun encodeParentHashInput ([B[B[B)[B
+	public final fun encryptPathSecrets (Lcom/vitorpamplona/mls/tree/RatchetTree;ILcom/vitorpamplona/mls/tree/TreeKem$GeneratedPath;Ljava/util/Set;[B)Ljava/util/List;
+	public final fun generate (Lcom/vitorpamplona/mls/tree/RatchetTree;I[B)Lcom/vitorpamplona/mls/tree/TreeKem$GeneratedPath;
+	public static synthetic fun generate$default (Lcom/vitorpamplona/mls/tree/TreeKem;Lcom/vitorpamplona/mls/tree/RatchetTree;I[BILjava/lang/Object;)Lcom/vitorpamplona/mls/tree/TreeKem$GeneratedPath;
+	public final fun holdsKeyFor (Lcom/vitorpamplona/mls/tree/RatchetTree;I[B)Z
+	public final fun isInSubtree (II)Z
+	public final fun keysFromWelcomePathSecret (Lcom/vitorpamplona/mls/tree/RatchetTree;II[B)Ljava/util/Map;
+	public final fun mergePathKeys (Lcom/vitorpamplona/mls/tree/RatchetTree;ILjava/util/List;)[B
+	public final fun nextPathSecret ([B)[B
+	public final fun nodeKeyPair ([B)Lkotlin/Pair;
+}
+
+public final class com/vitorpamplona/mls/tree/TreeKem$DecryptedPath {
+	public fun <init> (Ljava/util/Map;[B)V
+	public final fun getCommitSecret ()[B
+	public final fun getNodePrivateKeys ()Ljava/util/Map;
+}
+
+public final class com/vitorpamplona/mls/tree/TreeKem$GeneratedPath {
+	public fun <init> (Ljava/util/List;Ljava/util/List;Ljava/util/List;[B)V
+	public final fun getCommitSecret ()[B
+	public final fun getFilteredPath ()Ljava/util/List;
+	public final fun getNodeKeys ()Ljava/util/List;
+	public final fun getPathSecrets ()Ljava/util/List;
+	public final fun pathSecretFor (Lcom/vitorpamplona/mls/tree/RatchetTree;II)[B
+	public final fun privateKeysByNode ()Ljava/util/Map;
+}
+
+public abstract class com/vitorpamplona/mls/tree/TreeNode : com/vitorpamplona/mls/codec/TlsSerializable {
+	public static final field Companion Lcom/vitorpamplona/mls/tree/TreeNode$Companion;
+	public static final field NODE_TYPE_LEAF I
+	public static final field NODE_TYPE_PARENT I
+	public fun toTlsBytes ()[B
+}
+
+public final class com/vitorpamplona/mls/tree/TreeNode$Companion {
+	public final fun decodeTls (Lcom/vitorpamplona/mls/codec/TlsReader;)Lcom/vitorpamplona/mls/tree/TreeNode;
+}
+
+public final class com/vitorpamplona/mls/tree/TreeNode$Leaf : com/vitorpamplona/mls/tree/TreeNode {
+	public fun <init> (Lcom/vitorpamplona/mls/tree/LeafNode;)V
+	public final fun component1 ()Lcom/vitorpamplona/mls/tree/LeafNode;
+	public final fun copy (Lcom/vitorpamplona/mls/tree/LeafNode;)Lcom/vitorpamplona/mls/tree/TreeNode$Leaf;
+	public static synthetic fun copy$default (Lcom/vitorpamplona/mls/tree/TreeNode$Leaf;Lcom/vitorpamplona/mls/tree/LeafNode;ILjava/lang/Object;)Lcom/vitorpamplona/mls/tree/TreeNode$Leaf;
+	public fun encodeTls (Lcom/vitorpamplona/mls/codec/TlsWriter;)V
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getLeafNode ()Lcom/vitorpamplona/mls/tree/LeafNode;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/vitorpamplona/mls/tree/TreeNode$Parent : com/vitorpamplona/mls/tree/TreeNode {
+	public fun <init> (Lcom/vitorpamplona/mls/tree/ParentNode;)V
+	public final fun component1 ()Lcom/vitorpamplona/mls/tree/ParentNode;
+	public final fun copy (Lcom/vitorpamplona/mls/tree/ParentNode;)Lcom/vitorpamplona/mls/tree/TreeNode$Parent;
+	public static synthetic fun copy$default (Lcom/vitorpamplona/mls/tree/TreeNode$Parent;Lcom/vitorpamplona/mls/tree/ParentNode;ILjava/lang/Object;)Lcom/vitorpamplona/mls/tree/TreeNode$Parent;
+	public fun encodeTls (Lcom/vitorpamplona/mls/codec/TlsWriter;)V
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getParentNode ()Lcom/vitorpamplona/mls/tree/ParentNode;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/vitorpamplona/mls/tree/UpdatePathNode : com/vitorpamplona/mls/codec/TlsSerializable {
+	public static final field Companion Lcom/vitorpamplona/mls/tree/UpdatePathNode$Companion;
+	public fun <init> ([BLjava/util/List;)V
+	public final fun component1 ()[B
+	public final fun component2 ()Ljava/util/List;
+	public final fun copy ([BLjava/util/List;)Lcom/vitorpamplona/mls/tree/UpdatePathNode;
+	public static synthetic fun copy$default (Lcom/vitorpamplona/mls/tree/UpdatePathNode;[BLjava/util/List;ILjava/lang/Object;)Lcom/vitorpamplona/mls/tree/UpdatePathNode;
+	public fun encodeTls (Lcom/vitorpamplona/mls/codec/TlsWriter;)V
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getEncryptedPathSecret ()Ljava/util/List;
+	public final fun getEncryptionKey ()[B
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+	public fun toTlsBytes ()[B
+}
+
+public final class com/vitorpamplona/mls/tree/UpdatePathNode$Companion {
+	public final fun decodeTls (Lcom/vitorpamplona/mls/codec/TlsReader;)Lcom/vitorpamplona/mls/tree/UpdatePathNode;
+}
+

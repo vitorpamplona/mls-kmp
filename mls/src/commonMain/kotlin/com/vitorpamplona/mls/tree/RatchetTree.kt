@@ -39,14 +39,14 @@ import com.vitorpamplona.mls.crypto.MlsCryptoProvider
  *
  * The tree is stored as a flat array indexed by node number.
  */
-class RatchetTree(
+public class RatchetTree(
     initialLeafCount: Int = 0,
 ) {
     /** Node storage: null means blank */
     private val nodes = mutableListOf<TreeNode?>()
     private var _leafCount: Int = initialLeafCount
 
-    val leafCount: Int get() = _leafCount
+    public val leafCount: Int get() = _leafCount
 
     init {
         if (initialLeafCount > 0) {
@@ -56,10 +56,10 @@ class RatchetTree(
     }
 
     /** Get the node at a given node index */
-    fun getNode(nodeIndex: Int): TreeNode? = if (nodeIndex in nodes.indices) nodes[nodeIndex] else null
+    public fun getNode(nodeIndex: Int): TreeNode? = if (nodeIndex in nodes.indices) nodes[nodeIndex] else null
 
     /** Set a leaf node at the given leaf index */
-    fun setLeaf(
+    public fun setLeaf(
         leafIndex: Int,
         leafNode: LeafNode?,
     ) {
@@ -78,7 +78,7 @@ class RatchetTree(
     }
 
     /** Set a parent node at the given node index */
-    fun setParent(
+    public fun setParent(
         nodeIndex: Int,
         parentNode: ParentNode?,
     ) {
@@ -93,7 +93,7 @@ class RatchetTree(
     }
 
     /** Get a leaf node at the given leaf index */
-    fun getLeaf(leafIndex: Int): LeafNode? {
+    public fun getLeaf(leafIndex: Int): LeafNode? {
         // Indices come off the wire: out of range is "no such leaf", and the
         // check comes before leafToNode, which would overflow for large ones.
         if (leafIndex !in 0 until leafCount) return null
@@ -129,7 +129,7 @@ class RatchetTree(
      * then fails the commit with "Confirmation tag verification failed". Path encryption and decryption already exclude
      * the leaves added in the same commit from copath resolutions, as the RFC requires.
      */
-    fun addLeaf(leafNode: LeafNode): Int {
+    public fun addLeaf(leafNode: LeafNode): Int {
         requireUniqueEncryptionKey(leafNode)
         // the leftmost blank leaf, else extend the tree by one leaf
         val leafIndex =
@@ -155,7 +155,7 @@ class RatchetTree(
      * direct path. Replacing only the leaf keeps the sender's old path keys where the RFC (and the tree-operations test
      * vectors) have blanks — a different tree hash whenever those nodes are not overwritten by the committer's UpdatePath.
      */
-    fun updateLeaf(
+    public fun updateLeaf(
         leafIndex: Int,
         leafNode: LeafNode,
     ) {
@@ -177,7 +177,7 @@ class RatchetTree(
      * entry longer than the receiver's tree layout accepts, and the receiver
      * errors out with `UpdatePathError(PathLengthMismatch)`.
      */
-    fun removeLeaf(leafIndex: Int) {
+    public fun removeLeaf(leafIndex: Int) {
         setLeaf(leafIndex, null)
         val directPath = BinaryTree.directPath(leafIndex, _leafCount)
         for (nodeIdx in directPath) {
@@ -204,17 +204,17 @@ class RatchetTree(
      * are all immutable data classes — copying the `nodes` list is enough
      * to isolate future edits.
      */
-    fun snapshot(): Snapshot = Snapshot(nodes.toList(), _leafCount)
+    public fun snapshot(): Snapshot = Snapshot(nodes.toList(), _leafCount)
 
     /** Restore the mutable tree state produced by an earlier [snapshot]. */
-    fun restoreFrom(snapshot: Snapshot) {
+    public fun restoreFrom(snapshot: Snapshot) {
         nodes.clear()
         nodes.addAll(snapshot.nodes)
         _leafCount = snapshot.leafCount
     }
 
     /** Opaque capture of the ratchet tree's mutable state. */
-    class Snapshot internal constructor(
+    public class Snapshot internal constructor(
         internal val nodes: List<TreeNode?>,
         internal val leafCount: Int,
     )
@@ -223,7 +223,7 @@ class RatchetTree(
      * Compute the tree hash for this ratchet tree (RFC 9420 Section 7.9).
      * Used in GroupContext to bind the group state to the tree.
      */
-    fun treeHash(): ByteArray {
+    public fun treeHash(): ByteArray {
         val rootIdx = BinaryTree.root(_leafCount)
         return treeHashNode(rootIdx)
     }
@@ -232,7 +232,7 @@ class RatchetTree(
      * Compute tree hash using a specific logical leaf count.
      * Used when the serialized tree has more nodes than the logical tree.
      */
-    fun treeHashWithLeafCount(logicalLeafCount: Int): ByteArray {
+    public fun treeHashWithLeafCount(logicalLeafCount: Int): ByteArray {
         val rootIdx = BinaryTree.root(logicalLeafCount)
         return treeHashNode(rootIdx)
     }
@@ -340,7 +340,7 @@ class RatchetTree(
      * parent was populated, and the leaves added since are exactly the ones in
      * that parent's `unmerged_leaves`.
      */
-    fun resolutionExcluding(
+    public fun resolutionExcluding(
         nodeIndex: Int,
         excludedLeaves: Set<Int>,
     ): List<Int> {
@@ -402,7 +402,7 @@ class RatchetTree(
      * the level above the committer becomes fully blank, and the parent at
      * that level is dropped from the UpdatePath.
      */
-    fun filteredDirectPath(leafIndex: Int): Pair<List<Int>, List<Int>> {
+    public fun filteredDirectPath(leafIndex: Int): Pair<List<Int>, List<Int>> {
         val directPath = BinaryTree.directPath(leafIndex, _leafCount)
         val copath = BinaryTree.copath(leafIndex, _leafCount)
         val filteredDp = mutableListOf<Int>()
@@ -423,7 +423,7 @@ class RatchetTree(
      * that need to receive an encrypted path secret for this tree position.
      * Used to determine who gets HPKE-encrypted copies of path secrets.
      */
-    fun resolution(nodeIndex: Int): List<Int> {
+    public fun resolution(nodeIndex: Int): List<Int> {
         val node = getNode(nodeIndex)
         if (node != null) {
             val result = mutableListOf(nodeIndex)
@@ -450,7 +450,7 @@ class RatchetTree(
      * Encode the full ratchet tree as a TLS-serialized optional vector.
      * Used in GroupInfo for Welcome messages.
      */
-    fun encodeTls(writer: TlsWriter) {
+    public fun encodeTls(writer: TlsWriter) {
         val totalNodes = if (_leafCount > 0) BinaryTree.nodeCount(_leafCount) else 0
 
         // Find rightmost non-blank node to trim trailing blanks (RFC 9420 Section 7.8)
@@ -479,8 +479,8 @@ class RatchetTree(
         }
     }
 
-    companion object {
-        fun decodeTls(reader: TlsReader): RatchetTree {
+    public companion object {
+        public fun decodeTls(reader: TlsReader): RatchetTree {
             val treeBytes = reader.readOpaqueVarInt()
             val treeReader = TlsReader(treeBytes)
             val nodesList = mutableListOf<TreeNode?>()
@@ -532,8 +532,8 @@ class RatchetTree(
 }
 
 /** A node in the ratchet tree: either a Leaf or Parent */
-sealed class TreeNode : TlsSerializable {
-    data class Leaf(
+public sealed class TreeNode : TlsSerializable {
+    public data class Leaf(
         val leafNode: LeafNode,
     ) : TreeNode() {
         override fun encodeTls(writer: TlsWriter) {
@@ -542,7 +542,7 @@ sealed class TreeNode : TlsSerializable {
         }
     }
 
-    data class Parent(
+    public data class Parent(
         val parentNode: ParentNode,
     ) : TreeNode() {
         override fun encodeTls(writer: TlsWriter) {
@@ -551,11 +551,11 @@ sealed class TreeNode : TlsSerializable {
         }
     }
 
-    companion object {
-        const val NODE_TYPE_LEAF = 1
-        const val NODE_TYPE_PARENT = 2
+    public companion object {
+        public const val NODE_TYPE_LEAF: Int = 1
+        public const val NODE_TYPE_PARENT: Int = 2
 
-        fun decodeTls(reader: TlsReader): TreeNode {
+        public fun decodeTls(reader: TlsReader): TreeNode {
             val nodeType = reader.readUint8()
             return when (nodeType) {
                 NODE_TYPE_LEAF -> Leaf(LeafNode.decodeTls(reader))
@@ -567,7 +567,7 @@ sealed class TreeNode : TlsSerializable {
 }
 
 /** UpdatePath node: public key + encrypted path secrets for copath nodes */
-data class UpdatePathNode(
+public data class UpdatePathNode(
     val encryptionKey: ByteArray,
     val encryptedPathSecret: List<com.vitorpamplona.mls.crypto.HpkeCiphertext>,
 ) : TlsSerializable {
@@ -588,8 +588,8 @@ data class UpdatePathNode(
         return result
     }
 
-    companion object {
-        fun decodeTls(reader: TlsReader): UpdatePathNode =
+    public companion object {
+        public fun decodeTls(reader: TlsReader): UpdatePathNode =
             UpdatePathNode(
                 encryptionKey = reader.readOpaqueVarInt(),
                 encryptedPathSecret =

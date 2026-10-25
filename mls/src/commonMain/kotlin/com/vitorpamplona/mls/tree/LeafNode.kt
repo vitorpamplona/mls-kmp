@@ -28,11 +28,11 @@ import com.vitorpamplona.mls.codec.TlsWriter
  * MLS Credential (RFC 9420 Section 5.3).
  * For Marmot, we use BasicCredential with the Nostr public key.
  */
-sealed class Credential : TlsSerializable {
+public sealed class Credential : TlsSerializable {
     /** The `credential_type` on the wire. */
-    abstract val credentialType: Int
+    public abstract val credentialType: Int
 
-    data class Basic(
+    public data class Basic(
         val identity: ByteArray,
     ) : Credential() {
         override val credentialType: Int get() = CREDENTIAL_TYPE_BASIC
@@ -55,7 +55,7 @@ sealed class Credential : TlsSerializable {
      * X.509 credential (RFC 9420 Section 5.3).
      * Contains a chain of DER-encoded X.509 certificates.
      */
-    data class X509(
+    public data class X509(
         val certChain: List<ByteArray>,
     ) : Credential() {
         override val credentialType: Int get() = CREDENTIAL_TYPE_X509
@@ -89,9 +89,9 @@ sealed class Credential : TlsSerializable {
      * acceptable is the application's call, in
      * [com.vitorpamplona.mls.group.MlsGroupPolicy.validateCredential].
      */
-    class Custom(
+    public class Custom(
         override val credentialType: Int,
-        val data: ByteArray,
+        public val data: ByteArray,
     ) : Credential() {
         override fun encodeTls(writer: TlsWriter) {
             writer.putUint16(credentialType)
@@ -103,11 +103,11 @@ sealed class Credential : TlsSerializable {
         override fun hashCode(): Int = 31 * credentialType + data.contentHashCode()
     }
 
-    companion object {
-        const val CREDENTIAL_TYPE_BASIC = 1
-        const val CREDENTIAL_TYPE_X509 = 2
+    public companion object {
+        public const val CREDENTIAL_TYPE_BASIC: Int = 1
+        public const val CREDENTIAL_TYPE_X509: Int = 2
 
-        fun decodeTls(reader: TlsReader): Credential {
+        public fun decodeTls(reader: TlsReader): Credential {
             val type = reader.readUint16()
             return when (type) {
                 CREDENTIAL_TYPE_BASIC -> Basic(reader.readOpaqueVarInt())
@@ -122,7 +122,7 @@ sealed class Credential : TlsSerializable {
  * MLS Capabilities (RFC 9420 Section 7.2).
  * Advertises supported versions, ciphersuites, extensions, proposals, and credentials.
  */
-data class Capabilities(
+public data class Capabilities(
     val versions: List<Int> = listOf(1), // MLS protocol version 1
     val ciphersuites: List<Int> = listOf(1), // 0x0001
     val extensions: List<Int> = emptyList(),
@@ -156,8 +156,8 @@ data class Capabilities(
         writer.putOpaqueVarInt(credWriter.toByteArray())
     }
 
-    companion object {
-        fun decodeTls(reader: TlsReader): Capabilities {
+    public companion object {
+        public fun decodeTls(reader: TlsReader): Capabilities {
             fun readUint16List(data: ByteArray): List<Int> {
                 val r = TlsReader(data)
                 val list = mutableListOf<Int>()
@@ -180,7 +180,7 @@ data class Capabilities(
  * MLS Extension (RFC 9420 Section 7.2).
  * Generic extension container for extensibility.
  */
-data class Extension(
+public data class Extension(
     val extensionType: Int,
     val extensionData: ByteArray,
 ) : TlsSerializable {
@@ -201,8 +201,8 @@ data class Extension(
         return result
     }
 
-    companion object {
-        fun decodeTls(reader: TlsReader): Extension =
+    public companion object {
+        public fun decodeTls(reader: TlsReader): Extension =
             Extension(
                 extensionType = reader.readUint16(),
                 extensionData = reader.readOpaqueVarInt(),
@@ -213,7 +213,7 @@ data class Extension(
 /**
  * Lifetime extension for LeafNode validity period.
  */
-data class Lifetime(
+public data class Lifetime(
     val notBefore: Long,
     val notAfter: Long,
 ) : TlsSerializable {
@@ -222,8 +222,8 @@ data class Lifetime(
         writer.putUint64(notAfter)
     }
 
-    companion object {
-        fun decodeTls(reader: TlsReader): Lifetime =
+    public companion object {
+        public fun decodeTls(reader: TlsReader): Lifetime =
             Lifetime(
                 notBefore = reader.readUint64(),
                 notAfter = reader.readUint64(),
@@ -258,7 +258,7 @@ data class Lifetime(
  * } LeafNode;
  * ```
  */
-data class LeafNode(
+public data class LeafNode(
     val encryptionKey: ByteArray,
     val signatureKey: ByteArray,
     val credential: Credential,
@@ -298,7 +298,7 @@ data class LeafNode(
      * Includes all fields except the signature itself, plus context-dependent
      * group_id and leaf_index for update/commit sources.
      */
-    fun encodeTbs(
+    public fun encodeTbs(
         groupId: ByteArray? = null,
         leafIndex: Int? = null,
     ): ByteArray {
@@ -354,8 +354,8 @@ data class LeafNode(
         return result
     }
 
-    companion object {
-        fun decodeTls(reader: TlsReader): LeafNode {
+    public companion object {
+        public fun decodeTls(reader: TlsReader): LeafNode {
             val encryptionKey = reader.readOpaqueVarInt()
             val signatureKey = reader.readOpaqueVarInt()
             val credential = Credential.decodeTls(reader)
@@ -396,16 +396,16 @@ data class LeafNode(
     }
 }
 
-enum class LeafNodeSource(
-    val value: Int,
+public enum class LeafNodeSource(
+    public val value: Int,
 ) {
     KEY_PACKAGE(1),
     UPDATE(2),
     COMMIT(3),
     ;
 
-    companion object {
-        fun fromValue(value: Int): LeafNodeSource =
+    public companion object {
+        public fun fromValue(value: Int): LeafNodeSource =
             entries.find { it.value == value }
                 ?: throw IllegalArgumentException("Unknown LeafNodeSource: $value")
     }

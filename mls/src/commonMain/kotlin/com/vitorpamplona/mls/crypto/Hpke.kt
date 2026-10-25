@@ -36,7 +36,7 @@ import com.vitorpamplona.crypto.curve25519.X25519KeyPair
  *
  * Reference: RFC 9180 Section 4 (Base Mode), Section 4.1 (DHKEM)
  */
-object Hpke {
+public object Hpke {
     // Suite IDs per RFC 9180
     private val KEM_SUITE_ID = "KEM".encodeToByteArray() + byteArrayOf(0x00, 0x20) // DHKEM(X25519)
     private val KDF_ID = byteArrayOf(0x00, 0x01) // HKDF-SHA256
@@ -61,7 +61,7 @@ object Hpke {
      * @param plaintext data to encrypt
      * @return HpkeCiphertext containing KEM output (ephemeral public key) and encrypted data
      */
-    fun seal(
+    public fun seal(
         recipientPub: ByteArray,
         info: ByteArray,
         aad: ByteArray,
@@ -86,7 +86,7 @@ object Hpke {
      * @param ciphertext encrypted data + tag
      * @return decrypted plaintext
      */
-    fun open(
+    public fun open(
         recipientPriv: ByteArray,
         enc: ByteArray,
         info: ByteArray,
@@ -200,7 +200,7 @@ object Hpke {
      * DeriveKeyPair for DHKEM(X25519) (RFC 9180 Section 7.1.3).
      * Derives an X25519 key pair from a seed.
      */
-    fun deriveKeyPair(ikm: ByteArray): X25519KeyPair {
+    public fun deriveKeyPair(ikm: ByteArray): X25519KeyPair {
         val suiteId = KEM_SUITE_ID
         val dkpPrk = labeledExtract(suiteId, ByteArray(0), "dkp_prk", ikm)
         val sk = labeledExpand(suiteId, dkpPrk, "sk", ByteArray(0), N_SECRET)
@@ -216,7 +216,7 @@ object Hpke {
      * @param info context info (empty for external init)
      * @return (kem_output, exporter) where exporter derives secrets via context.export()
      */
-    fun setupBaseSExport(
+    public fun setupBaseSExport(
         recipientPub: ByteArray,
         info: ByteArray,
     ): Pair<ByteArray, HpkeExportContext> {
@@ -234,7 +234,7 @@ object Hpke {
      * @param info context info (empty for external init)
      * @return exporter context for deriving secrets
      */
-    fun setupBaseRExport(
+    public fun setupBaseRExport(
         enc: ByteArray,
         recipientPriv: ByteArray,
         info: ByteArray,
@@ -287,7 +287,7 @@ object Hpke {
  * HPKE export-only context (RFC 9180 Section 5.3).
  * Used for deriving secrets without encrypting data.
  */
-class HpkeExportContext(
+public class HpkeExportContext(
     private val exporterSecret: ByteArray,
 ) {
     /**
@@ -298,7 +298,7 @@ class HpkeExportContext(
      * MLS-Exporter does (RFC 9420 §8.5), not HPKE; doing it here gave an
      * external joiner an init_secret no other implementation derives.
      */
-    fun export(
+    public fun export(
         exporterContext: ByteArray,
         length: Int,
     ): ByteArray {

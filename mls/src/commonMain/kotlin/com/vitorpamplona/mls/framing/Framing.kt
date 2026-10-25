@@ -53,13 +53,13 @@ import com.vitorpamplona.mls.schedule.KeyNonceGeneration
  * AuthenticatedContent a ProposalRef hashes, the transcript hash input) is
  * produced by the one encoder below and cannot drift.
  */
-class FramedContent(
-    val groupId: ByteArray,
-    val epoch: Long,
-    val sender: Sender,
-    val authenticatedData: ByteArray,
-    val contentType: ContentType,
-    val body: ByteArray,
+public class FramedContent(
+    public val groupId: ByteArray,
+    public val epoch: Long,
+    public val sender: Sender,
+    public val authenticatedData: ByteArray,
+    public val contentType: ContentType,
+    public val body: ByteArray,
 ) : TlsSerializable {
     override fun encodeTls(writer: TlsWriter) {
         writer.putOpaqueVarInt(groupId)
@@ -73,13 +73,13 @@ class FramedContent(
         }
     }
 
-    fun proposal(): Proposal {
+    public fun proposal(): Proposal {
         require(contentType == ContentType.PROPOSAL) { "FramedContent carries $contentType, not a proposal" }
         val reader = TlsReader(body)
         return Proposal.decodeTls(reader).also { reader.requireFullyConsumed("Proposal") }
     }
 
-    fun commit(): Commit {
+    public fun commit(): Commit {
         require(contentType == ContentType.COMMIT) { "FramedContent carries $contentType, not a commit" }
         val reader = TlsReader(body)
         return Commit.decodeTls(reader).also { reader.requireFullyConsumed("Commit") }
@@ -87,7 +87,7 @@ class FramedContent(
 }
 
 /** The FramedContent a PublicMessage carries. */
-fun PublicMessage.framedContent(): FramedContent = FramedContent(groupId, epoch, sender, authenticatedData, contentType, content)
+public fun PublicMessage.framedContent(): FramedContent = FramedContent(groupId, epoch, sender, authenticatedData, contentType, content)
 
 /**
  * The structures RFC 9420 §6 derives from a FramedContent, in one place.
@@ -95,9 +95,9 @@ fun PublicMessage.framedContent(): FramedContent = FramedContent(groupId, epoch,
  * Every signed, MACed or hashed form of a message is built here so the
  * sending and the receiving side cannot encode them differently.
  */
-object Framing {
+public object Framing {
     /** Whether FramedContentTBS appends the GroupContext for this sender (RFC 9420 §6.1). */
-    fun senderSignsGroupContext(sender: Sender): Boolean = sender.senderType == SenderType.MEMBER || sender.senderType == SenderType.NEW_MEMBER_COMMIT
+    public fun senderSignsGroupContext(sender: Sender): Boolean = sender.senderType == SenderType.MEMBER || sender.senderType == SenderType.NEW_MEMBER_COMMIT
 
     /**
      * FramedContentTBS:
@@ -116,7 +116,7 @@ object Framing {
      * } FramedContentTBS;
      * ```
      */
-    fun tbs(
+    public fun tbs(
         wireFormat: WireFormat,
         content: FramedContent,
         groupContext: ByteArray?,
@@ -131,14 +131,14 @@ object Framing {
         return writer.toByteArray()
     }
 
-    fun sign(
+    public fun sign(
         signingKey: ByteArray,
         wireFormat: WireFormat,
         content: FramedContent,
         groupContext: ByteArray?,
     ): ByteArray = MlsCryptoProvider.signWithLabel(signingKey, "FramedContentTBS", tbs(wireFormat, content, groupContext))
 
-    fun verify(
+    public fun verify(
         verificationKey: ByteArray,
         wireFormat: WireFormat,
         content: FramedContent,
@@ -147,7 +147,7 @@ object Framing {
     ): Boolean = MlsCryptoProvider.verifyWithLabel(verificationKey, "FramedContentTBS", tbs(wireFormat, content, groupContext), signature)
 
     /** FramedContentAuthData: the signature, plus the confirmation tag for a commit. */
-    fun encodeAuthData(
+    public fun encodeAuthData(
         writer: TlsWriter,
         contentType: ContentType,
         signature: ByteArray,
@@ -160,7 +160,7 @@ object Framing {
     }
 
     /** AuthenticatedContent = wire_format || FramedContent || FramedContentAuthData. */
-    fun authenticatedContent(
+    public fun authenticatedContent(
         wireFormat: WireFormat,
         content: FramedContent,
         signature: ByteArray,
@@ -174,10 +174,10 @@ object Framing {
     }
 
     /** RFC 9420 §5.2 ProposalRef = RefHash("MLS 1.0 Proposal Reference", AuthenticatedContent). */
-    fun proposalRef(authenticatedContent: ByteArray): ByteArray = MlsCryptoProvider.refHash(PROPOSAL_REF_LABEL, authenticatedContent)
+    public fun proposalRef(authenticatedContent: ByteArray): ByteArray = MlsCryptoProvider.refHash(PROPOSAL_REF_LABEL, authenticatedContent)
 
     /** RFC 9420 §6.2: membership_tag = MAC(membership_key, AuthenticatedContentTBM), TBM = TBS || auth. */
-    fun membershipTag(
+    public fun membershipTag(
         membershipKey: ByteArray,
         content: FramedContent,
         groupContext: ByteArray,
@@ -193,7 +193,7 @@ object Framing {
     }
 
     /** RFC 9420 §8.2 ConfirmedTranscriptHashInput = wire_format || FramedContent || signature. */
-    fun confirmedTranscriptHashInput(
+    public fun confirmedTranscriptHashInput(
         wireFormat: WireFormat,
         content: FramedContent,
         signature: ByteArray,
@@ -205,7 +205,7 @@ object Framing {
         return writer.toByteArray()
     }
 
-    fun publicMessage(
+    public fun publicMessage(
         content: FramedContent,
         signature: ByteArray,
         confirmationTag: ByteArray?,
@@ -226,7 +226,7 @@ object Framing {
         )
     }
 
-    const val PROPOSAL_REF_LABEL = "MLS 1.0 Proposal Reference"
+    public const val PROPOSAL_REF_LABEL: String = "MLS 1.0 Proposal Reference"
 }
 
 /**
@@ -234,21 +234,21 @@ object Framing {
  * it: the sender data names which ratchet key opens the content, so it is
  * opened first and the caller looks the key up before the content is opened.
  */
-object PrivateMessageCodec {
-    const val REUSE_GUARD_LENGTH = 4
+public object PrivateMessageCodec {
+    public const val REUSE_GUARD_LENGTH: Int = 4
 
     /** SenderData: leaf_index, generation, reuse_guard. */
-    class SenderData(
-        val leafIndex: Int,
-        val generation: Int,
-        val reuseGuard: ByteArray,
+    public class SenderData(
+        public val leafIndex: Int,
+        public val generation: Int,
+        public val reuseGuard: ByteArray,
     )
 
     /** An opened PrivateMessage: its FramedContent (sender = member) and auth data. */
-    class Opened(
-        val content: FramedContent,
-        val signature: ByteArray,
-        val confirmationTag: ByteArray?,
+    public class Opened(
+        public val content: FramedContent,
+        public val signature: ByteArray,
+        public val confirmationTag: ByteArray?,
     )
 
     /**
@@ -257,7 +257,7 @@ object PrivateMessageCodec {
      * [paddingLength] zero bytes are appended to PrivateMessageContent, which
      * hides the plaintext length from whoever carries the message (§16.3).
      */
-    fun seal(
+    public fun seal(
         content: FramedContent,
         signature: ByteArray,
         confirmationTag: ByteArray?,
@@ -309,7 +309,7 @@ object PrivateMessageCodec {
         )
     }
 
-    fun openSenderData(
+    public fun openSenderData(
         message: PrivateMessage,
         senderDataSecret: ByteArray,
     ): SenderData {
@@ -329,7 +329,7 @@ object PrivateMessageCodec {
         return SenderData(leafIndex, generation, reuseGuard)
     }
 
-    fun openContent(
+    public fun openContent(
         message: PrivateMessage,
         senderData: SenderData,
         keyNonce: KeyNonceGeneration,

@@ -50,7 +50,7 @@ import com.vitorpamplona.mls.messages.Proposal
  * } MLSMessage;
  * ```
  */
-data class MlsMessage(
+public data class MlsMessage(
     val version: Int = MLS_VERSION_10,
     val wireFormat: WireFormat,
     val payload: ByteArray,
@@ -74,10 +74,10 @@ data class MlsMessage(
         return result
     }
 
-    companion object {
-        const val MLS_VERSION_10 = 1
+    public companion object {
+        public const val MLS_VERSION_10: Int = 1
 
-        fun decodeTls(reader: TlsReader): MlsMessage {
+        public fun decodeTls(reader: TlsReader): MlsMessage {
             val version = reader.readUint16()
             require(version == MLS_VERSION_10) { "Unsupported MLS version: $version" }
             val wireFormat = WireFormat.fromValue(reader.readUint16())
@@ -87,12 +87,12 @@ data class MlsMessage(
             return MlsMessage(version, wireFormat, payload)
         }
 
-        fun fromPublicMessage(publicMessage: PublicMessage): MlsMessage {
+        public fun fromPublicMessage(publicMessage: PublicMessage): MlsMessage {
             val payload = publicMessage.toTlsBytes()
             return MlsMessage(MLS_VERSION_10, WireFormat.PUBLIC_MESSAGE, payload)
         }
 
-        fun fromPrivateMessage(privateMessage: PrivateMessage): MlsMessage {
+        public fun fromPrivateMessage(privateMessage: PrivateMessage): MlsMessage {
             val payload = privateMessage.toTlsBytes()
             return MlsMessage(MLS_VERSION_10, WireFormat.PRIVATE_MESSAGE, payload)
         }
@@ -104,7 +104,7 @@ data class MlsMessage(
  *
  * This includes the wire_format, content fields, and group context.
  */
-data class FramedContentTbs(
+public data class FramedContentTbs(
     val version: Int = MlsMessage.MLS_VERSION_10,
     val wireFormat: WireFormat,
     val groupId: ByteArray,
@@ -146,7 +146,7 @@ data class FramedContentTbs(
  * Cleartext message format used for Proposals and some Commits.
  * Contains the content, membership MAC, and signature.
  */
-data class PublicMessage(
+public data class PublicMessage(
     val groupId: ByteArray,
     val epoch: Long,
     val sender: Sender,
@@ -195,12 +195,12 @@ data class PublicMessage(
 
     override fun hashCode(): Int = groupId.contentHashCode()
 
-    companion object {
+    public companion object {
         /** No longer enforced: `authenticated_data` is bounded by the message carrying it. */
         @Deprecated("No longer enforced")
-        const val MAX_AUTHENTICATED_DATA_BYTES = 1 shl 16 // 64 KiB
+        public const val MAX_AUTHENTICATED_DATA_BYTES: Int = 1 shl 16 // 64 KiB
 
-        fun decodeTls(reader: TlsReader): PublicMessage {
+        public fun decodeTls(reader: TlsReader): PublicMessage {
             val groupId = reader.readOpaqueVarInt()
             val epoch = reader.readUint64()
             val sender = decodeSender(reader)
@@ -254,7 +254,7 @@ data class PublicMessage(
  *
  * Encrypted message format used for application data and some commits.
  */
-data class PrivateMessage(
+public data class PrivateMessage(
     val groupId: ByteArray,
     val epoch: Long,
     val contentType: ContentType,
@@ -279,12 +279,12 @@ data class PrivateMessage(
 
     override fun hashCode(): Int = groupId.contentHashCode()
 
-    companion object {
+    public companion object {
         /** No longer enforced: these fields are bounded by the message carrying them. */
         @Deprecated("No longer enforced")
-        const val MAX_AAD_BYTES = 1 shl 16 // 64 KiB
+        public const val MAX_AAD_BYTES: Int = 1 shl 16 // 64 KiB
 
-        fun decodeTls(reader: TlsReader): PrivateMessage {
+        public fun decodeTls(reader: TlsReader): PrivateMessage {
             val groupId = reader.readOpaqueVarInt()
             val epoch = reader.readUint64()
             val contentType = ContentType.fromValue(reader.readUint8())

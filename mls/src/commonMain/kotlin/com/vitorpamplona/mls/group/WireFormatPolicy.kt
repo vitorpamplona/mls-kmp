@@ -39,7 +39,7 @@ import com.vitorpamplona.mls.framing.WireFormat
  * external sender or a new member — are always PublicMessages, whatever this
  * says.
  */
-data class WireFormatPolicy(
+public data class WireFormatPolicy(
     val outgoing: WireFormat,
     val incoming: Incoming,
 ) {
@@ -51,31 +51,31 @@ data class WireFormatPolicy(
     }
 
     /** The wire formats accepted for a member's proposals and commits. */
-    enum class Incoming {
+    public enum class Incoming {
         PUBLIC_ONLY,
         PRIVATE_ONLY,
         MIXED,
     }
 
     /** Whether a member's proposal or commit may arrive as [wireFormat]. */
-    fun accepts(wireFormat: WireFormat): Boolean =
+    public fun accepts(wireFormat: WireFormat): Boolean =
         when (incoming) {
             Incoming.PUBLIC_ONLY -> wireFormat == WireFormat.PUBLIC_MESSAGE
             Incoming.PRIVATE_ONLY -> wireFormat == WireFormat.PRIVATE_MESSAGE
             Incoming.MIXED -> wireFormat == WireFormat.PUBLIC_MESSAGE || wireFormat == WireFormat.PRIVATE_MESSAGE
         }
 
-    companion object {
+    public companion object {
         /** Send and accept PublicMessages only. */
-        val PURE_PLAINTEXT = WireFormatPolicy(WireFormat.PUBLIC_MESSAGE, Incoming.PUBLIC_ONLY)
+        public val PURE_PLAINTEXT: WireFormatPolicy = WireFormatPolicy(WireFormat.PUBLIC_MESSAGE, Incoming.PUBLIC_ONLY)
 
         /** Send and accept PrivateMessages only: the delivery service sees no handshake content. */
-        val PURE_CIPHERTEXT = WireFormatPolicy(WireFormat.PRIVATE_MESSAGE, Incoming.PRIVATE_ONLY)
+        public val PURE_CIPHERTEXT: WireFormatPolicy = WireFormatPolicy(WireFormat.PRIVATE_MESSAGE, Incoming.PRIVATE_ONLY)
 
         /** Send PublicMessages, accept both. The default. */
-        val MIXED_PLAINTEXT = WireFormatPolicy(WireFormat.PUBLIC_MESSAGE, Incoming.MIXED)
+        public val MIXED_PLAINTEXT: WireFormatPolicy = WireFormatPolicy(WireFormat.PUBLIC_MESSAGE, Incoming.MIXED)
 
         /** Send PrivateMessages, accept both. */
-        val MIXED_CIPHERTEXT = WireFormatPolicy(WireFormat.PRIVATE_MESSAGE, Incoming.MIXED)
+        public val MIXED_CIPHERTEXT: WireFormatPolicy = WireFormatPolicy(WireFormat.PRIVATE_MESSAGE, Incoming.MIXED)
     }
 }

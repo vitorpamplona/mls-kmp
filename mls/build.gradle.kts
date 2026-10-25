@@ -11,6 +11,13 @@ plugins {
 }
 
 kotlin {
+    explicitApi()
+
+    // The public API, dumped to mls/api/ and checked by `check`: any change to
+    // what bindings can call shows up as a diff in review.
+    @OptIn(org.jetbrains.kotlin.gradle.dsl.abi.ExperimentalAbiValidation::class)
+    abiValidation {}
+
     compilerOptions {
         freeCompilerArgs.add("-Xexpect-actual-classes")
         // The engine and its own tests use the members it exposes to binding tests.

@@ -23,16 +23,16 @@ package com.vitorpamplona.mls.framing
 /**
  * MLS ContentType (RFC 9420 Section 6.1).
  */
-enum class ContentType(
-    val value: Int,
+public enum class ContentType(
+    public val value: Int,
 ) {
     APPLICATION(1),
     PROPOSAL(2),
     COMMIT(3),
     ;
 
-    companion object {
-        fun fromValue(value: Int): ContentType =
+    public companion object {
+        public fun fromValue(value: Int): ContentType =
             entries.find { it.value == value }
                 ?: throw IllegalArgumentException("Unknown ContentType: $value")
     }
@@ -41,8 +41,8 @@ enum class ContentType(
 /**
  * MLS WireFormat (RFC 9420 Section 6).
  */
-enum class WireFormat(
-    val value: Int,
+public enum class WireFormat(
+    public val value: Int,
 ) {
     PUBLIC_MESSAGE(1),
     PRIVATE_MESSAGE(2),
@@ -51,8 +51,8 @@ enum class WireFormat(
     KEY_PACKAGE(5),
     ;
 
-    companion object {
-        fun fromValue(value: Int): WireFormat =
+    public companion object {
+        public fun fromValue(value: Int): WireFormat =
             entries.find { it.value == value }
                 ?: throw IllegalArgumentException("Unknown WireFormat: $value")
     }
@@ -61,8 +61,8 @@ enum class WireFormat(
 /**
  * MLS SenderType (RFC 9420 Section 6.1).
  */
-enum class SenderType(
-    val value: Int,
+public enum class SenderType(
+    public val value: Int,
 ) {
     MEMBER(1),
     EXTERNAL(2),
@@ -70,8 +70,8 @@ enum class SenderType(
     NEW_MEMBER_COMMIT(4),
     ;
 
-    companion object {
-        fun fromValue(value: Int): SenderType =
+    public companion object {
+        public fun fromValue(value: Int): SenderType =
             entries.find { it.value == value }
                 ?: throw IllegalArgumentException("Unknown SenderType: $value")
     }
@@ -80,7 +80,7 @@ enum class SenderType(
 /**
  * MLS Sender (RFC 9420 Section 6.1).
  */
-data class Sender(
+public data class Sender(
     val senderType: SenderType,
     val leafIndex: Int = 0,
 )

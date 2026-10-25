@@ -41,6 +41,10 @@ jobs:
       - name: Linter (gradle)
         run: ./gradlew spotlessCheck
 
+      - name: Check public API against mls/api
+        # A change to the public API must update the dump (./gradlew updateKotlinAbi), so it shows up in review.
+        run: ./gradlew checkKotlinAbi
+
       - name: Check JVM
         run: ./gradlew jvmTest
 

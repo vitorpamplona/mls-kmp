@@ -37,30 +37,30 @@ package com.vitorpamplona.mls.tree
  *    0  2 4  6
  * ```
  */
-object BinaryTree {
+public object BinaryTree {
     /** Total number of nodes for a tree with [leafCount] leaves */
-    fun nodeCount(leafCount: Int): Int {
+    public fun nodeCount(leafCount: Int): Int {
         require(leafCount > 0) { "leafCount must be positive" }
         return 2 * leafCount - 1
     }
 
     /** Convert a leaf index (0, 1, 2, ...) to a node index (0, 2, 4, ...) */
-    fun leafToNode(leafIndex: Int): Int = 2 * leafIndex
+    public fun leafToNode(leafIndex: Int): Int = 2 * leafIndex
 
     /** Convert a node index (0, 2, 4, ...) to a leaf index (0, 1, 2, ...) */
-    fun nodeToLeaf(nodeIndex: Int): Int {
+    public fun nodeToLeaf(nodeIndex: Int): Int {
         require(isLeaf(nodeIndex)) { "Node $nodeIndex is not a leaf" }
         return nodeIndex / 2
     }
 
     /** Whether a node index represents a leaf (even index) */
-    fun isLeaf(nodeIndex: Int): Boolean = nodeIndex % 2 == 0
+    public fun isLeaf(nodeIndex: Int): Boolean = nodeIndex % 2 == 0
 
     /** Whether a node index represents a parent (odd index) */
-    fun isParent(nodeIndex: Int): Boolean = nodeIndex % 2 == 1
+    public fun isParent(nodeIndex: Int): Boolean = nodeIndex % 2 == 1
 
     /** Level of a node in the tree (leaves are level 0) */
-    fun level(nodeIndex: Int): Int {
+    public fun level(nodeIndex: Int): Int {
         if (nodeIndex % 2 == 0) return 0
         var x = nodeIndex
         var k = 0
@@ -72,14 +72,14 @@ object BinaryTree {
     }
 
     /** Left child of a parent node */
-    fun left(nodeIndex: Int): Int {
+    public fun left(nodeIndex: Int): Int {
         val k = level(nodeIndex)
         require(k > 0) { "Leaves have no children" }
         return nodeIndex xor (1 shl (k - 1))
     }
 
     /** Right child of a parent node */
-    fun right(nodeIndex: Int): Int {
+    public fun right(nodeIndex: Int): Int {
         val k = level(nodeIndex)
         require(k > 0) { "Leaves have no children" }
         return nodeIndex xor (3 shl (k - 1))
@@ -98,7 +98,7 @@ object BinaryTree {
      * leafCount); fail loudly here so callers can't silently corrupt
      * the rest of the commit-processing pipeline.
      */
-    fun parent(
+    public fun parent(
         nodeIndex: Int,
         nodeCount: Int,
     ): Int {
@@ -137,7 +137,7 @@ object BinaryTree {
     }
 
     /** Root node index for a tree with [leafCount] leaves */
-    fun root(leafCount: Int): Int {
+    public fun root(leafCount: Int): Int {
         if (leafCount <= 1) return 0
         // Root of a left-balanced tree: (1 << ceil(log2(n))) - 1
         val ceilLog2 = if (leafCount and (leafCount - 1) == 0) log2(leafCount) else log2(leafCount) + 1
@@ -153,7 +153,7 @@ object BinaryTree {
      * was valid before the tree shrank under a Remove proposal — and used
      * to OOM here because `parent()` would loop on the out-of-range start.
      */
-    fun directPath(
+    public fun directPath(
         leafIndex: Int,
         leafCount: Int,
     ): List<Int> {
@@ -181,7 +181,7 @@ object BinaryTree {
      * Same range contract as [directPath]: `leafIndex` must be in
      * `[0, leafCount)`.
      */
-    fun copath(
+    public fun copath(
         leafIndex: Int,
         leafCount: Int,
     ): List<Int> {
@@ -206,7 +206,7 @@ object BinaryTree {
     /**
      * Sibling of a node (the other child of the same parent).
      */
-    fun sibling(
+    public fun sibling(
         nodeIndex: Int,
         nodeCount: Int,
     ): Int {
@@ -219,7 +219,7 @@ object BinaryTree {
     /**
      * All leaf indices that are in the subtree rooted at [nodeIndex].
      */
-    fun subtreeLeaves(
+    public fun subtreeLeaves(
         nodeIndex: Int,
         leafCount: Int,
     ): List<Int> {

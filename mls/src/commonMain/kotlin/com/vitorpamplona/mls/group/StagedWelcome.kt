@@ -37,33 +37,33 @@ import com.vitorpamplona.mls.tree.LeafNode
  * until a member notices our leaf never speaks; a member who should not be
  * there is removed by a commit, like any other.
  */
-class StagedWelcome internal constructor(
+public class StagedWelcome internal constructor(
     private val group: MlsGroup,
     /** The leaf of the member whose commit added us: it signed the GroupInfo. */
-    val welcomerLeafIndex: Int,
+    public val welcomerLeafIndex: Int,
     /** The PSKs the Welcome folded into the epoch, in order. */
-    val psks: List<PreSharedKeyId>,
+    public val psks: List<PreSharedKeyId>,
 ) {
     private var joined = false
 
-    val groupId: ByteArray get() = group.groupId.copyOf()
+    public val groupId: ByteArray get() = group.groupId.copyOf()
 
-    val epoch: Long get() = group.epoch
+    public val epoch: Long get() = group.epoch
 
     /** Our own leaf in the group. */
-    val leafIndex: Int get() = group.leafIndex
+    public val leafIndex: Int get() = group.leafIndex
 
     /** The GroupContext extensions: what the group requires of its members. */
-    val extensions: List<Extension> get() = group.groupContextExtensionsSnapshot()
+    public val extensions: List<Extension> get() = group.groupContextExtensionsSnapshot()
 
     /** The occupied leaves, ours included, by leaf index. */
-    fun members(): List<Pair<Int, LeafNode>> = group.members()
+    public fun members(): List<Pair<Int, LeafNode>> = group.members()
 
     /** The leaf of the member who added us. */
-    val welcomer: LeafNode get() = members().first { it.first == welcomerLeafIndex }.second
+    public val welcomer: LeafNode get() = members().first { it.first == welcomerLeafIndex }.second
 
     /** Become a member. Once only: the group this returns is the one live copy. */
-    fun join(): MlsGroup {
+    public fun join(): MlsGroup {
         check(!joined) { "This Welcome was already joined" }
         joined = true
         return group

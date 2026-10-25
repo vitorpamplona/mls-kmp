@@ -45,18 +45,18 @@ import com.vitorpamplona.mls.platform.Hex
  * `GroupSecrets.psks` lists, so a joiner can find the same PSKs the
  * committer folded into the key schedule.
  */
-sealed class PreSharedKeyId : TlsSerializable {
-    abstract val pskNonce: ByteArray
+public sealed class PreSharedKeyId : TlsSerializable {
+    public abstract val pskNonce: ByteArray
 
     /** The `psktype` on the wire. */
-    abstract val pskType: Int
+    public abstract val pskType: Int
 
     /** A PSK the application provisioned out of band, named by [pskId]. */
-    class External(
-        val pskId: ByteArray,
+    public class External(
+        public val pskId: ByteArray,
         override val pskNonce: ByteArray,
     ) : PreSharedKeyId() {
-        override val pskType = TYPE_EXTERNAL
+        override val pskType: Int = TYPE_EXTERNAL
 
         override fun encodeTls(writer: TlsWriter) {
             writer.putUint8(pskType)
@@ -70,13 +70,13 @@ sealed class PreSharedKeyId : TlsSerializable {
     }
 
     /** The `resumption_psk` of epoch [pskEpoch] of group [pskGroupId] (RFC 9420 §8.6). */
-    class Resumption(
-        val usage: Int,
-        val pskGroupId: ByteArray,
-        val pskEpoch: Long,
+    public class Resumption(
+        public val usage: Int,
+        public val pskGroupId: ByteArray,
+        public val pskEpoch: Long,
         override val pskNonce: ByteArray,
     ) : PreSharedKeyId() {
-        override val pskType = TYPE_RESUMPTION
+        override val pskType: Int = TYPE_RESUMPTION
 
         override fun encodeTls(writer: TlsWriter) {
             writer.putUint8(pskType)
@@ -100,21 +100,21 @@ sealed class PreSharedKeyId : TlsSerializable {
      * Identity without the nonce, for "the same PSK" comparisons (RFC 9420 §12.2
      * forbids two PreSharedKey proposals referencing the same PreSharedKeyID).
      */
-    fun identityKey(): String =
+    public fun identityKey(): String =
         when (this) {
             is External -> "e:" + Hex.encode(pskId)
             is Resumption -> "r:$usage:" + Hex.encode(pskGroupId) + ":" + pskEpoch
         }
 
-    companion object {
-        const val TYPE_EXTERNAL = 1
-        const val TYPE_RESUMPTION = 2
+    public companion object {
+        public const val TYPE_EXTERNAL: Int = 1
+        public const val TYPE_RESUMPTION: Int = 2
 
-        const val USAGE_APPLICATION = 1
-        const val USAGE_REINIT = 2
-        const val USAGE_BRANCH = 3
+        public const val USAGE_APPLICATION: Int = 1
+        public const val USAGE_REINIT: Int = 2
+        public const val USAGE_BRANCH: Int = 3
 
-        fun decodeTls(reader: TlsReader): PreSharedKeyId =
+        public fun decodeTls(reader: TlsReader): PreSharedKeyId =
             when (val type = reader.readUint8()) {
                 TYPE_EXTERNAL -> {
                     External(pskId = reader.readOpaqueVarInt(), pskNonce = reader.readOpaqueVarInt())

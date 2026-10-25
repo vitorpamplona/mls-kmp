@@ -231,6 +231,20 @@ checkout instead, point it at this directory:
 ./gradlew -PmlsKmpDir=../mls-kmp :quartz:jvmTest
 ```
 
+## Public API and persisted formats
+
+The library is built in explicit-API mode, and its public ABI is dumped to
+`mls/api/`. CI's `checkKotlinAbi` fails when the API changes without the dump
+changing too, so every API change shows up as a diff in review: run
+`./gradlew updateKotlinAbi` and commit the result.
+
+Saved group states (`MlsGroupState`, v1 to v10) and KeyPackage bundles
+(`KeyPackageBundleCodec` v1) are frozen in
+`mls/src/commonTest/resources/mls/persisted-formats.json`.
+`PersistedFormatsTest` restores every one of them and keeps using it. A new
+layout version adds an entry (`PersistedFormatFixtureWriter`); the old entries
+never change.
+
 ## Releasing
 
 Push a `v*` tag. `.github/workflows/create-release.yml` runs the tests and

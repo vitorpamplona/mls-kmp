@@ -35,4 +35,4 @@ package com.vitorpamplona.mls
 )
 @Retention(AnnotationRetention.BINARY)
 @Target(AnnotationTarget.CLASS, AnnotationTarget.FUNCTION, AnnotationTarget.PROPERTY)
-annotation class InternalMlsApi
+public annotation class InternalMlsApi
