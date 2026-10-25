@@ -210,6 +210,14 @@ interface MlsGroupPolicy {
     /** How many skipped generations' keys are kept for messages that arrive out of order. */
     val outOfOrderTolerance: Int get() = SecretTree.DEFAULT_OUT_OF_ORDER_TOLERANCE
 
+    /**
+     * Which wire format members' proposals and commits travel in (RFC 9420
+     * §6). The default sends PublicMessages and accepts both; a group that
+     * hides its handshake from the delivery service uses
+     * [WireFormatPolicy.PURE_CIPHERTEXT].
+     */
+    val wireFormatPolicy: WireFormatPolicy get() = WireFormatPolicy.MIXED_PLAINTEXT
+
     companion object {
         /** RFC 9420 exactly as written: any member may commit anything valid. */
         val Permissive: MlsGroupPolicy = object : MlsGroupPolicy {}

@@ -995,10 +995,80 @@ class MlsGroup private constructor(
         includeRatchetTreeInWelcome: Boolean = true,
     ): SuccessorGroup = createSuccessor(newGroupId, extensions, PreSharedKeyId.USAGE_BRANCH, keyPackages, includeRatchetTreeInWelcome)
 
+    // --- Fork recovery ---
+    //
+    // A group forks when members merge different commits for the same epoch:
+    // from then on each side holds keys the other cannot use. Neither helper
+    // detects a fork or decides which side is right; that is the
+    // application's (see docs/guide/fork-recovery.md).
+
+    /**
+     * The members outside [ownPartition]: the ones a fork left on the other
+     * side, whom [recoverForkByReadding] removes and re-adds.
+     */
+    fun forkComplement(ownPartition: Collection<Int>): List<Pair<Int, LeafNode>> {
+        val members = members()
+        val occupied = members.map { it.first }.toSet()
+        require(ownPartition.all { it in occupied }) { "Every leaf in the partition must be a member" }
+        require(myLeafIndex in ownPartition) { "Our own leaf belongs to our partition" }
+        return members.filter { it.first !in ownPartition }
+    }
+
+    /**
+     * Repair a fork by removing every member outside [ownPartition] — the
+     * leaves that merged a different commit than we did, ours included in
+     * the partition — and adding them back from fresh [keyPackages], in one
+     * commit (in the policy's outgoing wire format).
+     *
+     * The commit carries whatever proposals were already pending too. The
+     * re-added members join from its Welcome with [processWelcome]; the rest
+     * of our partition processes the commit. Cheap, but only as good as the
+     * application's knowledge of who is on which side. Nothing changes if
+     * building the commit fails.
+     */
+    fun recoverForkByReadding(
+        ownPartition: Collection<Int>,
+        keyPackages: List<ByteArray>,
+        includeRatchetTreeInWelcome: Boolean = true,
+    ): CommitResult {
+        val complement = forkComplement(ownPartition)
+        val before = captureState()
+        try {
+            complement.forEach { proposeRemove(it.first) }
+            keyPackages.forEach { proposeAdd(it) }
+            return commit(includeRatchetTreeInWelcome = includeRatchetTreeInWelcome)
+        } catch (t: Throwable) {
+            restoreState(before)
+            throw t
+        }
+    }
+
+    /**
+     * Repair a fork by starting over: a new group with this one's
+     * [extensions] (adjust them when they name the old group) and this
+     * member's leaf, adding everyone else from fresh [keyPackages]. Members
+     * join with a plain [processWelcome] — unlike [branch], no resumption PSK
+     * ties the groups together, since the forked members cannot supply it.
+     *
+     * Costlier than [recoverForkByReadding], but needs no knowledge of the
+     * partitions. This group carries on unchanged; leave it once the new one
+     * is running.
+     */
+    fun reboot(
+        keyPackages: List<ByteArray>,
+        newGroupId: ByteArray = MlsCryptoProvider.randomBytes(32),
+        extensions: List<Extension> = groupContext.extensions,
+        includeRatchetTreeInWelcome: Boolean = true,
+    ): SuccessorGroup = createSuccessor(newGroupId, extensions, usage = null, keyPackages, includeRatchetTreeInWelcome)
+
+    /** The members [reboot] has to re-invite: everyone but us. */
+    fun rebootMembers(): List<Pair<Int, LeafNode>> = members().filter { it.first != myLeafIndex }
+
+    /** A new group seeded from this one; [usage] names the resumption PSK linking them, null for none. */
     private fun createSuccessor(
         newGroupId: ByteArray,
         extensions: List<Extension>,
-        usage: Int,
+        usage: Int?,
         keyPackages: List<ByteArray>,
         includeRatchetTreeInWelcome: Boolean,
     ): SuccessorGroup {
@@ -1015,13 +1085,15 @@ class MlsGroup private constructor(
                 requiredCapabilities = null,
                 groupId = newGroupId,
             )
-        successor.pskStore[PreSharedKeyId.Resumption(PreSharedKeyId.USAGE_APPLICATION, groupId, epoch, ByteArray(0)).identityKey()] = epochSecrets.resumptionPsk
-        successor.pendingProposals.add(
-            PendingProposal(
-                Proposal.Psk(PreSharedKeyId.Resumption(usage, groupId, epoch, MlsCryptoProvider.randomBytes(MlsCryptoProvider.HASH_OUTPUT_LENGTH))),
-                successor.myLeafIndex,
-            ),
-        )
+        if (usage != null) {
+            successor.pskStore[PreSharedKeyId.Resumption(PreSharedKeyId.USAGE_APPLICATION, groupId, epoch, ByteArray(0)).identityKey()] = epochSecrets.resumptionPsk
+            successor.pendingProposals.add(
+                PendingProposal(
+                    Proposal.Psk(PreSharedKeyId.Resumption(usage, groupId, epoch, MlsCryptoProvider.randomBytes(MlsCryptoProvider.HASH_OUTPUT_LENGTH))),
+                    successor.myLeafIndex,
+                ),
+            )
+        }
         keyPackages.forEach { successor.proposeAdd(it) }
         val commit = successor.commit(includeRatchetTreeInWelcome = includeRatchetTreeInWelcome)
         return SuccessorGroup(successor, commit)
@@ -1086,8 +1158,9 @@ class MlsGroup private constructor(
      * commit won the epoch), so the group can stay where it was.
      *
      * @param authenticatedData the commit's `authenticated_data`.
-     * @param wireFormat [WireFormat.PUBLIC_MESSAGE] (default) or
-     *   [WireFormat.PRIVATE_MESSAGE] for [CommitResult.framedCommitBytes].
+     * @param wireFormat [WireFormat.PUBLIC_MESSAGE] or [WireFormat.PRIVATE_MESSAGE]
+     *   for [CommitResult.framedCommitBytes]; defaults to the policy's
+     *   [WireFormatPolicy.outgoing].
      * @param includeRatchetTreeInWelcome whether the Welcome's GroupInfo
      *   carries the `ratchet_tree` extension; without it joiners need the
      *   tree delivered out of band (see [processWelcome]).
@@ -1095,7 +1168,7 @@ class MlsGroup private constructor(
      */
     fun commit(
         authenticatedData: ByteArray = ByteArray(0),
-        wireFormat: WireFormat = WireFormat.PUBLIC_MESSAGE,
+        wireFormat: WireFormat = policy.wireFormatPolicy.outgoing,
         includeRatchetTreeInWelcome: Boolean = true,
         paddingLength: Int = 0,
     ): CommitResult {
@@ -1119,7 +1192,7 @@ class MlsGroup private constructor(
      */
     fun stageCommit(
         authenticatedData: ByteArray = ByteArray(0),
-        wireFormat: WireFormat = WireFormat.PUBLIC_MESSAGE,
+        wireFormat: WireFormat = policy.wireFormatPolicy.outgoing,
         includeRatchetTreeInWelcome: Boolean = true,
         paddingLength: Int = 0,
     ): CommitResult {
@@ -1166,6 +1239,7 @@ class MlsGroup private constructor(
         require(wireFormat == WireFormat.PUBLIC_MESSAGE || wireFormat == WireFormat.PRIVATE_MESSAGE) {
             "A commit is sent as a PublicMessage or a PrivateMessage, not $wireFormat"
         }
+        require(policy.wireFormatPolicy.accepts(wireFormat)) { "The group's wire format policy refuses a commit as $wireFormat" }
         check(isLocalMember()) { "Not a member of this group" }
         check(reInitPending == null) { "The group was reinitialized and must not be used to send (RFC 9420 §11.2)" }
 
@@ -1702,13 +1776,14 @@ class MlsGroup private constructor(
      */
     fun proposalMessage(
         proposal: Proposal,
-        wireFormat: WireFormat = WireFormat.PUBLIC_MESSAGE,
+        wireFormat: WireFormat = policy.wireFormatPolicy.outgoing,
         authenticatedData: ByteArray = ByteArray(0),
         paddingLength: Int = 0,
     ): ByteArray {
         require(wireFormat == WireFormat.PUBLIC_MESSAGE || wireFormat == WireFormat.PRIVATE_MESSAGE) {
             "A proposal is sent as a PublicMessage or a PrivateMessage, not $wireFormat"
         }
+        require(policy.wireFormatPolicy.accepts(wireFormat)) { "The group's wire format policy refuses a proposal as $wireFormat" }
         require(proposal !is Proposal.ExternalInit) { "ExternalInit only travels inside an external commit" }
         check(isLocalMember()) { "Not a member of this group" }
         check(reInitPending == null) { "The group was reinitialized and must not be used to send (RFC 9420 §11.2)" }
@@ -2108,6 +2183,7 @@ class MlsGroup private constructor(
             when (content.sender.senderType) {
                 SenderType.MEMBER -> {
                     val index = content.sender.leafIndex
+                    require(policy.wireFormatPolicy.accepts(wireFormat)) { "The group's wire format policy refuses a member's commit as $wireFormat" }
                     require(index in 0 until tree.leafCount) { "Invalid sender leaf index: $index" }
                     val leaf = requireNotNull(tree.getLeaf(index)) { "Sender leaf is blank at index $index" }
                     require(signature.isNotEmpty()) { "FramedContentTBS signature missing on commit from leaf $index" }
@@ -2369,6 +2445,7 @@ class MlsGroup private constructor(
         when (sender.senderType) {
             SenderType.MEMBER -> {
                 require(proposal !is Proposal.ExternalInit) { "ExternalInit is never sent on its own" }
+                require(policy.wireFormatPolicy.accepts(wireFormat)) { "The group's wire format policy refuses a member's proposal as $wireFormat" }
             }
 
             SenderType.EXTERNAL -> {
@@ -3192,7 +3269,20 @@ class MlsGroup private constructor(
             policy: MlsGroupPolicy = MlsGroupPolicy.Permissive,
             ratchetTree: ByteArray? = null,
             psks: (PreSharedKeyId) -> ByteArray? = { null },
-        ): MlsGroup = joinFromWelcome(welcomeBytes, bundle, policy, ratchetTree, psks, successorOf = null)
+        ): MlsGroup = stageWelcome(welcomeBytes, bundle, policy, ratchetTree, psks).join()
+
+        /**
+         * Decrypt and validate a Welcome like [processWelcome], but stop short
+         * of joining: the [StagedWelcome] shows the group — its members, who
+         * added us, its extensions — and [StagedWelcome.join] becomes a member.
+         */
+        fun stageWelcome(
+            welcomeBytes: ByteArray,
+            bundle: KeyPackageBundle,
+            policy: MlsGroupPolicy = MlsGroupPolicy.Permissive,
+            ratchetTree: ByteArray? = null,
+            psks: (PreSharedKeyId) -> ByteArray? = { null },
+        ): StagedWelcome = joinFromWelcome(welcomeBytes, bundle, policy, ratchetTree, psks, successorOf = null)
 
         /**
          * Join the group a ReInit or a branch of [predecessor] created
@@ -3221,7 +3311,7 @@ class MlsGroup private constructor(
                 ratchetTree,
                 psks = { id -> (id as? PreSharedKeyId.Resumption)?.let { predecessor.predecessorResumptionPsk(it) } },
                 successorOf = predecessor,
-            )
+            ).join()
 
         private fun joinFromWelcome(
             welcomeBytes: ByteArray,
@@ -3230,7 +3320,7 @@ class MlsGroup private constructor(
             ratchetTree: ByteArray?,
             psks: (PreSharedKeyId) -> ByteArray?,
             successorOf: MlsGroup?,
-        ): MlsGroup {
+        ): StagedWelcome {
             val mlsMsg = MlsMessage.decodeTls(TlsReader(welcomeBytes))
             require(mlsMsg.wireFormat == WireFormat.WELCOME) { "Expected Welcome message" }
             val welcomeReader = TlsReader(mlsMsg.payload)
@@ -3342,7 +3432,7 @@ class MlsGroup private constructor(
             groupSecrets.pathSecret?.let { pathSecret ->
                 joined.pathPrivateKeys.putAll(TreeKem.keysFromWelcomePathSecret(tree, groupInfo.signer, myLeafIndex, pathSecret))
             }
-            return joined
+            return StagedWelcome(joined, groupInfo.signer, groupSecrets.psks)
         }
 
         /** The ratchet tree from a GroupInfo's `ratchet_tree` extension, or the one delivered out of band. */
@@ -3728,8 +3818,9 @@ class MlsGroup private constructor(
     }
 
     /**
-     * Build a standalone SelfRemove proposal framed as a PublicMessage
-     * (draft-ietf-mls-extensions), staged in our own pool too.
+     * Build a standalone SelfRemove proposal (draft-ietf-mls-extensions) in
+     * the policy's [WireFormatPolicy.outgoing] format, staged in our own pool
+     * too.
      *
      * A member leaves by asking: it cannot commit its own removal, so another
      * member commits the proposal by reference. The second return value is
@@ -3740,7 +3831,7 @@ class MlsGroup private constructor(
         policy.authorizeSelfRemove(view())
         val preCommitExporterSecret =
             policy.commitExporter?.let { exporterSecret(it.label, it.context, it.length) } ?: ByteArray(0)
-        return proposalMessage(Proposal.SelfRemove(), WireFormat.PUBLIC_MESSAGE) to preCommitExporterSecret
+        return proposalMessage(Proposal.SelfRemove()) to preCommitExporterSecret
     }
 }
 
