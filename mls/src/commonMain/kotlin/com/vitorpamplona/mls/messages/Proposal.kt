@@ -56,6 +56,9 @@ enum class ProposalType(
     // openmls / mdk encode it as 0x000A on the wire; quartz was writing
     // 0xF001, which strict receivers reject as "Unknown ProposalType".
     SELF_REMOVE(0x000A),
+
+    /** Any other type: see [Proposal.Custom]. Never on the wire as -1. */
+    CUSTOM(-1),
     ;
 
     companion object {
@@ -70,6 +73,40 @@ enum class ProposalType(
  */
 sealed class Proposal : TlsSerializable {
     abstract val proposalType: ProposalType
+
+    /** The `proposal_type` on the wire. */
+    open val proposalTypeValue: Int get() = proposalType.value
+
+    /**
+     * A proposal type this engine has no struct for, carried as its type and
+     * an opaque<V> body — the encoding OpenMLS and ts-mls use for custom
+     * proposals. It has no effect on the tree or GroupContext; an
+     * application that defines it reads it from the commit (see
+     * [com.vitorpamplona.mls.group.MlsGroupPolicy.authorizeCommit]). Every
+     * member that processes a commit carrying one must list its type in its
+     * capabilities, as RFC 9420 §12.2 requires for any non-default type.
+     */
+    class Custom(
+        override val proposalTypeValue: Int,
+        val data: ByteArray,
+    ) : Proposal() {
+        override val proposalType = ProposalType.CUSTOM
+
+        init {
+            require(proposalTypeValue in 0..0xFFFF && ProposalType.entries.none { it.value == proposalTypeValue }) {
+                "0x${proposalTypeValue.toString(16)} is not a custom proposal type"
+            }
+        }
+
+        override fun encodeTls(writer: TlsWriter) {
+            writer.putUint16(proposalTypeValue)
+            writer.putOpaqueVarInt(data)
+        }
+
+        override fun equals(other: Any?): Boolean = other is Custom && proposalTypeValue == other.proposalTypeValue && data.contentEquals(other.data)
+
+        override fun hashCode(): Int = 31 * proposalTypeValue + data.contentHashCode()
+    }
 
     /**
      * Add proposal: includes a KeyPackage for the member to be added.
@@ -311,8 +348,13 @@ sealed class Proposal : TlsSerializable {
 
     companion object {
         fun decodeTls(reader: TlsReader): Proposal {
-            val type = ProposalType.fromValue(reader.readUint16())
+            val typeValue = reader.readUint16()
+            val type = ProposalType.entries.find { it.value == typeValue } ?: return Custom(typeValue, reader.readOpaqueVarInt())
             return when (type) {
+                ProposalType.CUSTOM -> {
+                    throw IllegalStateException("unreachable")
+                }
+
                 ProposalType.ADD -> {
                     Add(MlsKeyPackage.decodeTls(reader))
                 }

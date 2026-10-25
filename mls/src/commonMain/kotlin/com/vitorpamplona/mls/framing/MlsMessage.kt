@@ -196,7 +196,8 @@ data class PublicMessage(
     override fun hashCode(): Int = groupId.contentHashCode()
 
     companion object {
-        /** Same DoS cap that PrivateMessage applies to its AAD field. */
+        /** No longer enforced: `authenticated_data` is bounded by the message carrying it. */
+        @Deprecated("No longer enforced")
         const val MAX_AUTHENTICATED_DATA_BYTES = 1 shl 16 // 64 KiB
 
         fun decodeTls(reader: TlsReader): PublicMessage {
@@ -204,9 +205,6 @@ data class PublicMessage(
             val epoch = reader.readUint64()
             val sender = decodeSender(reader)
             val authenticatedData = reader.readOpaqueVarInt()
-            require(authenticatedData.size <= MAX_AUTHENTICATED_DATA_BYTES) {
-                "PublicMessage authenticated_data too large: ${authenticatedData.size} > $MAX_AUTHENTICATED_DATA_BYTES"
-            }
             val contentType = ContentType.fromValue(reader.readUint8())
 
             // RFC 9420 §6 FramedContent.content body varies by content_type.
@@ -282,37 +280,18 @@ data class PrivateMessage(
     override fun hashCode(): Int = groupId.contentHashCode()
 
     companion object {
-        /**
-         * Per-field DoS cap for `authenticated_data` and
-         * `encrypted_sender_data`. The underlying [TlsReader] already
-         * refuses any opaque<V> field larger than 1 MiB (its global
-         * `MAX_OPAQUE_SIZE`), but those fields shouldn't carry anything
-         * close to that — `encrypted_sender_data` is always exactly the
-         * sender-data AEAD ciphertext (a couple hundred bytes), and
-         * Marmot doesn't put anything in `authenticated_data` today.
-         * Tightening to 64 KiB makes the per-frame memory floor
-         * predictable and turns "we'd allocate up to 3 MiB on every
-         * inbound packet that escapes verification" into "we'll
-         * allocate at most ~1 MiB even before AEAD."
-         */
+        /** No longer enforced: these fields are bounded by the message carrying them. */
+        @Deprecated("No longer enforced")
         const val MAX_AAD_BYTES = 1 shl 16 // 64 KiB
 
         fun decodeTls(reader: TlsReader): PrivateMessage {
             val groupId = reader.readOpaqueVarInt()
             val epoch = reader.readUint64()
             val contentType = ContentType.fromValue(reader.readUint8())
+            // Every field is bounded by the message itself; RFC 9420 sets no
+            // smaller limit, and other implementations send what it allows.
             val authenticatedData = reader.readOpaqueVarInt()
-            require(authenticatedData.size <= MAX_AAD_BYTES) {
-                "PrivateMessage authenticated_data too large: ${authenticatedData.size} > $MAX_AAD_BYTES"
-            }
             val encryptedSenderData = reader.readOpaqueVarInt()
-            require(encryptedSenderData.size <= MAX_AAD_BYTES) {
-                "PrivateMessage encrypted_sender_data too large: ${encryptedSenderData.size} > $MAX_AAD_BYTES"
-            }
-            // `ciphertext` size is bounded by [TlsReader.MAX_OPAQUE_SIZE]
-            // (1 MiB) — which dominates any peer-side practical limit
-            // (Marmot kind:445 events ride a Nostr relay's per-event
-            // ceiling, typically 64 KiB). No tighter cap needed here.
             val ciphertext = reader.readOpaqueVarInt()
             return PrivateMessage(
                 groupId = groupId,

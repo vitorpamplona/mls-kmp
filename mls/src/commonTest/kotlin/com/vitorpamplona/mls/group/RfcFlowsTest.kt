@@ -34,8 +34,10 @@ import com.vitorpamplona.mls.messages.Commit
 import com.vitorpamplona.mls.messages.PreSharedKeyId
 import com.vitorpamplona.mls.messages.Proposal
 import com.vitorpamplona.mls.messages.ProposalOrRef
+import com.vitorpamplona.mls.tree.Capabilities
 import com.vitorpamplona.mls.tree.Credential
 import com.vitorpamplona.mls.tree.Extension
+import com.vitorpamplona.mls.tree.Grease
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
@@ -505,5 +507,73 @@ class RfcFlowsTest {
         assertTalk(bob, branch.group)
         // The original group is untouched.
         assertTalk(t.carol, t.alice)
+    }
+
+    @Test
+    fun theRatchetForwardDistanceIsAPolicySetting() {
+        val strict =
+            object : MlsGroupPolicy {
+                override val maxForwardRatchetDistance: Int get() = 2
+            }
+        val alice = MlsGroup.create("alice".encodeToByteArray(), policy = strict)
+        val b = keyPackage("bob")
+        val bob = MlsGroup.processWelcome(alice.addMember(b.keyPackage.toTlsBytes()).welcomeBytes!!, b)
+        val messages = (0 until 5).map { bob.encrypt("m$it".encodeToByteArray()) }
+        // Generation 4 is four steps ahead: further than this policy allows.
+        assertFailsWith<IllegalArgumentException> { alice.decrypt(messages[4]) }
+        assertEquals("m1", alice.decrypt(messages[1]).content.decodeToString())
+    }
+
+    @Test
+    fun customProposalsTravelInlineAndByReference() {
+        val custom = 0xF0F0
+        val caps = Capabilities(proposals = listOf(custom))
+        val alice = MlsGroup.create("alice".encodeToByteArray(), capabilities = caps)
+        val factory = MlsGroup.create("factory".encodeToByteArray())
+        val b = factory.createKeyPackage("bob".encodeToByteArray(), ByteArray(0), capabilities = caps)
+        val bob = MlsGroup.processWelcome(alice.addMember(b.keyPackage.toTlsBytes()).welcomeBytes!!, b)
+
+        // Inline, from the committer.
+        alice.proposeCustom(custom, "inline".encodeToByteArray())
+        val inline = assertIs<ProcessedMessage.AppliedCommit>(bob.processMessage(alice.commit().framedCommitBytes))
+        assertEquals("inline", (inline.proposals.single().proposal as Proposal.Custom).data.decodeToString())
+
+        // By reference, from another member.
+        alice.processMessage(bob.proposalMessage(Proposal.Custom(custom, "by ref".encodeToByteArray())))
+        val byRef = alice.commit()
+        val applied = assertIs<ProcessedMessage.AppliedCommit>(bob.processMessage(byRef.framedCommitBytes))
+        assertEquals("by ref", (applied.proposals.single().proposal as Proposal.Custom).data.decodeToString())
+        assertSameEpoch(alice, bob)
+    }
+
+    @Test
+    fun aCustomProposalNotEveryMemberSupportsIsRefused() {
+        val t = trio()
+        t.alice.proposeCustom(0xF0F0, ByteArray(1))
+        assertFailsWith<IllegalArgumentException> { t.alice.commit() }
+    }
+
+    @Test
+    fun leavesAdvertiseGrease() {
+        val kp = keyPackage("dave").keyPackage
+        val caps = kp.leafNode.capabilities
+        for (list in listOf(caps.ciphersuites, caps.extensions, caps.proposals, caps.credentials)) {
+            assertTrue(list.any { Grease.isGrease(it) }, "no GREASE value in $list")
+        }
+        // A GREASE value is only ever advertised, never sent as a proposal.
+        assertFailsWith<IllegalArgumentException> {
+            val alice = MlsGroup.create("alice".encodeToByteArray())
+            alice.proposeCustom(Grease.VALUES.first(), ByteArray(0))
+            alice.commit()
+        }
+    }
+
+    @Test
+    fun unknownCredentialAndProposalTypesRoundTrip() {
+        val credential = Credential.Custom(0xF00D, "opaque".encodeToByteArray())
+        val decoded = Credential.decodeTls(TlsReader(credential.toTlsBytes()))
+        assertEquals(credential, decoded)
+        val proposal = Proposal.Custom(0xF0F0, byteArrayOf(1, 2, 3))
+        assertEquals(proposal, Proposal.decodeTls(TlsReader(proposal.toTlsBytes())))
     }
 }

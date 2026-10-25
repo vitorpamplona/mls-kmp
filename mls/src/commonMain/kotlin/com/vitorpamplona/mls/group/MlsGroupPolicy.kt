@@ -21,6 +21,7 @@
 package com.vitorpamplona.mls.group
 
 import com.vitorpamplona.mls.messages.CommitResult
+import com.vitorpamplona.mls.schedule.SecretTree
 import com.vitorpamplona.mls.tree.Capabilities
 import com.vitorpamplona.mls.tree.Credential
 import com.vitorpamplona.mls.tree.Extension
@@ -191,6 +192,23 @@ interface MlsGroupPolicy {
      * declared.
      */
     val knownExtensionTypes: Set<Int> get() = emptySet()
+
+    /**
+     * How many generations one message may move a sender's ratchet forward
+     * (see [SecretTree]). A member that falls further behind than this within
+     * one epoch cannot read that sender's next message there.
+     */
+    val maxForwardRatchetDistance: Int get() = SecretTree.DEFAULT_MAX_FORWARD_DISTANCE
+
+    /**
+     * Whether leaves this engine builds advertise GREASE values in their
+     * capabilities (RFC 9420 §13.5 says they SHOULD). Turn off only for a
+     * peer that wrongly rejects values it does not know.
+     */
+    val greaseCapabilities: Boolean get() = true
+
+    /** How many skipped generations' keys are kept for messages that arrive out of order. */
+    val outOfOrderTolerance: Int get() = SecretTree.DEFAULT_OUT_OF_ORDER_TOLERANCE
 
     companion object {
         /** RFC 9420 exactly as written: any member may commit anything valid. */

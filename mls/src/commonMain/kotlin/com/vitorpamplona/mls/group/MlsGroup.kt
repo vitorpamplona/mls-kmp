@@ -68,6 +68,7 @@ import com.vitorpamplona.mls.tree.BinaryTree
 import com.vitorpamplona.mls.tree.Capabilities
 import com.vitorpamplona.mls.tree.Credential
 import com.vitorpamplona.mls.tree.Extension
+import com.vitorpamplona.mls.tree.Grease
 import com.vitorpamplona.mls.tree.LeafNode
 import com.vitorpamplona.mls.tree.LeafNodeSource
 import com.vitorpamplona.mls.tree.Lifetime
@@ -706,7 +707,7 @@ class MlsGroup private constructor(
                 identity = identity,
                 source = LeafNodeSource.KEY_PACKAGE,
                 signingKey = sigKp.privateKey,
-                capabilities = capabilities,
+                capabilities = greased(policy, capabilities),
                 leafExtensions = leafExtensions,
                 lifetime = lifetime,
             )
@@ -921,6 +922,20 @@ class MlsGroup private constructor(
         pskNonce: ByteArray = MlsCryptoProvider.randomBytes(MlsCryptoProvider.HASH_OUTPUT_LENGTH),
     ): Proposal.Psk {
         val proposal = Proposal.Psk(PreSharedKeyId.Resumption(usage, pskGroupId, pskEpoch, pskNonce))
+        pendingProposals.add(PendingProposal(proposal, myLeafIndex))
+        return proposal
+    }
+
+    /**
+     * Propose a proposal type this engine has no struct for (see
+     * [Proposal.Custom]). Every member must list [proposalType] in its leaf
+     * capabilities, or the commit carrying it is invalid.
+     */
+    fun proposeCustom(
+        proposalType: Int,
+        data: ByteArray,
+    ): Proposal.Custom {
+        val proposal = Proposal.Custom(proposalType, data)
         pendingProposals.add(PendingProposal(proposal, myLeafIndex))
         return proposal
     }
@@ -1279,7 +1294,7 @@ class MlsGroup private constructor(
             )
         epochSecrets = KeySchedule(groupContext.toTlsBytes()).deriveEpochSecrets(commitSecret, initSecret, pskSecret)
         initSecret = epochSecrets.initSecret
-        secretTree = SecretTree(epochSecrets.encryptionSecret, tree.leafCount)
+        secretTree = secretTreeFor(policy, epochSecrets.encryptionSecret, tree.leafCount)
         pushRetainedEpoch(retainedForThisEpoch)
 
         val confirmationTag = computeConfirmationTag(epochSecrets.confirmationKey, confirmedTranscriptHash)
@@ -1578,6 +1593,10 @@ class MlsGroup private constructor(
                 is Proposal.AppDataUpdate -> {
                     Unit
                 }
+
+                is Proposal.Custom -> {
+                    require(!Grease.isGrease(q.proposalTypeValue)) { "A GREASE proposal type is never sent (RFC 9420 §13.5)" }
+                }
             }
         }
         require(gceCount <= 1) { "Multiple GroupContextExtensions proposals" }
@@ -1585,7 +1604,7 @@ class MlsGroup private constructor(
         // A non-default proposal type must be supported by every member that
         // processes the commit — the ones it neither adds nor removes.
         val removed = proposals.mapNotNull { removedLeafOf(it) }.toSet()
-        for (type in proposals.map { it.proposal.proposalType.value }.toSet()) {
+        for (type in proposals.map { it.proposal.proposalTypeValue }.toSet()) {
             if (type in GroupValidation.DEFAULT_PROPOSAL_TYPES) continue
             for (i in 0 until tree.leafCount) {
                 if (i in removed) continue
@@ -1846,7 +1865,7 @@ class MlsGroup private constructor(
         }
         val retained = retainedEpochs[index]
         val formerTree = RatchetTree.decodeTls(TlsReader(retained.treeBytes))
-        val formerSecrets = SecretTree(retained.encryptionSecret, formerTree.leafCount)
+        val formerSecrets = secretTreeFor(policy, retained.encryptionSecret, formerTree.leafCount)
         formerSecrets.importSenderStates(retained.senderRatchetStates)
         formerSecrets.importSkippedSecrets(retained.skippedApplicationSecrets, emptyMap())
         if (retained.nodeSecrets.isNotEmpty()) formerSecrets.importNodeSecrets(retained.nodeSecrets)
@@ -1961,7 +1980,7 @@ class MlsGroup private constructor(
                     }
 
                     ContentType.COMMIT -> {
-                        ProcessedMessage.AppliedCommit(Sender(SenderType.MEMBER, decrypted.senderLeafIndex), epoch, removedSelf = !isLocalMember())
+                        ProcessedMessage.AppliedCommit(Sender(SenderType.MEMBER, decrypted.senderLeafIndex), epoch, removedSelf = !isLocalMember(), proposals = lastAppliedProposals)
                     }
                 }
             }
@@ -1980,7 +1999,7 @@ class MlsGroup private constructor(
 
                     ContentType.COMMIT -> {
                         processPublicCommit(pubMsg)
-                        ProcessedMessage.AppliedCommit(pubMsg.sender, epoch, removedSelf = !isLocalMember())
+                        ProcessedMessage.AppliedCommit(pubMsg.sender, epoch, removedSelf = !isLocalMember(), proposals = lastAppliedProposals)
                     }
                 }
             }
@@ -2137,6 +2156,7 @@ class MlsGroup private constructor(
         // The application's gate on inbound commits, mirroring what commit()
         // enforces locally: authorization has to run on both ends.
         if (committer != null) policy.authorizeCommit(view(), resolved, committer)
+        lastAppliedProposals = resolved
 
         val applied = applyProposalList(resolved, committer)
         val pskSecret = KeySchedule.pskSecret(applied.psks.map { it to requirePsk(it) })
@@ -2227,7 +2247,7 @@ class MlsGroup private constructor(
             "Confirmation tag verification failed"
         }
         interimTranscriptHash = interimTranscriptHashOf(confirmedTranscriptHash, expectedTag)
-        secretTree = SecretTree(epochSecrets.encryptionSecret, tree.leafCount)
+        secretTree = secretTreeFor(policy, epochSecrets.encryptionSecret, tree.leafCount)
         pushRetainedEpoch(retainedForThisEpoch)
 
         applied.reInit?.let { reInitPending = it }
@@ -2236,6 +2256,9 @@ class MlsGroup private constructor(
         sentKeys.clear()
         pendingCommit = null
     }
+
+    /** The proposals of the last inbound commit applied, for [processMessage]'s result. */
+    private var lastAppliedProposals: List<PendingProposal> = emptyList()
 
     /**
      * RFC 9420 §12.4.2: none of the public keys in an UpdatePath may already
@@ -2809,6 +2832,19 @@ class MlsGroup private constructor(
         /** How many former epochs' resumption PSKs a group remembers. */
         private const val RESUMPTION_PSK_EPOCHS = 64
 
+        /** [capabilities] with GREASE values when [policy] asks for them (RFC 9420 §13.5). */
+        private fun greased(
+            policy: MlsGroupPolicy,
+            capabilities: Capabilities,
+        ): Capabilities = if (policy.greaseCapabilities) Grease.addTo(capabilities) else capabilities
+
+        /** A SecretTree with [policy]'s ratchet limits. */
+        private fun secretTreeFor(
+            policy: MlsGroupPolicy,
+            encryptionSecret: ByteArray,
+            leafCount: Int,
+        ) = SecretTree(encryptionSecret, leafCount, policy.maxForwardRatchetDistance, policy.outOfOrderTolerance)
+
         private fun interimTranscriptHashOf(
             confirmedTranscriptHash: ByteArray,
             confirmationTag: ByteArray,
@@ -3092,7 +3128,7 @@ class MlsGroup private constructor(
                     identity = identity,
                     source = LeafNodeSource.KEY_PACKAGE,
                     signingKey = sigKp.privateKey,
-                    capabilities = capabilities,
+                    capabilities = greased(policy, capabilities),
                     leafExtensions = leafExtensions,
                 )
 
@@ -3122,7 +3158,7 @@ class MlsGroup private constructor(
             val keySchedule = KeySchedule(groupContext.toTlsBytes())
             val epochSecrets = keySchedule.deriveEpochSecrets(commitSecret, initSecret)
 
-            val secretTree = SecretTree(epochSecrets.encryptionSecret, 1)
+            val secretTree = secretTreeFor(policy, epochSecrets.encryptionSecret, 1)
 
             return MlsGroup(
                 groupContext = groupContext,
@@ -3292,7 +3328,7 @@ class MlsGroup private constructor(
                     tree = tree,
                     myLeafIndex = myLeafIndex,
                     epochSecrets = epochSecrets,
-                    secretTree = SecretTree(epochSecrets.encryptionSecret, tree.leafCount),
+                    secretTree = secretTreeFor(policy, epochSecrets.encryptionSecret, tree.leafCount),
                     initSecret = epochSecrets.initSecret,
                     signingPrivateKey = bundle.signaturePrivateKey,
                     encryptionPrivateKey = bundle.encryptionPrivateKey,
@@ -3431,7 +3467,7 @@ class MlsGroup private constructor(
                     kemOutput = kemOutput,
                     signingKeyPair = sigKp,
                     credential = Credential.Basic(identity),
-                    capabilities = capabilities,
+                    capabilities = greased(policy, capabilities),
                     leafExtensions = leafExtensions,
                     resyncLeafIndex = resyncLeafIndex,
                     psks = psks.map { it.first },
@@ -3461,7 +3497,7 @@ class MlsGroup private constructor(
             policy: MlsGroupPolicy = MlsGroupPolicy.Permissive,
         ): MlsGroup {
             val tree = RatchetTree.decodeTls(TlsReader(state.treeBytes))
-            val secretTree = SecretTree(state.encryptionSecret, tree.leafCount)
+            val secretTree = secretTreeFor(policy, state.encryptionSecret, tree.leafCount)
             secretTree.importSenderStates(state.senderRatchetStates)
             secretTree.importSkippedSecrets(state.skippedApplicationSecrets, state.skippedHandshakeSecrets)
             if (state.nodeSecrets.isNotEmpty()) secretTree.importNodeSecrets(state.nodeSecrets)
@@ -3646,7 +3682,7 @@ class MlsGroup private constructor(
         // initSecret was seeded with the external init secret (RFC 9420 §8.3).
         epochSecrets = KeySchedule(groupContext.toTlsBytes()).deriveEpochSecrets(generated.commitSecret, initSecret, pskSecret)
         initSecret = epochSecrets.initSecret
-        secretTree = SecretTree(epochSecrets.encryptionSecret, tree.leafCount)
+        secretTree = secretTreeFor(policy, epochSecrets.encryptionSecret, tree.leafCount)
         val confirmationTag = computeConfirmationTag(epochSecrets.confirmationKey, confirmedTranscriptHash)
         interimTranscriptHash = interimTranscriptHashOf(confirmedTranscriptHash, confirmationTag)
 
@@ -3788,5 +3824,7 @@ sealed class ProcessedMessage {
         val sender: Sender,
         val epoch: Long,
         val removedSelf: Boolean,
+        /** What the commit applied, each with its sender; [Proposal.Custom] ones are the application's to act on. */
+        val proposals: List<PendingProposal> = emptyList(),
     ) : ProcessedMessage()
 }

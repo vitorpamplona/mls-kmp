@@ -28,6 +28,7 @@ import com.vitorpamplona.mls.messages.CommitResult
 import com.vitorpamplona.mls.messages.KeyPackageBundle
 import com.vitorpamplona.mls.messages.Proposal
 import com.vitorpamplona.mls.toHexKey
+import com.vitorpamplona.mls.tree.Capabilities
 import com.vitorpamplona.mls.tree.Extension
 import kotlin.random.Random
 
@@ -47,6 +48,10 @@ import kotlin.random.Random
  */
 internal object MlsKmpAuthoredVectors {
     private val pskId = "mls-kmp external psk".encodeToByteArray()
+
+    /** A custom proposal type every leaf advertises, so commits can carry one. */
+    const val CUSTOM_PROPOSAL = 0xF0F0
+    private val caps = Capabilities(proposals = listOf(CUSTOM_PROPOSAL))
     private val psk = ByteArray(32) { (it * 7 + 3).toByte() }
 
     /** One scenario: the members, the passive member's KeyPackage, and the epochs recorded since it joined. */
@@ -58,7 +63,7 @@ internal object MlsKmpAuthoredVectors {
         private val proposals = mutableListOf<String>()
         private var names = 0
 
-        fun keyPackage(name: String = "member-${names++}"): KeyPackageBundle = MlsGroup.create(name.encodeToByteArray()).createKeyPackage(name.encodeToByteArray(), ByteArray(0))
+        fun keyPackage(name: String = "member-${names++}"): KeyPackageBundle = MlsGroup.create(name.encodeToByteArray()).createKeyPackage(name.encodeToByteArray(), ByteArray(0), capabilities = caps)
 
         /** Deliver a standalone proposal message from [from] to every other member. */
         fun propose(
@@ -90,6 +95,7 @@ internal object MlsKmpAuthoredVectors {
                 MlsGroup.externalJoin(
                     groupInfoFrom.groupInfoMessage(),
                     identity.encodeToByteArray(),
+                    capabilities = caps,
                     resyncLeafIndex = replacing?.leafIndex,
                 )
             if (replacing != null) members.remove(replacing)
@@ -123,7 +129,7 @@ internal object MlsKmpAuthoredVectors {
         includeTreeInWelcome: Boolean,
     ): Triple<Scenario, PassiveClientVector, () -> PassiveClientVector> {
         val s = Scenario(description)
-        val alice = MlsGroup.create("alice".encodeToByteArray())
+        val alice = MlsGroup.create("alice".encodeToByteArray(), capabilities = caps)
         val bob = s.keyPackage("bob")
         val carol = s.keyPackage("carol")
         val passive = s.keyPackage("passive")
@@ -211,6 +217,10 @@ internal object MlsKmpAuthoredVectors {
         s.propose(s.member("erin"), s.member("erin").proposalMessage(Proposal.Remove(s.member("frank").leafIndex)))
         val gina = s.keyPackage("gina")
         s.commit(alice, listOf(gina)) { it.apply { proposeAdd(gina.keyPackage.toTlsBytes()) }.commit() }
+
+        // A custom proposal type by reference, then inline.
+        s.propose(carol, carol.proposalMessage(Proposal.Custom(CUSTOM_PROPOSAL, "by reference".encodeToByteArray())))
+        s.commit(alice) { it.apply { proposeCustom(CUSTOM_PROPOSAL, "inline".encodeToByteArray()) }.commit() }
 
         // An inline Remove as a PrivateMessage, then a newcomer's first commit.
         s.commit(newBob) { it.apply { proposeRemove(s.member("erin").leafIndex) }.commit(wireFormat = WireFormat.PRIVATE_MESSAGE) }

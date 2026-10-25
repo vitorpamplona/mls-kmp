@@ -46,6 +46,16 @@ import com.vitorpamplona.mls.tree.BinaryTree
 class SecretTree(
     encryptionSecret: ByteArray,
     private val leafCount: Int,
+    /**
+     * How many generations one message may jump a sender's ratchet ahead.
+     * Each step is a hash, and the generation comes from the (authenticated
+     * but sender-chosen) sender data, so this bounds the work one message can
+     * cause. A member that missed more messages than this cannot read the
+     * next one at this epoch.
+     */
+    private val maxForwardDistance: Int = DEFAULT_MAX_FORWARD_DISTANCE,
+    /** How many skipped generations' keys are kept for late, out-of-order messages. */
+    private val outOfOrderTolerance: Int = DEFAULT_OUT_OF_ORDER_TOLERANCE,
 ) {
     /** Per-sender ratchet state: (handshake generation, handshake secret, app generation, app secret) */
     private val senderState = mutableMapOf<Int, SenderRatchetState>()
@@ -86,29 +96,15 @@ class SecretTree(
             if (encryptionSecret.isNotEmpty()) it[BinaryTree.root(leafCount)] = encryptionSecret
         }
 
-    private companion object {
-        /** Maximum number of skipped key entries to retain (prevents unbounded memory growth). */
-        const val MAX_SKIPPED_KEYS = 1000
+    companion object {
+        /** Default for [maxForwardDistance]; OpenMLS defaults to 1000. */
+        const val DEFAULT_MAX_FORWARD_DISTANCE = 4096
+
+        /** Default for [outOfOrderTolerance]. */
+        const val DEFAULT_OUT_OF_ORDER_TOLERANCE = 1000
 
         /** Maximum consumed generation entries to track per sender before pruning. */
-        const val MAX_CONSUMED_GENERATIONS_PER_SENDER = 1000
-
-        /**
-         * Hard cap on how many ratchet steps a single decrypt request may
-         * fast-forward through. Without this an attacker who can deliver a
-         * single PrivateMessage with a forged `generation` field can force
-         * the receiver into ~`generation` HKDF-Expand steps — trivially
-         * many seconds of CPU per packet. The skipped-key cache itself
-         * stops at [MAX_SKIPPED_KEYS] entries, but the ratchet keeps
-         * advancing past that point, so the cache cap doesn't bound
-         * compute cost.
-         *
-         * 4096 leaves room for a realistic application/handshake gap
-         * (e.g. mobile catching up after a long sleep) while making the
-         * attack worst-case ~4096 SHA-256 invocations — bounded enough
-         * that the receiver stays responsive.
-         */
-        const val MAX_RATCHET_STEPS_PER_CALL = 4096
+        private const val MAX_CONSUMED_GENERATIONS_PER_SENDER = 1000
     }
 
     /**
@@ -195,10 +191,10 @@ class SecretTree(
         // DoS guard: a malicious sender can put any uint32 in the
         // PrivateMessage generation field, and without this cap a single
         // packet would force unbounded HKDF-Expand work. See
-        // MAX_RATCHET_STEPS_PER_CALL.
-        require(generation - state.applicationGeneration <= MAX_RATCHET_STEPS_PER_CALL) {
+        // maxForwardDistance.
+        require(generation - state.applicationGeneration <= maxForwardDistance) {
             "Application generation jump too large: " +
-                "${generation - state.applicationGeneration} steps (cap $MAX_RATCHET_STEPS_PER_CALL); " +
+                "${generation - state.applicationGeneration} steps (cap $maxForwardDistance); " +
                 "sender $leafIndex from ${state.applicationGeneration} to $generation"
         }
 
@@ -221,7 +217,7 @@ class SecretTree(
         while (gen < generation) {
             // Save the intermediate generation's secret for later out-of-order retrieval
             val cacheKey = Pair(leafIndex, gen)
-            if (skippedKeys.size < MAX_SKIPPED_KEYS) {
+            if (skippedKeys.size < outOfOrderTolerance) {
                 skippedKeys[cacheKey] = secret
             }
             secret = MlsCryptoProvider.expandWithLabel(secret, "secret", generationContext(gen), MlsCryptoProvider.HASH_OUTPUT_LENGTH)
@@ -280,9 +276,9 @@ class SecretTree(
                 "Handshake generation $generation already consumed (current: ${state.handshakeGeneration})",
             )
         }
-        require(generation - state.handshakeGeneration <= MAX_RATCHET_STEPS_PER_CALL) {
+        require(generation - state.handshakeGeneration <= maxForwardDistance) {
             "Handshake generation jump too large: " +
-                "${generation - state.handshakeGeneration} steps (cap $MAX_RATCHET_STEPS_PER_CALL); " +
+                "${generation - state.handshakeGeneration} steps (cap $maxForwardDistance); " +
                 "sender $leafIndex from ${state.handshakeGeneration} to $generation"
         }
 
@@ -306,7 +302,7 @@ class SecretTree(
         var gen = state.handshakeGeneration
         while (gen < generation) {
             val cacheKey = Pair(leafIndex, gen)
-            if (handshakeSkippedKeys.size < MAX_SKIPPED_KEYS) {
+            if (handshakeSkippedKeys.size < outOfOrderTolerance) {
                 handshakeSkippedKeys[cacheKey] = secret
             }
             secret = MlsCryptoProvider.expandWithLabel(secret, "secret", generationContext(gen), MlsCryptoProvider.HASH_OUTPUT_LENGTH)
@@ -491,8 +487,8 @@ class SecretTree(
         application: Map<Pair<Int, Int>, ByteArray>,
         handshake: Map<Pair<Int, Int>, ByteArray>,
     ) {
-        for ((k, v) in application) if (skippedKeys.size < MAX_SKIPPED_KEYS) skippedKeys[k] = v
-        for ((k, v) in handshake) if (handshakeSkippedKeys.size < MAX_SKIPPED_KEYS) handshakeSkippedKeys[k] = v
+        for ((k, v) in application) if (skippedKeys.size < outOfOrderTolerance) skippedKeys[k] = v
+        for ((k, v) in handshake) if (handshakeSkippedKeys.size < outOfOrderTolerance) handshakeSkippedKeys[k] = v
     }
 }
 

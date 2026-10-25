@@ -83,6 +83,26 @@ sealed class Credential : TlsSerializable {
         override fun hashCode(): Int = certChain.fold(0) { acc, c -> 31 * acc + c.contentHashCode() }
     }
 
+    /**
+     * A credential type this engine has no struct for, carried as its type and
+     * an opaque<V> body (the encoding OpenMLS and ts-mls use). Whether it is
+     * acceptable is the application's call, in
+     * [com.vitorpamplona.mls.group.MlsGroupPolicy.validateCredential].
+     */
+    class Custom(
+        override val credentialType: Int,
+        val data: ByteArray,
+    ) : Credential() {
+        override fun encodeTls(writer: TlsWriter) {
+            writer.putUint16(credentialType)
+            writer.putOpaqueVarInt(data)
+        }
+
+        override fun equals(other: Any?): Boolean = other is Custom && credentialType == other.credentialType && data.contentEquals(other.data)
+
+        override fun hashCode(): Int = 31 * credentialType + data.contentHashCode()
+    }
+
     companion object {
         const val CREDENTIAL_TYPE_BASIC = 1
         const val CREDENTIAL_TYPE_X509 = 2
@@ -92,7 +112,7 @@ sealed class Credential : TlsSerializable {
             return when (type) {
                 CREDENTIAL_TYPE_BASIC -> Basic(reader.readOpaqueVarInt())
                 CREDENTIAL_TYPE_X509 -> X509(reader.readVectorVarInt { it.readOpaqueVarInt() })
-                else -> throw IllegalArgumentException("Unknown credential type: $type")
+                else -> Custom(type, reader.readOpaqueVarInt())
             }
         }
     }

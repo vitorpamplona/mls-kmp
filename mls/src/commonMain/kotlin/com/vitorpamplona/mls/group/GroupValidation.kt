@@ -116,6 +116,8 @@ internal object GroupValidation {
         groupExtensions: List<Extension>,
         policy: MlsGroupPolicy,
         now: Long?,
+        /** False when the caller checks the whole tree's uniqueness and credential support at once. */
+        againstMembers: Boolean = true,
     ) {
         policy.validateCredential(leaf.credential, leaf.signatureKey)
 
@@ -149,6 +151,7 @@ internal object GroupValidation {
             "LeafNode does not list its own credential type ${leaf.credential.credentialType} in its capabilities"
         }
         for (i in 0 until tree.leafCount) {
+            if (!againstMembers) break
             if (i == replacedLeafIndex) continue
             val other = tree.getLeaf(i) ?: continue
             require(leaf.credential.credentialType in other.capabilities.credentials) {
@@ -174,6 +177,7 @@ internal object GroupValidation {
         }
 
         for (i in 0 until tree.leafCount) {
+            if (!againstMembers) break
             if (i == replacedLeafIndex) continue
             val other = tree.getLeaf(i) ?: continue
             require(!other.signatureKey.contentEquals(leaf.signatureKey)) { "Duplicate signature key: leaf $i already uses it" }
@@ -220,9 +224,26 @@ internal object GroupValidation {
             throw IllegalStateException("ratchet_tree fails parent_hash validation: $reason")
         }
 
+        // Each leaf on its own, then what relates leaves to each other in one
+        // pass: a large group's tree has thousands of leaves.
+        val credentialTypes = mutableSetOf<Int>()
+        val signatureKeys = mutableSetOf<String>()
         for (i in 0 until tree.leafCount) {
             val leaf = tree.getLeaf(i) ?: continue
-            validateLeafNode(leaf, null, groupContext.groupId, i, tree, i, groupContext.extensions, policy, now = null)
+            validateLeafNode(leaf, null, groupContext.groupId, i, tree, i, groupContext.extensions, policy, now = null, againstMembers = false)
+            credentialTypes.add(leaf.credential.credentialType)
+            require(
+                signatureKeys.add(
+                    com.vitorpamplona.mls.platform.Hex
+                        .encode(leaf.signatureKey),
+                ),
+            ) { "Duplicate signature key at leaf $i" }
+        }
+        for (i in 0 until tree.leafCount) {
+            val leaf = tree.getLeaf(i) ?: continue
+            require(leaf.capabilities.credentials.containsAll(credentialTypes)) {
+                "Member leaf $i does not support every credential type in use ($credentialTypes)"
+            }
         }
 
         val seenKeys = mutableSetOf<String>()
