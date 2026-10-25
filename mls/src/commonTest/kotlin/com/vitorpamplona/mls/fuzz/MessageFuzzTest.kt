@@ -28,6 +28,7 @@ import com.vitorpamplona.mls.group.MlsGroup
 import com.vitorpamplona.mls.group.MlsGroupState
 import com.vitorpamplona.mls.group.PublicGroup
 import com.vitorpamplona.mls.messages.KeyPackageBundle
+import com.vitorpamplona.mls.messages.KeyPackageBundleCodec
 import com.vitorpamplona.mls.testEnv
 import com.vitorpamplona.mls.toHexKey
 import kotlin.random.Random
@@ -119,7 +120,7 @@ class MessageFuzzTest {
             groupInfo = alice.groupInfoMessage(),
             keyPackage = bundle("gina").keyPackage.toTlsBytes(),
             state = bob.saveState().encodeTls(),
-            bundleBytes = d.encodeTls(),
+            bundleBytes = KeyPackageBundleCodec.encode(d),
         )
     }
 
@@ -213,7 +214,7 @@ class MessageFuzzTest {
         fuzz("MlsGroup.proposeAdd(KeyPackage)", listOf(c.keyPackage), c, mayAccept = true) { adder.proposeAdd(it) }
         fuzz("MlsMessage.decodeTls", c.all, c, mayAccept = true) { MlsMessage.decodeTls(TlsReader(it)) }
         fuzz("MlsGroupState.decodeTls + restore", listOf(c.state), c, mayAccept = true) { MlsGroup.restore(MlsGroupState.decodeTls(it)) }
-        fuzz("KeyPackageBundle.decodeTls", listOf(c.bundleBytes), c, mayAccept = true) { KeyPackageBundle.decodeTls(it) }
+        fuzz("KeyPackageBundleCodec.decode", listOf(c.bundleBytes), c, mayAccept = true) { KeyPackageBundleCodec.decode(it) }
 
         if (failures.isNotEmpty()) {
             fail("${failures.size} fuzz failures (replay with MLSKMP_FUZZ_SEED=$seed):\n" + failures.take(20).joinToString("\n"))

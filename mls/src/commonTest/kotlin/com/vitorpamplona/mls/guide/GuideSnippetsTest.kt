@@ -29,7 +29,7 @@ import com.vitorpamplona.mls.group.PendingProposal
 import com.vitorpamplona.mls.group.ProcessedMessage
 import com.vitorpamplona.mls.group.PublicGroup
 import com.vitorpamplona.mls.group.WireFormatPolicy
-import com.vitorpamplona.mls.messages.KeyPackageBundle
+import com.vitorpamplona.mls.messages.KeyPackageBundleCodec
 import com.vitorpamplona.mls.messages.ProposalType
 import com.vitorpamplona.mls.tree.Capabilities
 import com.vitorpamplona.mls.tree.Credential
@@ -69,11 +69,11 @@ class GuideSnippetsTest {
         // region key-package
         val bundle = MlsGroup.createKeyPackage(identity = "bob".encodeToByteArray())
         publish(bundle.keyPackage.toTlsBytes()) // what others add bob with
-        val stored: ByteArray = bundle.encodeTls() // keep it, encrypted: it holds private keys
+        val stored: ByteArray = KeyPackageBundleCodec.encode(bundle) // keep it, encrypted: it holds private keys
         // endregion
 
         // region key-package-restore
-        val restored = KeyPackageBundle.decodeTls(stored)
+        val restored = KeyPackageBundleCodec.decode(stored)
         // endregion
         assertEquals(bundle, restored)
         assertContentEquals(bundle.initPrivateKey, restored.initPrivateKey)

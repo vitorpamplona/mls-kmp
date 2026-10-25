@@ -9,7 +9,7 @@ after each is consumed.
 ```kotlin
 val bundle = MlsGroup.createKeyPackage(identity = "bob".encodeToByteArray())
 publish(bundle.keyPackage.toTlsBytes()) // what others add bob with
-val stored: ByteArray = bundle.encodeTls() // keep it, encrypted: it holds private keys
+val stored: ByteArray = KeyPackageBundleCodec.encode(bundle) // keep it, encrypted: it holds private keys
 ```
 
 The bundle holds the private keys the Welcome will need, possibly days later.
@@ -18,7 +18,7 @@ with:
 
 <!-- snippet: key-package-restore -->
 ```kotlin
-val restored = KeyPackageBundle.decodeTls(stored)
+val restored = KeyPackageBundleCodec.decode(stored)
 ```
 
 Delete a bundle once its Welcome has been processed. Reusing one lets two

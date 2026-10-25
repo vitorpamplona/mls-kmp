@@ -44,6 +44,8 @@ import com.vitorpamplona.mls.tree.LeafNode
  * fresh GroupInfo. A group whose policy sends handshakes as PrivateMessages
  * ([WireFormatPolicy.PURE_CIPHERTEXT]) cannot be followed this way at all.
  * Nor can a PublicGroup produce anything: it has no leaf and signs nothing.
+ *
+ * Not thread-safe, like [MlsGroup]: one thread at a time per view.
  */
 class PublicGroup private constructor(
     private val group: MlsGroup,

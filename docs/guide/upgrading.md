@@ -4,8 +4,8 @@
 
 - **New:** `PublicGroup`, `MlsGroup.stageWelcome` and `StagedWelcome`,
   `MlsGroupPolicy.wireFormatPolicy`, `recoverForkByReadding`, `reboot`,
-  the companion `MlsGroup.createKeyPackage(identity, policy)`, and
-  `KeyPackageBundle.encodeTls`/`decodeTls`.
+  and the companion `MlsGroup.createKeyPackage(identity, policy)`.
+- `KeyPackageBundleCodec.decode` refuses trailing bytes.
 - `commit`, `stageCommit` and `proposalMessage` take their default wire
   format from the policy. The default policy still sends PublicMessages.
 - `buildSelfRemoveProposalMessage` also follows the policy's wire format.

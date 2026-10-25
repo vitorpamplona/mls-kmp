@@ -37,6 +37,15 @@ Every member enforces the policy on its own. One that skips a check accepts
 commits the others refuse, and the group forks. Ship the same policy to
 every client.
 
+## One thread at a time per group
+
+An `MlsGroup` is mutable and not thread-safe. Every call, reads included
+(decrypting advances a ratchet), must come from one thread at a time. Confine
+each group to a thread or coroutine, or guard every call with one lock. Two
+threads encrypting at once could seal two messages under the same key and
+nonce. Separate groups share no mutable state and can be used in parallel.
+`ConcurrencyStressTest` holds the engine to both.
+
 ## GREASE
 
 Leaves advertise a few reserved, meaningless type values (RFC 9420 §13.5),

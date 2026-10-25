@@ -108,6 +108,13 @@ import com.vitorpamplona.mls.tree.TreeNode
  * // Export key for a binding's own outer encryption
  * val key = group.exporterSecret("myapp", "group-event".encodeToByteArray(), 32)
  * ```
+ *
+ * **Threads.** An MlsGroup is mutable and not thread-safe: every call,
+ * reads included — decrypting advances a ratchet — must come from one thread
+ * at a time. Confine each group to one thread or coroutine, or guard every
+ * call with one lock (Marmot's `MlsGroupManager` holds a mutex). Different
+ * groups share no mutable state, so they may be used from different threads
+ * at once. The same holds for [PublicGroup].
  */
 internal fun constantTimeEquals(
     a: ByteArray,

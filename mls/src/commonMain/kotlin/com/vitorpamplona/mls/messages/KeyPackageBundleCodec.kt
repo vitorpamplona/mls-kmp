@@ -72,6 +72,6 @@ object KeyPackageBundleCodec {
             initPrivateKey = reader.readOpaque2(),
             encryptionPrivateKey = reader.readOpaque2(),
             signaturePrivateKey = reader.readOpaque2(),
-        )
+        ).also { reader.requireFullyConsumed("KeyPackageBundle") }
     }
 }

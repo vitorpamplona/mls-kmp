@@ -168,8 +168,8 @@ data class MlsKeyPackage(
  * A KeyPackage bundled with its private keys (for the owner).
  *
  * Kept locally until a Welcome for [keyPackage] arrives, which may be days
- * after it was published: [encodeTls] gives the bytes to keep, and they hold
- * private keys, so store them as carefully as group state. Never sent.
+ * after it was published: [KeyPackageBundleCodec] gives the bytes to keep, and
+ * they hold private keys, so store them as carefully as group state. Never sent.
  */
 data class KeyPackageBundle(
     val keyPackage: MlsKeyPackage,
@@ -184,31 +184,4 @@ data class KeyPackageBundle(
     }
 
     override fun hashCode(): Int = keyPackage.hashCode()
-
-    /** The bundle for local storage; [decodeTls] reads it back. */
-    fun encodeTls(): ByteArray {
-        val writer = TlsWriter()
-        writer.putUint16(BUNDLE_VERSION)
-        keyPackage.encodeTls(writer)
-        writer.putOpaqueVarInt(initPrivateKey)
-        writer.putOpaqueVarInt(encryptionPrivateKey)
-        writer.putOpaqueVarInt(signaturePrivateKey)
-        return writer.toByteArray()
-    }
-
-    companion object {
-        private const val BUNDLE_VERSION = 1
-
-        fun decodeTls(data: ByteArray): KeyPackageBundle {
-            val reader = TlsReader(data)
-            val version = reader.readUint16()
-            require(version == BUNDLE_VERSION) { "Unsupported KeyPackageBundle version: $version" }
-            return KeyPackageBundle(
-                keyPackage = MlsKeyPackage.decodeTls(reader),
-                initPrivateKey = reader.readOpaqueVarInt(),
-                encryptionPrivateKey = reader.readOpaqueVarInt(),
-                signaturePrivateKey = reader.readOpaqueVarInt(),
-            ).also { reader.requireFullyConsumed("KeyPackageBundle") }
-        }
-    }
 }
