@@ -168,6 +168,13 @@ class MlsGroup private constructor(
      * our leaf holds keys only we can supply.
      */
     private val pendingUpdateKeys: MutableMap<String, PendingUpdateKeys> = mutableMapOf(),
+    /**
+     * A [PublicGroup]'s engine: no leaf of its own and no epoch secrets, so it
+     * checks and applies everything a PublicMessage proves and skips what
+     * only a member can verify — membership tags, path secrets, the key
+     * schedule and confirmation tag, PSKs.
+     */
+    internal val observer: Boolean = false,
 ) {
     /**
      * Unix seconds the RFC 9420 lifetime checks on incoming LeafNodes compare against.
@@ -1648,7 +1655,8 @@ class MlsGroup private constructor(
                             "A commit carries at most one reinit or branch PSK"
                         }
                     }
-                    requireNotNull(resolvePsk(q.psk)) { "PSK not available: ${q.psk.identityKey()}" }
+                    // An observer holds no PSKs; only members can tell one is missing.
+                    if (!observer) requireNotNull(resolvePsk(q.psk)) { "PSK not available: ${q.psk.identityKey()}" }
                 }
 
                 is Proposal.ReInit -> {
@@ -2121,7 +2129,8 @@ class MlsGroup private constructor(
         // RFC 9420 §6.2: a member's PublicMessage carries a membership_tag; an
         // external commit's sender is not a member yet and carries none.
         if (pubMsg.sender.senderType == SenderType.MEMBER) {
-            require(verifyPublicMessageCommitMembershipTag(pubMsg)) {
+            // An observer holds no membership key: it can only see the tag is there.
+            require(if (observer) pubMsg.membershipTag != null else verifyPublicMessageCommitMembershipTag(pubMsg)) {
                 "Invalid membership_tag on PublicMessage commit"
             }
         }
@@ -2174,7 +2183,7 @@ class MlsGroup private constructor(
         require(confirmationTag.isNotEmpty()) { "Confirmation tag missing on commit" }
         val commit = content.commit()
         val preContextBytes = groupContext.toTlsBytes()
-        val retainedForThisEpoch = captureRetainedEpoch()
+        val retainedForThisEpoch = if (observer) null else captureRetainedEpoch()
 
         // Authenticate the committer (RFC 9420 §6.1). A member signs with its
         // leaf key; an external joiner with the key of the leaf in its path
@@ -2235,16 +2244,16 @@ class MlsGroup private constructor(
         lastAppliedProposals = resolved
 
         val applied = applyProposalList(resolved, committer)
-        val pskSecret = KeySchedule.pskSecret(applied.psks.map { it to requirePsk(it) })
+        val pskSecret = if (observer) ByteArray(0) else KeySchedule.pskSecret(applied.psks.map { it to requirePsk(it) })
         // The external init secret comes from THIS epoch's external key pair.
-        val externalInitSecret = applied.externalInit?.let { deriveExternalInitSecret(it.kemOutput) }
+        val externalInitSecret = if (observer) null else applied.externalInit?.let { deriveExternalInitSecret(it.kemOutput) }
 
         // A commit that removes us still changed the tree; keep that state so
         // the caller can see we are out, but there is no key schedule we can
         // follow — the path was not encrypted to us. Judge by the proposals,
         // not the tree: the same commit may add someone into our old leaf.
         if (myLeafIndex in applied.removedLeaves) removedFromGroup = true
-        if (!isLocalMember()) {
+        if (!observer && !isLocalMember()) {
             pendingProposals.clear()
             sentKeys.clear()
             pendingCommit = null
@@ -2287,24 +2296,35 @@ class MlsGroup private constructor(
             }
             prunePathKeys()
 
-            val provisional = groupContext.copy(epoch = epoch + 1, treeHash = tree.treeHash()).toTlsBytes()
-            val decrypted =
-                TreeKem.decryptPathSecrets(
-                    tree = tree,
-                    senderLeafIndex = senderLeafIndex,
-                    myLeafIndex = myLeafIndex,
-                    updatePath = updatePath,
-                    excludedLeaves = applied.addedLeaves.map { it.first }.toSet(),
-                    groupContext = provisional,
-                    privateKeyFor = ::privateKeyFor,
-                )
-            pathPrivateKeys.putAll(decrypted.nodePrivateKeys)
-            commitSecret = decrypted.commitSecret
+            if (!observer) {
+                val provisional = groupContext.copy(epoch = epoch + 1, treeHash = tree.treeHash()).toTlsBytes()
+                val decrypted =
+                    TreeKem.decryptPathSecrets(
+                        tree = tree,
+                        senderLeafIndex = senderLeafIndex,
+                        myLeafIndex = myLeafIndex,
+                        updatePath = updatePath,
+                        excludedLeaves = applied.addedLeaves.map { it.first }.toSet(),
+                        groupContext = provisional,
+                        privateKeyFor = ::privateKeyFor,
+                    )
+                pathPrivateKeys.putAll(decrypted.nodePrivateKeys)
+                commitSecret = decrypted.commitSecret
+            }
         }
         prunePathKeys()
 
         val confirmedTranscriptHash =
             MlsCryptoProvider.hash(interimTranscriptHash + Framing.confirmedTranscriptHashInput(wireFormat, content, signature))
+
+        if (observer) {
+            // Everything public about the new epoch, on the committer's word for the tag.
+            groupContext = groupContext.copy(epoch = epoch + 1, treeHash = tree.treeHash(), confirmedTranscriptHash = confirmedTranscriptHash)
+            interimTranscriptHash = interimTranscriptHashOf(confirmedTranscriptHash, confirmationTag)
+            applied.reInit?.let { reInitPending = it }
+            pendingProposals.clear()
+            return
+        }
 
         rememberResumptionPsk()
         groupContext =
@@ -2324,7 +2344,7 @@ class MlsGroup private constructor(
         }
         interimTranscriptHash = interimTranscriptHashOf(confirmedTranscriptHash, expectedTag)
         secretTree = secretTreeFor(policy, epochSecrets.encryptionSecret, tree.leafCount)
-        pushRetainedEpoch(retainedForThisEpoch)
+        pushRetainedEpoch(checkNotNull(retainedForThisEpoch))
 
         applied.reInit?.let { reInitPending = it }
         pendingProposals.clear()
@@ -2402,7 +2422,7 @@ class MlsGroup private constructor(
                     requireNotNull(pubMsg.membershipTag) {
                         "PublicMessage proposal from leaf $senderLeafIndex is missing membership_tag"
                     }
-                require(constantTimeEquals(Framing.membershipTag(epochSecrets.membershipKey, content, contextBytes, pubMsg.signature, null), membershipTag)) {
+                require(observer || constantTimeEquals(Framing.membershipTag(epochSecrets.membershipKey, content, contextBytes, pubMsg.signature, null), membershipTag)) {
                     "Invalid membership_tag on PublicMessage proposal from leaf $senderLeafIndex"
                 }
             }
@@ -3448,6 +3468,45 @@ class MlsGroup private constructor(
             return RatchetTree.decodeTls(reader).also { reader.requireFullyConsumed("ratchet_tree") }
         }
 
+        /**
+         * The engine behind [PublicGroup.fromGroupInfo]: the group a signed,
+         * valid GroupInfo describes, seen from outside.
+         */
+        internal fun observe(
+            groupInfoBytes: ByteArray,
+            policy: MlsGroupPolicy,
+            ratchetTree: ByteArray?,
+        ): MlsGroup {
+            val groupInfo = decodeGroupInfo(groupInfoBytes)
+            val groupContext = groupInfo.groupContext
+            GroupValidation.validateExtensions(groupInfo.extensions, GroupValidation.ExtensionContext.GROUP_INFO)
+            require(groupContext.version == GroupValidation.MLS_VERSION && groupContext.cipherSuite == GroupValidation.CIPHER_SUITE) {
+                "Unsupported group version ${groupContext.version} / ciphersuite ${groupContext.cipherSuite}"
+            }
+            val tree = treeFrom(groupInfo, ratchetTree)
+            val signerLeaf = requireNotNull(tree.getLeaf(groupInfo.signer)) { "GroupInfo signer leaf ${groupInfo.signer} is blank" }
+            require(groupInfo.verifySignature(signerLeaf.signatureKey)) { "Invalid GroupInfo signature" }
+            GroupValidation.validateTree(tree, groupContext, policy)
+
+            // No secrets: the engine never derives a key from these.
+            val none = ByteArray(MlsCryptoProvider.HASH_OUTPUT_LENGTH)
+            val epochSecrets = KeySchedule(groupContext.toTlsBytes()).deriveEpochSecrets(none, none, none)
+            return MlsGroup(
+                groupContext = groupContext,
+                tree = tree,
+                myLeafIndex = -1,
+                epochSecrets = epochSecrets,
+                secretTree = secretTreeFor(policy, epochSecrets.encryptionSecret, tree.leafCount),
+                initSecret = none,
+                signingPrivateKey = ByteArray(0),
+                encryptionPrivateKey = ByteArray(0),
+                interimTranscriptHash =
+                    if (groupContext.epoch == 0L) ByteArray(0) else interimTranscriptHashOf(groupContext.confirmedTranscriptHash, groupInfo.confirmationTag),
+                policy = policy,
+                observer = true,
+            )
+        }
+
         /** A GroupInfo given bare or wrapped in an MLSMessage (`mls_group_info`). */
         private fun decodeGroupInfo(bytes: ByteArray): GroupInfo {
             val probe = TlsReader(bytes)
@@ -3585,6 +3644,12 @@ class MlsGroup private constructor(
         fun restore(
             state: MlsGroupState,
             policy: MlsGroupPolicy = MlsGroupPolicy.Permissive,
+        ): MlsGroup = restore(state, policy, observer = false)
+
+        internal fun restore(
+            state: MlsGroupState,
+            policy: MlsGroupPolicy,
+            observer: Boolean,
         ): MlsGroup {
             val tree = RatchetTree.decodeTls(TlsReader(state.treeBytes))
             val secretTree = secretTreeFor(policy, state.encryptionSecret, tree.leafCount)
@@ -3608,6 +3673,7 @@ class MlsGroup private constructor(
                 policy = policy,
                 resumptionPsks = state.resumptionPsks.toMutableMap(),
                 pendingUpdateKeys = state.pendingUpdateKeys.associateByTo(mutableMapOf()) { Hex.encode(it.encryptionKey) },
+                observer = observer,
             ).also { group ->
                 group.reInitPending = state.reInitPending
                 group.removedFromGroup = state.removedFromGroup
