@@ -85,6 +85,10 @@ internal object GroupValidation {
             require(seen.add(ext.extensionType)) { "Extension type ${ext.extensionType} appears twice" }
             val allowedIn = DEFAULT_EXTENSION_CONTEXT[ext.extensionType] ?: continue
             require(allowedIn == context) { "Extension type ${ext.extensionType} may not appear in a $context" }
+            // external_pub is opaque<V> (RFC 9420 §12.4.3.2), but ts-mls and
+            // mls-kmp 1.2 write the bare key; a suite-1 key alone is 32 bytes,
+            // which no opaque<V> of a 32-byte key can be.
+            if (ext.extensionType == 0x0004 && ext.extensionData.size == MlsCryptoProvider.KEM_PUBLIC_KEY_LENGTH) continue
             val reader = TlsReader(ext.extensionData)
             when (ext.extensionType) {
                 0x0001, 0x0004 -> reader.readOpaqueVarInt()

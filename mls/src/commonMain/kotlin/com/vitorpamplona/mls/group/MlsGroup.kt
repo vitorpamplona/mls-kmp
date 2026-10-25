@@ -3429,7 +3429,7 @@ class MlsGroup private constructor(
             val externalPubData =
                 groupInfo.extensions.find { it.extensionType == EXTERNAL_PUB_EXTENSION_TYPE }?.extensionData
                     ?: throw IllegalArgumentException("GroupInfo missing external_pub extension")
-            // RFC 9420 encodes the key as opaque<V>; mls-kmp 1.2 and older wrote the bare key.
+            // RFC 9420 encodes the key as opaque<V>; ts-mls and mls-kmp 1.2 write the bare key.
             val externalPub =
                 if (externalPubData.size == MlsCryptoProvider.KEM_PUBLIC_KEY_LENGTH) externalPubData else TlsReader(externalPubData).let { r -> r.readOpaqueVarInt().also { r.requireFullyConsumed("external_pub") } }
 

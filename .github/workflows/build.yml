@@ -93,13 +93,21 @@ jobs:
           key: ${{ runner.os }}-openmls-${{ hashFiles('tools/openmls-verifier/*') }}
 
       - name: Write mls-kmp-authored vectors
-        run: MLSKMP_PASSIVE_VECTORS=$RUNNER_TEMP/mls-kmp-passive.json ./gradlew :mls:jvmTest --tests com.vitorpamplona.mls.MlsKmpAuthoredVectorsWriter
+        # --rerun: the variable is not a task input, so a cached result would write nothing.
+        run: MLSKMP_PASSIVE_VECTORS=$RUNNER_TEMP/mls-kmp-passive.json ./gradlew :mls:jvmTest --rerun --tests com.vitorpamplona.mls.MlsKmpAuthoredVectorsWriter
 
       - name: ts-mls replays them
         working-directory: tools/tsmls-vector-gen
         run: |
           npm install --legacy-peer-deps
           node verify-passive-client.mjs $RUNNER_TEMP/mls-kmp-passive.json
+
+      - name: mls-kmp joins ts-mls groups by external commit, ts-mls verifies
+        run: |
+          node tools/tsmls-vector-gen/external-join.mjs fixture $RUNNER_TEMP/extjoin-fixture.json
+          MLSKMP_EXTJOIN_FIXTURE=$RUNNER_TEMP/extjoin-fixture.json MLSKMP_EXTJOIN_RESULT=$RUNNER_TEMP/extjoin-result.json \
+            ./gradlew :mls:jvmTest --rerun --tests com.vitorpamplona.mls.ExternalJoinFromTsMls
+          node tools/tsmls-vector-gen/external-join.mjs verify $RUNNER_TEMP/extjoin-fixture.json $RUNNER_TEMP/extjoin-result.json
 
       - name: OpenMLS replays them
         run: tools/openmls-verifier/run.sh $RUNNER_TEMP/mls-kmp-passive.json
