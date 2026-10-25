@@ -40,7 +40,7 @@ MLSKMP_PASSIVE_VECTORS=/tmp/mls-kmp-passive.json \
 node verify-passive-client.mjs /tmp/mls-kmp-passive.json
 ```
 
-`../openmls-verifier` does the same against OpenMLS.
+`../openmls-verifier` and `../mlsrs-verifier` do the same against OpenMLS and mls-rs.
 
 
 ## Joining a ts-mls group by external commit

@@ -206,10 +206,15 @@ The other direction is covered too: `MlsKmpAuthoredVectors` has mls-kmp
 members run a group through every epoch change — commits of every shape,
 proposals by reference, external joins and resyncs, PSKs, ReInit and branch
 successors — and records it as passive-client vectors, which ts-mls
-(`tools/tsmls-vector-gen/verify-passive-client.mjs`) and OpenMLS
-(`tools/openmls-verifier/run.sh`) must follow epoch by epoch. CI runs both.
+(`tools/tsmls-vector-gen/verify-passive-client.mjs`), OpenMLS
+(`tools/openmls-verifier/run.sh`) and mls-rs (`tools/mlsrs-verifier/run.sh`)
+must follow epoch by epoch. CI runs all three, and also has mls-kmp join
+ts-mls groups by external commit from ts-mls GroupInfos
+(`tools/tsmls-vector-gen/external-join.mjs`), with ts-mls then following
+mls-kmp's commits and messages.
 `MdkWelcomeInteropTest` and `TsMlsWelcomeInteropTest` join groups created by
-OpenMLS (via MDK) and ts-mls. `group/MlsGroupPolicySeamTest` pins the policy seam
+OpenMLS (via MDK) and ts-mls, and `TsMlsExternalJoinInteropTest` joins
+ts-mls groups by external commit. `group/MlsGroupPolicySeamTest` pins the policy seam
 itself with a recording policy.
 
 ```bash

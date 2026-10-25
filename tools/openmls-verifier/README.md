@@ -19,4 +19,4 @@ tools/openmls-verifier/run.sh /tmp/mls-kmp-passive.json
 Needs `git` and a Rust toolchain. `OPENMLS_TAG` picks the OpenMLS release
 (default `v0.9.2`); the first run compiles OpenMLS's test suite and takes a
 few minutes. `tools/tsmls-vector-gen/verify-passive-client.mjs` does the same
-against ts-mls.
+against ts-mls, and `tools/mlsrs-verifier/run.sh` against mls-rs.

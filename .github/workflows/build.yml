@@ -90,7 +90,8 @@ jobs:
             ~/.cargo/registry
             ~/.cargo/git
             tools/openmls-verifier/build
-          key: ${{ runner.os }}-openmls-${{ hashFiles('tools/openmls-verifier/*') }}
+            tools/mlsrs-verifier/build
+          key: ${{ runner.os }}-rust-verifiers-${{ hashFiles('tools/openmls-verifier/*', 'tools/mlsrs-verifier/*') }}
 
       - name: Write mls-kmp-authored vectors
         # --rerun: the variable is not a task input, so a cached result would write nothing.
@@ -111,3 +112,6 @@ jobs:
 
       - name: OpenMLS replays them
         run: tools/openmls-verifier/run.sh $RUNNER_TEMP/mls-kmp-passive.json
+
+      - name: mls-rs replays them
+        run: tools/mlsrs-verifier/run.sh $RUNNER_TEMP/mls-kmp-passive.json
