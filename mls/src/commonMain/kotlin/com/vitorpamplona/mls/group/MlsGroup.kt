@@ -109,7 +109,7 @@ import com.vitorpamplona.mls.tree.TreeNode
  * val key = group.exporterSecret("myapp", "group-event".encodeToByteArray(), 32)
  * ```
  */
-private fun constantTimeEquals(
+internal fun constantTimeEquals(
     a: ByteArray,
     b: ByteArray,
 ): Boolean {
@@ -400,7 +400,7 @@ class MlsGroup private constructor(
      */
     fun restoreOwnSenderRatchet(record: OwnSenderRatchet): Boolean {
         if (record.epoch != epoch || record.leafIndex != myLeafIndex) return false
-        if (!record.treeBinder.contentEquals(OwnSenderRatchet.binderFor(epochSecrets.encryptionSecret))) return false
+        if (!constantTimeEquals(record.treeBinder, OwnSenderRatchet.binderFor(epochSecrets.encryptionSecret))) return false
 
         val current = secretTree.exportSenderStates()[myLeafIndex]
         if (current == null) {
@@ -1374,6 +1374,10 @@ class MlsGroup private constructor(
                 }
             }
 
+        // The new epoch's leaf carries the rotated signature key, so from here
+        // on — the Welcome's GroupInfo first — we sign with it. The commit
+        // itself was signed above with the key of the epoch it leaves.
+        pendingSigningKey?.let { signingPrivateKey = it }
         val welcomeBytes =
             if (applied.addedLeaves.isNotEmpty()) {
                 buildWelcome(applied.addedLeaves, generated, applied.psks, includeRatchetTreeInWelcome)
@@ -1381,7 +1385,9 @@ class MlsGroup private constructor(
                 null
             }
 
-        pendingSigningKey?.let { signingPrivateKey = it }
+        // Path secrets and the commit secret are spent once the Welcome is built.
+        generated?.pathSecrets?.forEach { it.fill(0) }
+        commitSecret.fill(0)
         pendingSigningKey = null
         pendingEncryptionKey = null
         pendingLeafAdvertisement = null
@@ -1928,6 +1934,7 @@ class MlsGroup private constructor(
      * refused, as is an epoch no longer retained.
      */
     fun decryptFormerEpoch(messageBytes: ByteArray): DecryptedMessage {
+        requireMessageSize(policy, messageBytes)
         val mlsMsg = MlsMessage.decodeTls(TlsReader(messageBytes))
         require(mlsMsg.wireFormat == WireFormat.PRIVATE_MESSAGE) { "Expected PrivateMessage" }
         val privMsg = decodePrivateMessage(mlsMsg)
@@ -2000,6 +2007,7 @@ class MlsGroup private constructor(
 
     /** [decrypt], plus the pool entry a proposal was staged as. */
     private fun decryptAndStage(messageBytes: ByteArray): Pair<DecryptedMessage, PendingProposal?> {
+        requireMessageSize(policy, messageBytes)
         val mlsMsg = MlsMessage.decodeTls(TlsReader(messageBytes))
         require(mlsMsg.wireFormat == WireFormat.PRIVATE_MESSAGE) { "Expected PrivateMessage" }
         val privMsg = decodePrivateMessage(mlsMsg)
@@ -2052,6 +2060,7 @@ class MlsGroup private constructor(
      * exactly as it was. An echo of our own staged commit merges it.
      */
     fun processMessage(messageBytes: ByteArray): ProcessedMessage {
+        requireMessageSize(policy, messageBytes)
         val mlsMsg = MlsMessage.decodeTls(TlsReader(messageBytes))
         if (mergeIfOwnStagedCommit(messageBytes) != null) {
             return ProcessedMessage.AppliedCommit(Sender(SenderType.MEMBER, myLeafIndex), epoch, removedSelf = false)
@@ -2120,6 +2129,7 @@ class MlsGroup private constructor(
      * applies it atomically. An echo of our own staged commit merges it.
      */
     fun processFramedCommit(framedCommitBytes: ByteArray) {
+        requireMessageSize(policy, framedCommitBytes)
         val mlsMessage = MlsMessage.decodeTls(TlsReader(framedCommitBytes))
         require(mlsMessage.wireFormat == WireFormat.PUBLIC_MESSAGE) {
             "processFramedCommit expects a PublicMessage envelope, got ${mlsMessage.wireFormat}"
@@ -2169,6 +2179,7 @@ class MlsGroup private constructor(
         wireFormat: WireFormat = WireFormat.PUBLIC_MESSAGE,
         authenticatedData: ByteArray = ByteArray(0),
     ) {
+        requireMessageSize(policy, commitBytes)
         val commit = Commit.decodeTls(TlsReader(commitBytes))
         val isExternal = commit.proposals.any { it is ProposalOrRef.Inline && it.proposal is Proposal.ExternalInit }
         val sender = if (isExternal) Sender(SenderType.NEW_MEMBER_COMMIT) else Sender(SenderType.MEMBER, senderLeafIndex)
@@ -2352,6 +2363,8 @@ class MlsGroup private constructor(
             )
         epochSecrets = KeySchedule(groupContext.toTlsBytes()).deriveEpochSecrets(commitSecret, externalInitSecret ?: initSecret, pskSecret)
         initSecret = epochSecrets.initSecret
+        commitSecret.fill(0)
+        externalInitSecret?.fill(0)
 
         // The last line of defense: a committer with a valid signing key but a
         // forged tree or key schedule cannot produce this tag.
@@ -3355,6 +3368,7 @@ class MlsGroup private constructor(
             psks: (PreSharedKeyId) -> ByteArray?,
             successorOf: MlsGroup?,
         ): StagedWelcome {
+            requireMessageSize(policy, welcomeBytes, ratchetTree)
             val mlsMsg = MlsMessage.decodeTls(TlsReader(welcomeBytes))
             require(mlsMsg.wireFormat == WireFormat.WELCOME) { "Expected Welcome message" }
             val welcomeReader = TlsReader(mlsMsg.payload)
@@ -3393,6 +3407,10 @@ class MlsGroup private constructor(
             val memberSecret = MlsCryptoProvider.hkdfExtract(groupSecrets.joinerSecret, pskSecret)
             val (welcomeKey, welcomeNonce) = welcomeKeyNonce(MlsCryptoProvider.deriveSecret(memberSecret, "welcome"))
             val groupInfoBytes = MlsCryptoProvider.aeadDecrypt(welcomeKey, welcomeNonce, ByteArray(0), welcome.encryptedGroupInfo)
+            // Spent: the decoded GroupSecrets hold copies of what is still needed.
+            gsBytes.fill(0)
+            memberSecret.fill(0)
+            welcomeKey.fill(0)
             val giReader = TlsReader(groupInfoBytes)
             val groupInfo = GroupInfo.decodeTls(giReader)
             giReader.requireFullyConsumed("GroupInfo")
@@ -3536,6 +3554,16 @@ class MlsGroup private constructor(
             return KeyPackageBundle(kp, initKp.privateKey, encKp.privateKey, sigKp.privateKey)
         }
 
+        /** Refuses, before decoding anything, input larger than [MlsGroupPolicy.maxMessageSize]. */
+        private fun requireMessageSize(
+            policy: MlsGroupPolicy,
+            vararg inputs: ByteArray?,
+        ) {
+            for (input in inputs) {
+                if (input != null) require(input.size <= policy.maxMessageSize) { "Message of ${input.size} bytes exceeds the policy's maxMessageSize of ${policy.maxMessageSize}" }
+            }
+        }
+
         /**
          * The engine behind [PublicGroup.fromGroupInfo]: the group a signed,
          * valid GroupInfo describes, seen from outside.
@@ -3545,6 +3573,7 @@ class MlsGroup private constructor(
             policy: MlsGroupPolicy,
             ratchetTree: ByteArray?,
         ): MlsGroup {
+            requireMessageSize(policy, groupInfoBytes, ratchetTree)
             val groupInfo = decodeGroupInfo(groupInfoBytes)
             val groupContext = groupInfo.groupContext
             GroupValidation.validateExtensions(groupInfo.extensions, GroupValidation.ExtensionContext.GROUP_INFO)
@@ -3628,6 +3657,7 @@ class MlsGroup private constructor(
             psks: List<Pair<PreSharedKeyId, ByteArray>> = emptyList(),
             authenticatedData: ByteArray = ByteArray(0),
         ): ExternalJoinResult {
+            requireMessageSize(policy, groupInfoBytes, ratchetTree)
             val groupInfo = decodeGroupInfo(groupInfoBytes)
             val groupContext = groupInfo.groupContext
             GroupValidation.validateExtensions(groupInfo.extensions, GroupValidation.ExtensionContext.GROUP_INFO)

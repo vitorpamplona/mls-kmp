@@ -218,10 +218,10 @@ class PublicGroupTest {
     @Test
     fun theViewSurvivesARestart() {
         val t = trio()
-        val view = PublicGroup.restore(PublicGroup.fromGroupInfo(t.alice.groupInfoMessage()).saveState())
+        val view = PublicGroup.restore(MlsGroupState.decodeTls(PublicGroup.fromGroupInfo(t.alice.groupInfoMessage()).saveState().encodeTls()))
         val update = t.carol.proposalMessage(t.carol.proposeSigningKeyRotation())
         deliver(update, view, t.alice, t.bob)
-        val restored = PublicGroup.restore(view.saveState())
+        val restored = PublicGroup.restore(MlsGroupState.decodeTls(view.saveState().encodeTls()))
         assertEquals(1, restored.pendingProposals().size)
         val commit = t.alice.commit()
         deliver(commit.framedCommitBytes, restored, t.bob, t.carol)

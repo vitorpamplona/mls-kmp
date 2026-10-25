@@ -79,7 +79,7 @@ data class ParentNode(
             val ulReader = TlsReader(ulBytes)
             val unmergedLeaves = mutableListOf<Int>()
             while (ulReader.hasRemaining) {
-                unmergedLeaves.add(ulReader.readUint32().toInt())
+                unmergedLeaves.add(ulReader.readIndex())
             }
             return ParentNode(encryptionKey, parentHash, unmergedLeaves)
         }

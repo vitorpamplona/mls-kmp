@@ -218,9 +218,20 @@ interface MlsGroupPolicy {
      */
     val wireFormatPolicy: WireFormatPolicy get() = WireFormatPolicy.MIXED_PLAINTEXT
 
+    /**
+     * The largest message, Welcome, GroupInfo or ratchet tree accepted, in
+     * bytes, checked before anything is decoded. Lengths inside a message are
+     * already bounded by the message itself; this bounds the message. The
+     * default fits the ratchet tree of a group of some 80,000 members.
+     */
+    val maxMessageSize: Int get() = DEFAULT_MAX_MESSAGE_SIZE
+
     companion object {
         /** RFC 9420 exactly as written: any member may commit anything valid. */
         val Permissive: MlsGroupPolicy = object : MlsGroupPolicy {}
+
+        /** 16 MiB: see [maxMessageSize]. */
+        const val DEFAULT_MAX_MESSAGE_SIZE: Int = 16 * 1024 * 1024
     }
 }
 

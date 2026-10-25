@@ -67,7 +67,8 @@ object TreeKem {
     )
 
     fun nodeKeyPair(pathSecret: ByteArray): Pair<ByteArray, ByteArray> {
-        val kp = Hpke.deriveKeyPair(MlsCryptoProvider.deriveSecret(pathSecret, "node"))
+        val nodeSecret = MlsCryptoProvider.deriveSecret(pathSecret, "node")
+        val kp = Hpke.deriveKeyPair(nodeSecret).also { nodeSecret.fill(0) }
         return kp.privateKey to kp.publicKey
     }
 
@@ -268,15 +269,20 @@ object TreeKem {
             )
 
         val keys = mutableMapOf<Int, ByteArray>()
-        for (i in ancestor until filtered.size) {
-            if (i > ancestor) secret = nextPathSecret(secret)
-            val (priv, pub) = nodeKeyPair(secret)
-            require(pub.contentEquals(updatePath.nodes[i].encryptionKey)) {
-                "UpdatePath public key at node ${filtered[i]} does not match the key derived from its path secret"
+        try {
+            for (i in ancestor until filtered.size) {
+                if (i > ancestor) secret = nextPathSecret(secret).also { secret.fill(0) }
+                val (priv, pub) = nodeKeyPair(secret)
+                require(pub.contentEquals(updatePath.nodes[i].encryptionKey)) {
+                    "UpdatePath public key at node ${filtered[i]} does not match the key derived from its path secret"
+                }
+                keys[filtered[i]] = priv
             }
-            keys[filtered[i]] = priv
+            return DecryptedPath(keys, nextPathSecret(secret))
+        } finally {
+            // Path secrets are spent once their keys exist (RFC 9420 §16.6).
+            secret.fill(0)
         }
-        return DecryptedPath(keys, nextPathSecret(secret))
     }
 
     /**
@@ -298,7 +304,7 @@ object TreeKem {
         var secret = pathSecret
         val keys = mutableMapOf<Int, ByteArray>()
         for (i in ancestor until filtered.size) {
-            if (i > ancestor) secret = nextPathSecret(secret)
+            if (i > ancestor) secret = nextPathSecret(secret).also { if (secret !== pathSecret) secret.fill(0) }
             val (priv, pub) = nodeKeyPair(secret)
             val treeKey = (tree.getNode(filtered[i]) as? TreeNode.Parent)?.parentNode?.encryptionKey
             require(treeKey != null && treeKey.contentEquals(pub)) {
@@ -306,6 +312,7 @@ object TreeKem {
             }
             keys[filtered[i]] = priv
         }
+        if (secret !== pathSecret) secret.fill(0)
         return keys
     }
 

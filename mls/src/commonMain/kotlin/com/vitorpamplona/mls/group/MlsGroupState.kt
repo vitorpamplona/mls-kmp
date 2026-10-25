@@ -150,7 +150,8 @@ data class MlsGroupState(
         writer.putOpaqueVarInt(treeBytes)
 
         // Local member state
-        writer.putUint32(myLeafIndex.toLong())
+        // A PublicGroup has no leaf (-1): written as 0xFFFFFFFF, read back as -1.
+        writer.putUint32(myLeafIndex.toLong() and 0xFFFFFFFFL)
 
         // Epoch secrets (all 12 fields)
         writer.putOpaqueVarInt(epochSecrets.joinerSecret)
@@ -321,7 +322,16 @@ data class MlsGroupState(
 
             val groupContext = GroupContext.decodeTls(reader)
             val treeBytes = reader.readOpaqueVarInt()
-            val myLeafIndex = reader.readUint32().toInt()
+            // 0xFFFFFFFF is a PublicGroup's -1; anything else is a real leaf.
+            val myLeafIndex =
+                reader.readUint32().let {
+                    if (it == 0xFFFFFFFFL) {
+                        -1
+                    } else {
+                        require(it <= Int.MAX_VALUE) { "Leaf index $it out of range" }
+                        it.toInt()
+                    }
+                }
 
             val epochSecrets =
                 EpochSecrets(
@@ -349,14 +359,14 @@ data class MlsGroupState(
             // empty count) for v1 blobs, which restore at generation 0.
             val senderRatchetStates =
                 if (version >= 2 && reader.hasRemaining) {
-                    val count = reader.readUint32().toInt()
+                    val count = reader.readCount()
                     buildMap {
                         repeat(count) {
-                            val leafIndex = reader.readUint32().toInt()
+                            val leafIndex = reader.readIndex()
                             val handshakeSecret = reader.readOpaqueVarInt()
-                            val handshakeGeneration = reader.readUint32().toInt()
+                            val handshakeGeneration = reader.readIndex()
                             val applicationSecret = reader.readOpaqueVarInt()
-                            val applicationGeneration = reader.readUint32().toInt()
+                            val applicationGeneration = reader.readIndex()
                             put(
                                 leafIndex,
                                 SenderRatchetState(
@@ -377,10 +387,10 @@ data class MlsGroupState(
             // own leaf until the next commit refills the path.
             val pathPrivateKeys =
                 if (version >= 3 && reader.hasRemaining) {
-                    val count = reader.readUint32().toInt()
+                    val count = reader.readCount()
                     buildMap {
                         repeat(count) {
-                            val nodeIndex = reader.readUint32().toInt()
+                            val nodeIndex = reader.readIndex()
                             put(nodeIndex, reader.readOpaqueVarInt())
                         }
                     }
@@ -393,10 +403,10 @@ data class MlsGroupState(
             // every version before this one had.
             val pendingProposals =
                 if (version >= 4 && reader.hasRemaining) {
-                    val count = reader.readUint32().toInt()
+                    val count = reader.readCount()
                     buildList {
                         repeat(count) {
-                            val senderLeafIndex = reader.readUint32().toInt()
+                            val senderLeafIndex = reader.readIndex()
                             val proposal = Proposal.decodeTls(TlsReader(reader.readOpaqueVarInt()))
                             val authenticatedContentBytes = reader.readOpaqueVarInt()
                             add(
@@ -419,7 +429,7 @@ data class MlsGroupState(
             // v6+: retained former epochs. Absent for older blobs.
             val retainedEpochs =
                 if (version >= 6 && reader.hasRemaining) {
-                    val count = reader.readUint32().toInt()
+                    val count = reader.readCount()
                     List(count) { RetainedEpochReceiverData.decodeTls(reader) }
                 } else {
                     emptyList()
@@ -442,10 +452,10 @@ data class MlsGroupState(
                 pendingWithSenders = pendingProposals.map { it.copy(senderType = SenderType.fromValue(reader.readUint8())) }
                 resumptionPsks =
                     buildMap {
-                        repeat(reader.readUint32().toInt()) { put(reader.readUint64(), reader.readOpaqueVarInt()) }
+                        repeat(reader.readCount()) { put(reader.readUint64(), reader.readOpaqueVarInt()) }
                     }
                 pendingUpdateKeys =
-                    List(reader.readUint32().toInt()) {
+                    List(reader.readCount()) {
                         PendingUpdateKeys(reader.readOpaqueVarInt(), reader.readOpaqueVarInt(), reader.readOpaqueVarInt())
                     }
                 reInitPending =
@@ -537,21 +547,21 @@ data class MlsGroupState(
         }
 
         private fun readNodeSecrets(reader: TlsReader): Map<Int, ByteArray> {
-            val count = reader.readUint32().toInt()
+            val count = reader.readCount()
             return buildMap {
                 repeat(count) {
-                    val nodeIndex = reader.readUint32().toInt()
+                    val nodeIndex = reader.readIndex()
                     put(nodeIndex, reader.readOpaqueVarInt())
                 }
             }
         }
 
         internal fun readSkippedSecrets(reader: TlsReader): Map<Pair<Int, Int>, ByteArray> {
-            val count = reader.readUint32().toInt()
+            val count = reader.readCount()
             return buildMap {
                 repeat(count) {
-                    val leafIndex = reader.readUint32().toInt()
-                    val generation = reader.readUint32().toInt()
+                    val leafIndex = reader.readIndex()
+                    val generation = reader.readIndex()
                     put(Pair(leafIndex, generation), reader.readOpaqueVarInt())
                 }
             }
@@ -618,15 +628,15 @@ data class RetainedEpochReceiverData(
             val resumptionPsk = reader.readOpaqueVarInt()
             val groupContext = GroupContext.decodeTls(TlsReader(reader.readOpaqueVarInt()))
             val treeBytes = reader.readOpaqueVarInt()
-            val count = reader.readUint32().toInt()
+            val count = reader.readCount()
             val senderRatchetStates =
                 buildMap {
                     repeat(count) {
-                        val leafIndex = reader.readUint32().toInt()
+                        val leafIndex = reader.readIndex()
                         val handshakeSecret = reader.readOpaqueVarInt()
-                        val handshakeGeneration = reader.readUint32().toInt()
+                        val handshakeGeneration = reader.readIndex()
                         val applicationSecret = reader.readOpaqueVarInt()
-                        val applicationGeneration = reader.readUint32().toInt()
+                        val applicationGeneration = reader.readIndex()
                         put(leafIndex, SenderRatchetState(handshakeSecret, handshakeGeneration, applicationSecret, applicationGeneration))
                     }
                 }
@@ -680,7 +690,7 @@ data class RetainedEpochSecrets(
             val epoch = reader.readUint64()
             val senderDataSecret = reader.readOpaqueVarInt()
             val encryptionSecret = reader.readOpaqueVarInt()
-            val leafCount = reader.readUint32().toInt()
+            val leafCount = reader.readIndex()
             // exporterSecret was added later; tolerate its absence in older serialized data
             val exporterSecret =
                 if (reader.hasRemaining) {
@@ -745,7 +755,7 @@ data class OwnSenderRatchet(
         if (other !is OwnSenderRatchet) return false
         return epoch == other.epoch &&
             leafIndex == other.leafIndex &&
-            treeBinder.contentEquals(other.treeBinder) &&
+            constantTimeEquals(treeBinder, other.treeBinder) &&
             handshakeGeneration == other.handshakeGeneration &&
             applicationGeneration == other.applicationGeneration &&
             handshakeSecret.contentEquals(other.handshakeSecret) &&
@@ -782,12 +792,12 @@ data class OwnSenderRatchet(
             val reader = TlsReader(bytes)
             return OwnSenderRatchet(
                 epoch = reader.readUint64(),
-                leafIndex = reader.readUint32().toInt(),
+                leafIndex = reader.readIndex(),
                 treeBinder = reader.readOpaqueVarInt(),
                 handshakeSecret = reader.readOpaqueVarInt(),
-                handshakeGeneration = reader.readUint32().toInt(),
+                handshakeGeneration = reader.readIndex(),
                 applicationSecret = reader.readOpaqueVarInt(),
-                applicationGeneration = reader.readUint32().toInt(),
+                applicationGeneration = reader.readIndex(),
             )
         }
 

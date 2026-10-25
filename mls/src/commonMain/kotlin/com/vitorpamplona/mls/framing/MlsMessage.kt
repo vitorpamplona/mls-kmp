@@ -329,7 +329,7 @@ internal fun decodeSender(reader: TlsReader): Sender {
     val senderType = SenderType.fromValue(reader.readUint8())
     val leafIndex =
         when (senderType) {
-            SenderType.MEMBER, SenderType.EXTERNAL -> reader.readUint32().toInt()
+            SenderType.MEMBER, SenderType.EXTERNAL -> reader.readIndex()
             else -> 0
         }
     return Sender(senderType, leafIndex)

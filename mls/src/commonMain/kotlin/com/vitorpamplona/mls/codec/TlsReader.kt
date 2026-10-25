@@ -81,6 +81,29 @@ class TlsReader(
         return result
     }
 
+    /**
+     * A uint32 used as an index or a generation: a leaf, a node, a ratchet
+     * position. Values above Int.MAX_VALUE fit no tree and no ratchet, and read
+     * as negative Ints would slip past `index < size` checks, so they are
+     * refused here.
+     */
+    fun readIndex(): Int {
+        val value = readUint32()
+        require(value <= Int.MAX_VALUE) { "Index $value out of range" }
+        return value.toInt()
+    }
+
+    /**
+     * A uint32 element count of a vector of [minElementSize]-byte-or-larger
+     * elements. A count the remaining bytes cannot hold is refused before
+     * anything is allocated for it.
+     */
+    fun readCount(minElementSize: Int = 1): Int {
+        val value = readUint32()
+        require(value <= remaining.toLong() / minElementSize.coerceAtLeast(1)) { "Count $value exceeds the $remaining bytes left" }
+        return value.toInt()
+    }
+
     /** Read a fixed number of raw bytes */
     fun readBytes(count: Int): ByteArray {
         require(count >= 0) { "Negative length $count" }

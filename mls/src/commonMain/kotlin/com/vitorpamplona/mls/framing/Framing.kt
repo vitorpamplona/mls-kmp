@@ -322,8 +322,8 @@ object PrivateMessageCodec {
                 message.encryptedSenderData,
             )
         val reader = TlsReader(plain)
-        val leafIndex = reader.readUint32().toInt()
-        val generation = reader.readUint32().toInt()
+        val leafIndex = reader.readIndex()
+        val generation = reader.readIndex()
         val reuseGuard = reader.readBytes(REUSE_GUARD_LENGTH)
         reader.requireFullyConsumed("SenderData")
         return SenderData(leafIndex, generation, reuseGuard)

@@ -20,8 +20,6 @@
  */
 package com.vitorpamplona.mls.group
 
-import com.vitorpamplona.mls.codec.TlsReader
-import com.vitorpamplona.mls.framing.MlsMessage
 import com.vitorpamplona.mls.framing.WireFormat
 import com.vitorpamplona.mls.tree.Extension
 import com.vitorpamplona.mls.tree.LeafNode
@@ -75,8 +73,11 @@ class PublicGroup private constructor(
      * has no leaf to lose.
      */
     fun processMessage(messageBytes: ByteArray): ProcessedMessage {
-        val wireFormat = MlsMessage.decodeTls(TlsReader(messageBytes)).wireFormat
-        require(wireFormat == WireFormat.PUBLIC_MESSAGE) { "A PublicGroup reads PublicMessages only, not $wireFormat" }
+        // The header alone says the wire format (version, then wire_format); the
+        // engine decodes the rest after its size check.
+        require(messageBytes.size >= 4) { "Not an MLSMessage" }
+        val wireFormat = ((messageBytes[2].toInt() and 0xFF) shl 8) or (messageBytes[3].toInt() and 0xFF)
+        require(wireFormat == WireFormat.PUBLIC_MESSAGE.value) { "A PublicGroup reads PublicMessages only, not wire format $wireFormat" }
         return when (val processed = group.processMessage(messageBytes)) {
             is ProcessedMessage.AppliedCommit -> ProcessedMessage.AppliedCommit(processed.sender, processed.epoch, removedSelf = false, processed.proposals)
             else -> processed

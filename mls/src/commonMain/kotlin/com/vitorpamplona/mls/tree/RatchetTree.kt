@@ -56,7 +56,7 @@ class RatchetTree(
     }
 
     /** Get the node at a given node index */
-    fun getNode(nodeIndex: Int): TreeNode? = if (nodeIndex < nodes.size) nodes[nodeIndex] else null
+    fun getNode(nodeIndex: Int): TreeNode? = if (nodeIndex in nodes.indices) nodes[nodeIndex] else null
 
     /** Set a leaf node at the given leaf index */
     fun setLeaf(
@@ -94,6 +94,9 @@ class RatchetTree(
 
     /** Get a leaf node at the given leaf index */
     fun getLeaf(leafIndex: Int): LeafNode? {
+        // Indices come off the wire: out of range is "no such leaf", and the
+        // check comes before leafToNode, which would overflow for large ones.
+        if (leafIndex !in 0 until leafCount) return null
         val nodeIdx = BinaryTree.leafToNode(leafIndex)
         val node = getNode(nodeIdx) ?: return null
         return (node as? TreeNode.Leaf)?.leafNode

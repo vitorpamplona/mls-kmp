@@ -151,6 +151,23 @@ class AuditRegressionTest {
         assertTrue(error.message.orEmpty().contains("unknown proposal"), "got '${error.message}'")
     }
 
+    // --- Found by the group simulator ---
+
+    @Test
+    fun aCommitThatRotatesOurKeyAndAddsSomeoneSignsTheWelcomeWithTheNewKey() {
+        val t = trio()
+        t.alice.proposeSigningKeyRotation()
+        val dave = bundle("dave")
+        t.alice.proposeAdd(dave.keyPackage.toTlsBytes())
+        val commit = t.alice.commit()
+        // The GroupInfo inside the Welcome is checked against alice's leaf in the NEW tree.
+        val joined = MlsGroup.processWelcome(commit.welcomeBytes!!, dave)
+        t.bob.processMessage(commit.framedCommitBytes)
+        assertSameEpoch(t.alice, t.bob, joined)
+        // And her external GroupInfo afterwards is signed with the rotated key too.
+        MlsGroup.externalJoin(t.alice.groupInfoMessage(), "zara".encodeToByteArray())
+    }
+
     // --- What our next commit does to our own leaf survives a restart ---
 
     @Test

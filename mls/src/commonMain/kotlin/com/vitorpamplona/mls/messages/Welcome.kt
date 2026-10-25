@@ -181,7 +181,7 @@ data class GroupInfo(
                 groupContext = GroupContext.decodeTls(reader),
                 extensions = reader.readVectorVarInt { Extension.decodeTls(it) },
                 confirmationTag = reader.readOpaqueVarInt(),
-                signer = reader.readUint32().toInt(),
+                signer = reader.readIndex(),
                 signature = reader.readOpaqueVarInt(),
             )
     }

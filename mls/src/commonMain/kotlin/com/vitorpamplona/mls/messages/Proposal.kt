@@ -364,7 +364,7 @@ sealed class Proposal : TlsSerializable {
                 }
 
                 ProposalType.REMOVE -> {
-                    Remove(reader.readUint32().toInt())
+                    Remove(reader.readIndex())
                 }
 
                 ProposalType.SELF_REMOVE -> {
