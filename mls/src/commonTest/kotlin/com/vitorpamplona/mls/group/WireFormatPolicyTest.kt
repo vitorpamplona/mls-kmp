@@ -182,4 +182,15 @@ class WireFormatPolicyTest {
         val refused = assertFailsWith<IllegalArgumentException> { WireFormatPolicy(WireFormat.PUBLIC_MESSAGE, WireFormatPolicy.Incoming.PRIVATE_ONLY) }
         assertContains(refused.message.orEmpty(), "must accept it")
     }
+
+    /** processMessage opens the current epoch only; a former one goes to decryptFormerEpoch. */
+    @Test
+    fun aPrivateMessageFromAFormerEpochIsRefusedByItsHeader() {
+        val (alice, bob) = pair(MlsGroupPolicy.Permissive.wireFormatPolicy)
+        val old = alice.encrypt("hi".encodeToByteArray())
+        bob.processMessage(alice.commit().framedCommitBytes)
+        val error = assertFailsWith<IllegalArgumentException> { bob.processMessage(old) }
+        assertContains(error.message.orEmpty(), "doesn't match current epoch")
+        assertEquals("hi", bob.decryptFormerEpoch(old).content.decodeToString())
+    }
 }
