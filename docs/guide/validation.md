@@ -14,7 +14,9 @@ purpose.
 | Sender signature over `FramedContentTBS` | §6.1 | `MlsGroupNegativeTest.tamperedSignatureIsRejectedAndStateRolledBack`, `spoofedSenderLeafIndexIsRejected` |
 | Membership tag on a member's PublicMessage | §6.2 | `MlsGroupNegativeTest.tamperedMembershipTagFailsPublicMessageCheck` |
 | Confirmation tag on every commit | §6.1, §8 | `MlsGroupNegativeTest.tamperedConfirmationTagIsRejectedAndStateRolledBack`, `emptyConfirmationTagIsRejected` |
-| LeafNode rules: source, signature, lifetime, capabilities, unique keys | §7.3 | `ProposalValidationTest.keyPackagesThatBreakLeafRulesAreRefusedLocally` |
+| LeafNode rules: source, signature, capabilities, unique keys | §7.3 | `ProposalValidationTest.keyPackagesThatBreakLeafRulesAreRefusedLocally` |
+| KeyPackage lifetime, judged by the committer only, so no receiver forks itself off over its own clock | §7.3 | `AuditRegressionTest.aMemberPastAKeyPackagesLifetimeStillAppliesTheCommitThatAddedIt` |
+| A ProposalRef names only a proposal that was sent | §12.4.2 | `AuditRegressionTest.aCommitCannotReferenceAProposalWeStagedButNeverSent` |
 | KeyPackage signature, suite and init key | §10.1 | `ProposalValidationTest.anAddWithAForgedKeyPackageIsRejected` |
 | No Add of a member already in the group | §12.2 | `ProposalValidationTest.anAddOfAMemberAlreadyInTheGroupIsRejected` |
 | One Update or Remove per leaf; no removal of the committer; not the committer's own Update | §12.2 | `ProposalValidationTest.twoRemovalsOfOneLeafAreRejected`, `removingTheCommitterIsRejected`, `theCommittersOwnUpdateIsRejected` |

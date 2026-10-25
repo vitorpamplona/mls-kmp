@@ -29,6 +29,8 @@ import com.vitorpamplona.mls.messages.GroupContext
 import com.vitorpamplona.mls.messages.Proposal
 import com.vitorpamplona.mls.schedule.EpochSecrets
 import com.vitorpamplona.mls.schedule.SenderRatchetState
+import com.vitorpamplona.mls.tree.Capabilities
+import com.vitorpamplona.mls.tree.Extension
 
 /**
  * Serializable snapshot of an MLS group's complete state.
@@ -126,6 +128,14 @@ data class MlsGroupState(
     val removedFromGroup: Boolean = false,
     /** A commit staged by [MlsGroup.stageCommit] and not yet merged (STATE_VERSION 9+). */
     val pendingCommit: StagedCommitState? = null,
+    /**
+     * The new leaf keys a [MlsGroup.proposeSigningKeyRotation] staged for our
+     * next commit, and what [MlsGroup.advertiseInNextCommit] asked that leaf
+     * to advertise (STATE_VERSION 10+).
+     */
+    val pendingSigningKey: ByteArray? = null,
+    val pendingEncryptionKey: ByteArray? = null,
+    val pendingLeafAdvertisement: Pair<Capabilities, List<Extension>>? = null,
 ) {
     fun encodeTls(): ByteArray {
         val writer = TlsWriter()
@@ -246,6 +256,17 @@ data class MlsGroupState(
             writer.putOpaqueVarInt(pendingCommit.after.encodeTls())
         }
 
+        // STATE_VERSION 10+: what our next commit does to our own leaf.
+        writer.putOpaqueVarInt(pendingSigningKey ?: ByteArray(0))
+        writer.putOpaqueVarInt(pendingEncryptionKey ?: ByteArray(0))
+        if (pendingLeafAdvertisement == null) {
+            writer.putUint8(0)
+        } else {
+            writer.putUint8(1)
+            pendingLeafAdvertisement.first.encodeTls(writer)
+            writer.putVectorVarInt(pendingLeafAdvertisement.second)
+        }
+
         return writer.toByteArray()
     }
 
@@ -287,8 +308,10 @@ data class MlsGroupState(
          * v9: appends whether a commit removed us and a staged commit (its
          *     CommitResult and the state merging it leads to). Older blobs
          *     decode as still members with nothing staged.
+         * v10: appends the leaf keys and advertisement staged for our next
+         *     commit. Older blobs decode with none.
          */
-        private const val STATE_VERSION = 9
+        private const val STATE_VERSION = 10
 
         fun decodeTls(data: ByteArray): MlsGroupState {
             val reader = TlsReader(data)
@@ -448,6 +471,20 @@ data class MlsGroupState(
                 }
             }
 
+            // v10+: what our next commit does to our own leaf.
+            var pendingSigningKey: ByteArray? = null
+            var pendingEncryptionKey: ByteArray? = null
+            var pendingLeafAdvertisement: Pair<Capabilities, List<Extension>>? = null
+            if (version >= 10 && reader.hasRemaining) {
+                pendingSigningKey = reader.readOpaqueVarInt().takeIf { it.isNotEmpty() }
+                pendingEncryptionKey = reader.readOpaqueVarInt().takeIf { it.isNotEmpty() }
+                val advertised = reader.readUint8()
+                require(advertised == 0 || advertised == 1) { "Invalid pending advertisement flag: $advertised" }
+                if (advertised == 1) {
+                    pendingLeafAdvertisement = Capabilities.decodeTls(reader) to reader.readVectorVarInt { Extension.decodeTls(it) }
+                }
+            }
+
             return MlsGroupState(
                 groupContext = groupContext,
                 treeBytes = treeBytes,
@@ -470,6 +507,9 @@ data class MlsGroupState(
                 reInitPending = reInitPending,
                 removedFromGroup = removedFromGroup,
                 pendingCommit = pendingCommit,
+                pendingSigningKey = pendingSigningKey,
+                pendingEncryptionKey = pendingEncryptionKey,
+                pendingLeafAdvertisement = pendingLeafAdvertisement,
             )
         }
 

@@ -355,6 +355,9 @@ class MlsGroup private constructor(
                     pendingCommit = staged
                     StagedCommitState(staged.fromEpoch, staged.result, after)
                 },
+            pendingSigningKey = pendingSigningKey,
+            pendingEncryptionKey = pendingEncryptionKey,
+            pendingLeafAdvertisement = pendingLeafAdvertisement,
         )
     }
 
@@ -1252,7 +1255,7 @@ class MlsGroup private constructor(
                 if (pending.isFrom(myLeafIndex)) {
                     ProposalOrRef.Inline(pending.proposal)
                 } else {
-                    ProposalOrRef.Reference(Framing.proposalRef(pending.authenticatedContentBytes ?: pending.proposal.toTlsBytes()))
+                    ProposalOrRef.Reference(checkNotNull(pending.proposalRef))
                 }
             }
 
@@ -1272,6 +1275,9 @@ class MlsGroup private constructor(
 
         var commitSecret = ByteArray(MlsCryptoProvider.HASH_OUTPUT_LENGTH)
         var generated: TreeKem.GeneratedPath? = null
+        // Computed once, after the path merge: the provisional and the new
+        // GroupContext share it.
+        val newTreeHash by lazy { tree.treeHash() }
         val updatePath: UpdatePath? =
             if (needsPath) {
                 val previousLeaf = checkNotNull(tree.getLeaf(myLeafIndex)) { "Our leaf is blank" }
@@ -1312,7 +1318,7 @@ class MlsGroup private constructor(
                 // RFC 9420 §12.4.2: path secrets are encrypted under the
                 // provisional GroupContext — new epoch, new tree hash, new
                 // extensions, the OLD confirmed transcript hash.
-                val provisional = groupContext.copy(epoch = preContext.epoch + 1, treeHash = tree.treeHash()).toTlsBytes()
+                val provisional = groupContext.copy(epoch = preContext.epoch + 1, treeHash = newTreeHash).toTlsBytes()
                 val nodes = TreeKem.encryptPathSecrets(tree, myLeafIndex, gen, applied.addedLeaves.map { it.first }.toSet(), provisional)
                 commitSecret = gen.commitSecret
                 generated = gen
@@ -1341,7 +1347,7 @@ class MlsGroup private constructor(
         groupContext =
             groupContext.copy(
                 epoch = preContext.epoch + 1,
-                treeHash = tree.treeHash(),
+                treeHash = newTreeHash,
                 confirmedTranscriptHash = confirmedTranscriptHash,
             )
         epochSecrets = KeySchedule(groupContext.toTlsBytes()).deriveEpochSecrets(commitSecret, initSecret, pskSecret)
@@ -1408,10 +1414,20 @@ class MlsGroup private constructor(
         check(pendingProposals.none { it.isFrom(myLeafIndex) && it.proposal is Proposal.SelfRemove }) {
             "A member cannot commit its own SelfRemove: send it with buildSelfRemoveProposalMessage for another member to commit"
         }
+        val now = clock()
         val candidates =
             pendingProposals.filterNot { p ->
                 (p.isFrom(myLeafIndex) && (p.proposal is Proposal.Update || p.proposal is Proposal.SelfRemove)) ||
-                    (p.proposal is Proposal.Remove && p.proposal.removedLeafIndex == myLeafIndex)
+                    (p.proposal is Proposal.Remove && p.proposal.removedLeafIndex == myLeafIndex) ||
+                    // RFC 9420 §12.2: the committer leaves out what it cannot
+                    // validly commit, rather than failing every commit of the
+                    // epoch over one proposal: a PSK we were never given, or an
+                    // Add whose KeyPackage expired while it waited in the pool.
+                    (p.proposal is Proposal.Psk && resolvePsk(p.proposal.psk) == null) ||
+                    (p.proposal is Proposal.Add && !GroupValidation.lifetimeCovers(p.proposal.keyPackage.leafNode, now)) ||
+                    // Someone else's proposal goes in by reference, which needs
+                    // the AuthenticatedContent it arrived in.
+                    (!p.isFrom(myLeafIndex) && p.proposalRef == null)
             }
 
         val removed = mutableSetOf<Int>()
@@ -1525,7 +1541,12 @@ class MlsGroup private constructor(
             proposals.mapNotNull { it.proposal as? Proposal.Add }.map { add ->
                 // Validated against the tree as it stands after the Removes, so
                 // re-adding a client this commit removes is allowed (§12.2).
-                GroupValidation.validateKeyPackage(add.keyPackage, groupContext, tree, policy, clock())
+                // Only the committer judges the lifetime: a receiver checking it
+                // against its own clock would refuse, alone, a commit everyone
+                // else applied — a member back from a week offline, or one with
+                // a skewed clock, would fork itself off the group.
+                val now = if (!observer && committer == myLeafIndex) clock() else null
+                GroupValidation.validateKeyPackage(add.keyPackage, groupContext, tree, policy, now)
                 tree.addLeaf(add.keyPackage.leafNode) to add.keyPackage
             }
 
@@ -1813,6 +1834,7 @@ class MlsGroup private constructor(
 
     /** The pool entry [messageBytes] staged when we sent it, if it is our own proposal still pending. */
     private fun ownProposalEcho(messageBytes: ByteArray): SentProposal? {
+        if (sentProposalMessages.isEmpty()) return null
         val sent = sentProposalMessages[Hex.encode(MlsCryptoProvider.hash(messageBytes))] ?: return null
         return sent.takeIf { s -> pendingProposals.any { it === s.pending } }
     }
@@ -1918,7 +1940,7 @@ class MlsGroup private constructor(
             "Message epoch ${privMsg.epoch} is no longer retained (oldest kept: ${retainedEpochs.firstOrNull()?.epoch ?: "none"})"
         }
         val retained = retainedEpochs[index]
-        val formerTree = RatchetTree.decodeTls(TlsReader(retained.treeBytes))
+        val formerTree = formerTree(retained)
         val formerSecrets = secretTreeFor(policy, retained.encryptionSecret, formerTree.leafCount)
         formerSecrets.importSenderStates(retained.senderRatchetStates)
         formerSecrets.importSkippedSecrets(retained.skippedApplicationSecrets, emptyMap())
@@ -1933,6 +1955,23 @@ class MlsGroup private constructor(
                 nodeSecrets = formerSecrets.exportNodeSecrets(),
             )
         return decrypted
+    }
+
+    /**
+     * Decoded trees of the retained epochs, so a burst of late messages does
+     * not parse the same tree once per message. Keyed by epoch and checked
+     * against the very [RetainedEpochReceiverData.treeBytes] array, which
+     * every update of the record carries over; read-only once decoded.
+     */
+    private val formerTrees = mutableMapOf<Long, Pair<ByteArray, RatchetTree>>()
+
+    private fun formerTree(retained: RetainedEpochReceiverData): RatchetTree {
+        formerTrees[retained.epoch]?.let { (bytes, tree) -> if (bytes === retained.treeBytes) return tree }
+        val tree = RatchetTree.decodeTls(TlsReader(retained.treeBytes))
+        val live = retainedEpochs.mapTo(mutableSetOf()) { it.epoch }
+        formerTrees.keys.retainAll(live)
+        formerTrees[retained.epoch] = retained.treeBytes to tree
+        return tree
     }
 
     /** Exporter secrets of the retained former epochs, by epoch, for keys an application derives per epoch. */
@@ -2154,7 +2193,6 @@ class MlsGroup private constructor(
         require(confirmationTag.isNotEmpty()) { "Confirmation tag missing on commit" }
         val commit = content.commit()
         val preContextBytes = groupContext.toTlsBytes()
-        val retainedForThisEpoch = if (observer) null else captureRetainedEpoch()
 
         // Authenticate the committer (RFC 9420 §6.1). A member signs with its
         // leaf key; an external joiner with the key of the leaf in its path
@@ -2186,6 +2224,11 @@ class MlsGroup private constructor(
                     throw IllegalArgumentException("A ${content.sender.senderType} sender cannot commit")
                 }
             }
+
+        // The epoch we are leaving, kept for late messages. Captured once the
+        // committer is authenticated, so a forged commit costs no tree copy,
+        // and before anything below changes the tree.
+        val retainedForThisEpoch = if (observer) null else captureRetainedEpoch()
 
         // Resolve references against the pending pool BEFORE applying
         // anything, so the policy sees the proposals with their real senders.
@@ -2233,6 +2276,9 @@ class MlsGroup private constructor(
 
         val updatePath = commit.updatePath
         require(updatePath != null || !applied.pathRequired) { "Commit is missing its required UpdatePath (RFC 9420 §12.4.2)" }
+        // The new tree's hash, computed once the tree stops changing (after the
+        // path merge) and used for the provisional and the new GroupContext.
+        val newTreeHash by lazy { tree.treeHash() }
 
         var commitSecret = ByteArray(MlsCryptoProvider.HASH_OUTPUT_LENGTH)
         if (updatePath != null) {
@@ -2268,7 +2314,7 @@ class MlsGroup private constructor(
             prunePathKeys()
 
             if (!observer) {
-                val provisional = groupContext.copy(epoch = epoch + 1, treeHash = tree.treeHash()).toTlsBytes()
+                val provisional = groupContext.copy(epoch = epoch + 1, treeHash = newTreeHash).toTlsBytes()
                 val decrypted =
                     TreeKem.decryptPathSecrets(
                         tree = tree,
@@ -2290,7 +2336,7 @@ class MlsGroup private constructor(
 
         if (observer) {
             // Everything public about the new epoch, on the committer's word for the tag.
-            groupContext = groupContext.copy(epoch = epoch + 1, treeHash = tree.treeHash(), confirmedTranscriptHash = confirmedTranscriptHash)
+            groupContext = groupContext.copy(epoch = epoch + 1, treeHash = newTreeHash, confirmedTranscriptHash = confirmedTranscriptHash)
             interimTranscriptHash = interimTranscriptHashOf(confirmedTranscriptHash, confirmationTag)
             applied.reInit?.let { reInitPending = it }
             pendingProposals.clear()
@@ -2301,7 +2347,7 @@ class MlsGroup private constructor(
         groupContext =
             groupContext.copy(
                 epoch = epoch + 1,
-                treeHash = tree.treeHash(),
+                treeHash = newTreeHash,
                 confirmedTranscriptHash = confirmedTranscriptHash,
             )
         epochSecrets = KeySchedule(groupContext.toTlsBytes()).deriveEpochSecrets(commitSecret, externalInitSecret ?: initSecret, pskSecret)
@@ -2349,10 +2395,13 @@ class MlsGroup private constructor(
         }
     }
 
-    private fun findPendingProposal(ref: ByteArray): PendingProposal? =
-        pendingProposals.find { pending ->
-            Framing.proposalRef(pending.authenticatedContentBytes ?: pending.proposal.toTlsBytes()).contentEquals(ref)
-        }
+    /**
+     * The pooled proposal a commit's ProposalRef names. Only proposals that
+     * travelled on their own have a reference (RFC 9420 §5.2 hashes the
+     * AuthenticatedContent they came in); one we staged and never sent has
+     * none, since nobody else holds it to reference.
+     */
+    private fun findPendingProposal(ref: ByteArray): PendingProposal? = pendingProposals.find { it.proposalRef?.contentEquals(ref) == true }
 
     // --- Proposal Reception ---
 
@@ -2462,7 +2511,10 @@ class MlsGroup private constructor(
         // RFC 9420 §12.1: the proposal on its own must be valid against this epoch.
         when (proposal) {
             is Proposal.Add -> {
-                GroupValidation.validateKeyPackage(proposal.keyPackage, groupContext, tree, policy, clock())
+                // No lifetime check: the commit that references this proposal
+                // would then be unresolvable here alone. The committer checks it
+                // (see selectProposalsForCommit).
+                GroupValidation.validateKeyPackage(proposal.keyPackage, groupContext, tree, policy, now = null)
             }
 
             is Proposal.Update -> {
@@ -2956,8 +3008,6 @@ class MlsGroup private constructor(
         // the pair indistinguishable anywhere they were compared as a set.
         private const val EXTERNAL_SENDERS_EXTENSION_TYPE = 0x0005
 
-        private const val APPLICATION_ID_EXTENSION_TYPE = 0x0001
-
         /**
          * The extension types RFC 9420 §7.2 calls "default".
          *
@@ -2967,14 +3017,7 @@ class MlsGroup private constructor(
          * happens to recognise is not a reason to skip the check, and a
          * binding's own extension types come from [MlsGroupPolicy.knownExtensionTypes].
          */
-        private val DEFAULT_EXTENSION_TYPES =
-            setOf(
-                APPLICATION_ID_EXTENSION_TYPE,
-                RATCHET_TREE_EXTENSION_TYPE,
-                REQUIRED_CAPABILITIES_EXTENSION_TYPE,
-                EXTERNAL_PUB_EXTENSION_TYPE,
-                EXTERNAL_SENDERS_EXTENSION_TYPE,
-            )
+        private val DEFAULT_EXTENSION_TYPES = GroupValidation.DEFAULT_EXTENSION_TYPES
 
         /** MLS self_remove proposal type (MIP-00 / MIP-03). */
         const val SELF_REMOVE_PROPOSAL_TYPE = 0x000A
@@ -3603,9 +3646,7 @@ class MlsGroup private constructor(
             val externalPubData =
                 groupInfo.extensions.find { it.extensionType == EXTERNAL_PUB_EXTENSION_TYPE }?.extensionData
                     ?: throw IllegalArgumentException("GroupInfo missing external_pub extension")
-            // RFC 9420 encodes the key as opaque<V>; ts-mls and mls-kmp 1.2 write the bare key.
-            val externalPub =
-                if (externalPubData.size == MlsCryptoProvider.KEM_PUBLIC_KEY_LENGTH) externalPubData else TlsReader(externalPubData).let { r -> r.readOpaqueVarInt().also { r.requireFullyConsumed("external_pub") } }
+            val externalPub = GroupValidation.externalPubKey(externalPubData)
 
             val sigKp =
                 signingKey?.let { key -> Ed25519KeyPair(key, Ed25519.publicFromPrivate(key)) } ?: Ed25519.generateKeyPair()
@@ -3698,8 +3739,11 @@ class MlsGroup private constructor(
                 policy = policy,
                 resumptionPsks = state.resumptionPsks.toMutableMap(),
                 pendingUpdateKeys = state.pendingUpdateKeys.associateByTo(mutableMapOf()) { Hex.encode(it.encryptionKey) },
+                pendingSigningKey = state.pendingSigningKey,
+                pendingEncryptionKey = state.pendingEncryptionKey,
                 observer = observer,
             ).also { group ->
+                group.pendingLeafAdvertisement = state.pendingLeafAdvertisement
                 group.reInitPending = state.reInitPending
                 group.removedFromGroup = state.removedFromGroup
                 state.pendingCommit?.let { staged ->
@@ -3835,7 +3879,8 @@ class MlsGroup private constructor(
         encryptionPrivateKey = encKp.privateKey
         pathPrivateKeys.putAll(generated.privateKeysByNode())
 
-        val provisional = groupContext.copy(epoch = preContext.epoch + 1, treeHash = tree.treeHash()).toTlsBytes()
+        val newTreeHash = tree.treeHash()
+        val provisional = groupContext.copy(epoch = preContext.epoch + 1, treeHash = newTreeHash).toTlsBytes()
         val nodes = TreeKem.encryptPathSecrets(tree, leafIndex, generated, emptySet(), provisional)
         val commitBytes = Commit(inline.map { ProposalOrRef.Inline(it) }, UpdatePath(leaf, nodes)).toTlsBytes()
 
@@ -3857,7 +3902,7 @@ class MlsGroup private constructor(
         groupContext =
             groupContext.copy(
                 epoch = preContext.epoch + 1,
-                treeHash = tree.treeHash(),
+                treeHash = newTreeHash,
                 confirmedTranscriptHash = confirmedTranscriptHash,
             )
         // initSecret was seeded with the external init secret (RFC 9420 §8.3).
@@ -3938,10 +3983,8 @@ data class PendingProposal(
     /**
      * Encoded `AuthenticatedContent` bytes for the message that delivered
      * this proposal — the input to `MakeProposalRef` per RFC 9420 §5.2.
-     * Null when the proposal was created locally and never went through
-     * the MLS framing layer; in that case the lookup falls back to the
-     * bare `proposal.toTlsBytes()` since local commits inline rather than
-     * reference our own pending proposals.
+     * Null when the proposal was created locally and never sent: then it has
+     * no reference, and only our own commit can carry it, inline.
      */
     val authenticatedContentBytes: ByteArray? = null,
     /** Who sent it: a member, an external sender, or a new member proposing its own Add. */
@@ -3949,6 +3992,9 @@ data class PendingProposal(
 ) {
     /** Whether the member at [leafIndex] sent this proposal. */
     fun isFrom(leafIndex: Int): Boolean = senderType == SenderType.MEMBER && senderLeafIndex == leafIndex
+
+    /** Its RFC 9420 §5.2 ProposalRef, hashed once; null for one never sent. */
+    val proposalRef: ByteArray? by lazy { authenticatedContentBytes?.let { Framing.proposalRef(it) } }
 }
 
 data class DecryptedMessage(

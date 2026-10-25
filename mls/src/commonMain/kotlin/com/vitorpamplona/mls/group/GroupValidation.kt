@@ -85,14 +85,16 @@ internal object GroupValidation {
             require(seen.add(ext.extensionType)) { "Extension type ${ext.extensionType} appears twice" }
             val allowedIn = DEFAULT_EXTENSION_CONTEXT[ext.extensionType] ?: continue
             require(allowedIn == context) { "Extension type ${ext.extensionType} may not appear in a $context" }
-            // external_pub is opaque<V> (RFC 9420 §12.4.3.2), but ts-mls and
-            // mls-kmp 1.2 write the bare key; a suite-1 key alone is 32 bytes,
-            // which no opaque<V> of a 32-byte key can be.
-            if (ext.extensionType == 0x0004 && ext.extensionData.size == MlsCryptoProvider.KEM_PUBLIC_KEY_LENGTH) continue
+            if (ext.extensionType == 0x0004) {
+                externalPubKey(ext.extensionData)
+                continue
+            }
             val reader = TlsReader(ext.extensionData)
             when (ext.extensionType) {
-                0x0001, 0x0004 -> reader.readOpaqueVarInt()
-                0x0002 -> RatchetTree.decodeTls(reader)
+                0x0001 -> reader.readOpaqueVarInt()
+                // ratchet_tree: every caller decodes it strictly right after
+                // (treeFrom); parsing the largest structure twice buys nothing.
+                0x0002 -> continue
                 0x0003 -> repeat(3) { reader.readOpaqueVarInt() }
                 0x0005 -> reader.readVectorVarInt { r -> r.readOpaqueVarInt().also { Credential.decodeTls(r) } }
             }
@@ -167,10 +169,8 @@ internal object GroupValidation {
         }
 
         if (now != null && leaf.leafNodeSource == LeafNodeSource.KEY_PACKAGE) {
-            val lifetime = requireNotNull(leaf.lifetime) { "key_package LeafNode without a lifetime" }
-            // not_before / not_after are uint64: compare unsigned, or a lifetime
-            // ending at 2^64-1 ("never") reads as -1 and is always expired.
-            require(now.toULong() in lifetime.notBefore.toULong()..lifetime.notAfter.toULong()) { "KeyPackage lifetime expired or not yet valid" }
+            requireNotNull(leaf.lifetime) { "key_package LeafNode without a lifetime" }
+            require(lifetimeCovers(leaf, now)) { "KeyPackage lifetime expired or not yet valid" }
         }
 
         validateExtensions(leaf.extensions, ExtensionContext.LEAF_NODE)
@@ -187,6 +187,31 @@ internal object GroupValidation {
             require(!other.signatureKey.contentEquals(leaf.signatureKey)) { "Duplicate signature key: leaf $i already uses it" }
             require(!other.encryptionKey.contentEquals(leaf.encryptionKey)) { "Duplicate encryption key: leaf $i already uses it" }
         }
+    }
+
+    /**
+     * The HPKE key an `external_pub` extension carries. RFC 9420 §12.4.3.2
+     * encodes it as opaque<V>, but ts-mls and mls-kmp 1.2 write the bare key;
+     * a suite-1 key alone is 32 bytes, which no opaque<V> of a 32-byte key
+     * can be, so both read unambiguously.
+     */
+    fun externalPubKey(extensionData: ByteArray): ByteArray {
+        if (extensionData.size == MlsCryptoProvider.KEM_PUBLIC_KEY_LENGTH) return extensionData
+        val reader = TlsReader(extensionData)
+        return reader.readOpaqueVarInt().also { reader.requireFullyConsumed("external_pub") }
+    }
+
+    /**
+     * Whether [now] (Unix seconds) falls within [leaf]'s lifetime; a leaf
+     * without one is not limited. not_before / not_after are uint64: compared
+     * unsigned, or a lifetime ending at 2^64-1 ("never") reads as -1.
+     */
+    fun lifetimeCovers(
+        leaf: LeafNode,
+        now: Long,
+    ): Boolean {
+        val lifetime = leaf.lifetime ?: return true
+        return now.toULong() in lifetime.notBefore.toULong()..lifetime.notAfter.toULong()
     }
 
     /** RFC 9420 §10.1 KeyPackage validation, plus §7.3 for its leaf. */

@@ -12,6 +12,16 @@
 - An `external_pub` sent as the bare key (ts-mls does this) is accepted.
 - The instance method `createKeyPackage(identity, signingKey, ...)` still
   works; its `signingKey` was always ignored.
+- A KeyPackage's lifetime is checked by the member that commits its Add,
+  not again by every receiver: a member reading a week-old backlog, or with a
+  skewed clock, no longer refuses a commit the rest of the group applied.
+- `commit()` leaves out pooled proposals it cannot commit (a PSK it was never
+  given, an Add whose KeyPackage expired in the pool) instead of failing.
+- A commit can only reference proposals that were sent; one we staged and
+  never sent cannot be named by a guessed reference.
+- `MlsGroupState` is at version 10: a key rotation or leaf advertisement
+  staged for the next commit survives a restart. Older blobs still restore;
+  version 10 blobs do not restore on older releases.
 
 ## From 1.2
 

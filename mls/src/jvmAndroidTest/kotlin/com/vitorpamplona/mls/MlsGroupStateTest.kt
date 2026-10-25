@@ -180,7 +180,7 @@ class MlsGroupStateTest {
             com.vitorpamplona.mls.codec
                 .TlsReader(bytes)
         val version = reader.readUint16()
-        assertEquals(9, version)
+        assertEquals(10, version)
     }
 
     @Test
