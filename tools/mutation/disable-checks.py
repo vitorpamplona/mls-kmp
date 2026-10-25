@@ -91,6 +91,8 @@ UNREACHABLE = {
         "MlsKeyPackage.decodeTls refuses any version but 1, and suite 1 is the only group there is",
     "keyPackage.cipherSuite == groupContext.cipherSuite":
         "MlsKeyPackage.decodeTls refuses any ciphersuite but 1, and suite 1 is the only group there is",
+    "!update.leafNode.encryptionKey.contentEquals(previous.encryptionKey)":
+        "an Update only arrives by reference, and receiveProposal refused one that keeps its leaf's key",
     "tree.leafCount > 0":
         "an empty tree has no GroupInfo signer, which is refused first",
 }
