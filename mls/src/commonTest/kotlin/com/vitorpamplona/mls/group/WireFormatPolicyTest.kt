@@ -24,6 +24,7 @@ import com.vitorpamplona.mls.codec.TlsReader
 import com.vitorpamplona.mls.framing.MlsMessage
 import com.vitorpamplona.mls.framing.WireFormat
 import kotlin.test.Test
+import kotlin.test.assertContains
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -132,5 +133,45 @@ class WireFormatPolicyTest {
             val error = assertFailsWith<IllegalArgumentException> { open(public) }
             assertEquals("Expected PrivateMessage", error.message)
         }
+    }
+
+    /** The header's group id is checked before anything is decrypted, in this epoch and in a former one. */
+    @Test
+    fun aPrivateMessageForAnotherGroupIsRefusedByItsHeader() {
+        val (alice, bob) = pair(MlsGroupPolicy.Permissive.wireFormatPolicy)
+
+        fun elsewhere(bytes: ByteArray): ByteArray {
+            val m = MlsMessage.decodeTls(TlsReader(bytes))
+            val priv =
+                com.vitorpamplona.mls.framing.PrivateMessage
+                    .decodeTls(TlsReader(m.payload))
+            return MlsMessage.fromPrivateMessage(priv.copy(groupId = ByteArray(32) { 3 })).toTlsBytes()
+        }
+        val now = elsewhere(alice.encrypt("hi".encodeToByteArray()))
+        assertEquals("Message group ID doesn't match current group", assertFailsWith<IllegalArgumentException> { bob.processMessage(now) }.message)
+
+        val old = elsewhere(alice.encrypt("hi".encodeToByteArray()))
+        bob.processMessage(alice.commit().framedCommitBytes)
+        assertEquals("Message group ID doesn't match current group", assertFailsWith<IllegalArgumentException> { bob.decryptFormerEpoch(old) }.message)
+    }
+
+    /**
+     * Every member can derive every sender's ratchet keys, so only the
+     * signature inside a PrivateMessage stops one member writing as another.
+     */
+    @Test
+    fun aPrivateMessageSealedWithAnotherMembersKeysIsRefused() {
+        val (alice, bob) = pair(MlsGroupPolicy.Permissive.wireFormatPolicy)
+        val impostor =
+            MlsGroup.restore(
+                alice.saveState().copy(
+                    signingPrivateKey =
+                        com.vitorpamplona.crypto.curve25519.Ed25519
+                            .generateKeyPair()
+                            .privateKey,
+                ),
+            )
+        val error = assertFailsWith<IllegalArgumentException> { bob.processMessage(impostor.encrypt("hi".encodeToByteArray())) }
+        assertContains(error.message.orEmpty(), "signature")
     }
 }

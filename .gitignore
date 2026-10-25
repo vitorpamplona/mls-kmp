@@ -22,3 +22,4 @@ captures
 hs_err_pid*
 replay_pid*
 /mutation-report.md
+__pycache__/
