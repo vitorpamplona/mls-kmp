@@ -7,7 +7,7 @@ validation-focused tests, and record whether they failed ("killed") or not
 ("survived": no test notices that check is gone). Restores every file
 afterwards, whatever happens.
 
-  tools/mutation/disable-checks.py [--limit N] [--report out.md] [--strict]
+  tools/mutation/disable-checks.py [--limit N] [--match REGEX] [--report out.md] [--strict]
 
 Run it in a scratch worktree: it edits sources while it runs. A mutant that
 does not compile is reported as such, not as killed.
@@ -118,6 +118,7 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--limit", type=int, default=0)
     ap.add_argument("--report", default=os.path.join(ROOT, "mutation-report.md"))
+    ap.add_argument("--match", help="only the checks whose condition matches this regex")
     ap.add_argument("--strict", action="store_true", help="exit 1 if a check survives that is not listed as unreachable")
     args = ap.parse_args()
 
@@ -129,6 +130,8 @@ def main():
         for start, end in requires(text, ranges):
             line = text.count("\n", 0, start) + 1
             mutants.append((rel, start, end, line, text[start:end].strip().replace("\n", " ")[:110]))
+    if args.match:
+        mutants = [m for m in mutants if re.search(args.match, m[4])]
     if args.limit:
         mutants = mutants[: args.limit]
     print(f"{len(mutants)} mutants", flush=True)
