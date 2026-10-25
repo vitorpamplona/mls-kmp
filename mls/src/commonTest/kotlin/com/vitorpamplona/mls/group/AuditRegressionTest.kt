@@ -218,4 +218,24 @@ class AuditRegressionTest {
                 .second.capabilities
         assertTrue(0xF0B0 in now.extensions, "the advertisement was lost on restart")
     }
+
+    /**
+     * Removing a member and bringing in a PSK it does not hold, in one commit,
+     * is how a group shuts a member out of the next epoch. The removed member
+     * still has to see it is out, not refuse the commit over the PSK.
+     */
+    @Test
+    fun aMemberRemovedAlongsideAPskItLacksStillSeesItIsOut() {
+        val t = trio()
+        val id = "kept from bob".encodeToByteArray()
+        for (g in listOf(t.alice, t.carol)) g.registerPsk(id, ByteArray(32) { 4 })
+        t.alice.proposeRemove(t.bob.leafIndex)
+        t.alice.proposePsk(id)
+        val commit = t.alice.commit()
+        t.carol.processMessage(commit.framedCommitBytes)
+        assertSameEpoch(t.alice, t.carol)
+        val result = assertIs<ProcessedMessage.AppliedCommit>(t.bob.processMessage(commit.framedCommitBytes))
+        assertTrue(result.removedSelf)
+        assertFalse(t.bob.isLocalMember())
+    }
 }

@@ -1614,6 +1614,13 @@ public class MlsGroup private constructor(
             }
         }
 
+        // A member this commit removes need not hold its PSKs: they key the
+        // epoch it is shut out of (and often exist to shut it out).
+        val removesUs =
+            !observer &&
+                proposals.any {
+                    (it.proposal as? Proposal.Remove)?.removedLeafIndex == myLeafIndex || (it.proposal is Proposal.SelfRemove && it.isFrom(myLeafIndex))
+                }
         val touchedLeaves = mutableSetOf<Int>()
         val pskIds = mutableSetOf<String>()
         var gceCount = 0
@@ -1660,8 +1667,8 @@ public class MlsGroup private constructor(
                             "A commit carries at most one reinit or branch PSK"
                         }
                     }
-                    // An observer holds no PSKs; only members can tell one is missing.
-                    if (!observer) requireNotNull(resolvePsk(q.psk)) { "PSK not available: ${q.psk.identityKey()}" }
+                    // An observer holds no PSKs; only members staying in can tell one is missing.
+                    if (!observer && !removesUs) requireNotNull(resolvePsk(q.psk)) { "PSK not available: ${q.psk.identityKey()}" }
                 }
 
                 is Proposal.ReInit -> {
@@ -2276,17 +2283,19 @@ public class MlsGroup private constructor(
         lastAppliedProposals = resolved
 
         val applied = applyProposalList(resolved, committer)
-        val pskSecret = if (observer) ByteArray(0) else KeySchedule.pskSecret(applied.psks.map { it to requirePsk(it) })
-        // The external init secret comes from THIS epoch's external key pair.
-        val externalInitSecret = if (observer) null else applied.externalInit?.let { deriveExternalInitSecret(it.kemOutput) }
 
         // A commit that removes us still has to be a valid commit: everything
         // public about it is checked below as for anyone else, so a member
         // cannot talk us out of the group with one the others would refuse.
         // Only the key schedule is out of reach — the path was not encrypted
-        // to us — and with it the confirmation tag. Judge by the proposals,
-        // not the tree: the same commit may add someone into our old leaf.
+        // to us, and its PSKs need not be ours — and with it the confirmation
+        // tag. Judge by the proposals, not the tree: the same commit may add
+        // someone into our old leaf.
         val removesUs = !observer && (myLeafIndex in applied.removedLeaves || !isLocalMember())
+        val followsKeySchedule = !observer && !removesUs
+        val pskSecret = if (followsKeySchedule) KeySchedule.pskSecret(applied.psks.map { it to requirePsk(it) }) else ByteArray(0)
+        // The external init secret comes from THIS epoch's external key pair.
+        val externalInitSecret = if (followsKeySchedule) applied.externalInit?.let { deriveExternalInitSecret(it.kemOutput) } else null
 
         val updatePath = commit.updatePath
         require(updatePath != null || !applied.pathRequired) { "Commit is missing its required UpdatePath (RFC 9420 §12.4.2)" }
@@ -2327,7 +2336,7 @@ public class MlsGroup private constructor(
             }
             prunePathKeys()
 
-            if (!observer && !removesUs) {
+            if (followsKeySchedule) {
                 val provisional = groupContext.copy(epoch = epoch + 1, treeHash = newTreeHash).toTlsBytes()
                 val decrypted =
                     TreeKem.decryptPathSecrets(

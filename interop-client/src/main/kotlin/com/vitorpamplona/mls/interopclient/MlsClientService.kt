@@ -526,7 +526,7 @@ public class MlsClientService : MLSClientGrpc.MLSClientImplBase() {
         observer: StreamObserver<CreateSubgroupResponse>,
     ): Unit =
         call(observer) {
-            val pending = reinits[request.reinitId] ?: throw IllegalArgumentException("No reinit ${request.reinitId}")
+            val pending = reinits.remove(request.reinitId) ?: throw IllegalArgumentException("No reinit ${request.reinitId}")
             val successor = pending.group.reinit(request.keyPackageList.map { keyPackage(it.toByteArray()).toTlsBytes() }, includeRatchetTreeInWelcome = !request.externalTree)
             subgroup(successor)
         }

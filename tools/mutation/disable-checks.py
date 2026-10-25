@@ -12,7 +12,7 @@ afterwards, whatever happens.
 Run it in a scratch worktree: it edits sources while it runs. A mutant that
 does not compile is reported as such, not as killed.
 """
-import argparse, os, re, subprocess, sys, time
+import argparse, os, re, signal, subprocess, sys, time
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 SRC = os.path.join(ROOT, "mls/src/commonMain/kotlin/com/vitorpamplona/mls")
@@ -93,8 +93,6 @@ UNREACHABLE = {
         "MlsKeyPackage.decodeTls refuses any ciphersuite but 1, and suite 1 is the only group there is",
     "!update.leafNode.encryptionKey.contentEquals(previous.encryptionKey)":
         "an Update only arrives by reference, and receiveProposal refused one that keeps its leaf's key",
-    "tree.leafCount > 0":
-        "an empty tree has no GroupInfo signer, which is refused first",
 }
 
 
@@ -104,14 +102,19 @@ def unreachable(cond):
 
 
 def run_tests():
-    cmd = ["./gradlew", ":mls:jvmTest", "-q", "--offline"] + [a for t in TESTS for a in ("--tests", t)]
+    # LargeGroupTest proves scale, not validation, and is most of the run time.
+    cmd = ["./gradlew", ":mls:jvmTest", "-q", "--offline", "-PmlsKmpSkipSlowTests"] + [a for t in TESTS for a in ("--tests", t)]
     p = subprocess.run(cmd, cwd=ROOT, capture_output=True, text=True)
     out = p.stdout + p.stderr
     if p.returncode == 0:
         return "survived"
     if re.search(r"^e: ", out, re.M) or "Compilation error" in out:
         return "does not compile"
-    return "killed"
+    # Only a failing test kills a mutant; anything else (a daemon crash, an
+    # offline resolution failure) says nothing about the check.
+    if "There were failing tests" in out or re.search(r" FAILED$", out, re.M):
+        return "killed"
+    return "error"
 
 
 def main():
@@ -121,6 +124,8 @@ def main():
     ap.add_argument("--match", help="only the checks whose condition matches this regex")
     ap.add_argument("--strict", action="store_true", help="exit 1 if a check survives that is not listed as unreachable")
     args = ap.parse_args()
+    # A SIGTERM (a CI timeout, `timeout`) must still run the finally that restores the source.
+    signal.signal(signal.SIGTERM, lambda *_: sys.exit(143))
 
     mutants = []
     for rel, names in SCOPES:
@@ -153,21 +158,31 @@ def main():
     survived = [r for r in results if r[3] == "survived" and not unreachable(r[2])]
     shadowed = [r for r in results if r[3] == "survived" and unreachable(r[2])]
     broken = [r for r in results if r[3] == "does not compile"]
+    errors = [r for r in results if r[3] == "error"]
+    stale = [r for r in results if r[3] == "killed" and unreachable(r[2])]
     with open(args.report, "w") as f:
         f.write(f"# Disabled-check mutants\n\n{killed} killed, {len(survived)} survived, "
-                f"{len(shadowed)} unreachable, {len(broken)} did not compile, of {len(results)}.\n\n")
+                f"{len(shadowed)} unreachable, {len(broken)} did not compile, {len(errors)} errored, of {len(results)}.\n\n")
         f.write("## Survivors: checks no test notices\n\n")
         for rel, line, cond, _ in survived:
             f.write(f"- `{rel}:{line}` `require({cond})`\n")
         f.write("\n## Unreachable: refused earlier by another check\n\n")
         for rel, line, cond, _ in shadowed:
             f.write(f"- `{rel}:{line}` `require({cond})`: {unreachable(cond)}\n")
+        if stale:
+            f.write("\n## Listed as unreachable, but a test kills them: take them off UNREACHABLE\n\n")
+            for rel, line, cond, _ in stale:
+                f.write(f"- `{rel}:{line}` `require({cond})`\n")
+        if errors:
+            f.write("\n## Errored (the build failed without a failing test; rerun these)\n\n")
+            for rel, line, cond, _ in errors:
+                f.write(f"- `{rel}:{line}` `require({cond})`\n")
         if broken:
             f.write("\n## Did not compile (the script could not disable these)\n\n")
             for rel, line, cond, _ in broken:
                 f.write(f"- `{rel}:{line}` `require({cond})`\n")
     print(f"report: {args.report}")
-    sys.exit(1 if args.strict and (survived or broken) else 0)
+    sys.exit(1 if args.strict and (survived or broken or errors or stale) else 0)
 
 
 if __name__ == "__main__":

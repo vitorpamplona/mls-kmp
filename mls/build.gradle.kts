@@ -70,8 +70,12 @@ kotlin {
         environment("SIMCTL_CHILD_TEST_RESOURCES_ROOT", resourcesRoot)
     }
 
+    // -PmlsKmpSkipSlowTests leaves out the tests that only prove scale, for
+    // runs that repeat the suite many times (tools/mutation).
+    val skipSlowTests = providers.gradleProperty("mlsKmpSkipSlowTests").isPresent
     tasks.withType<Test>().configureEach {
         maxHeapSize = "2g"
+        if (skipSlowTests) filter.excludeTestsMatching("*LargeGroupTest*")
     }
 
     sourceSets {

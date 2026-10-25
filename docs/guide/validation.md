@@ -32,7 +32,7 @@ reason and stay where they were.
 | UpdatePath parent hashes, fresh and distinct public keys, and derived keys matching the path | §7.9, §12.4.2 | `MaliciousMemberTest` › "a tampered update path", "an update path that reuses a key already in the tree", "an update path that repeats a key", `TreeKemInteropTest` |
 | A standalone proposal: this group and epoch; from a live member (signature and membership tag), a listed external sender (its signature, and only Add, Remove, PreSharedKey, ReInit or GroupContextExtensions), or a new member's own Add (signed by its leaf); valid on its own | §6, §12.1 | `MaliciousMemberTest` › "a proposal from another epoch", "a proposal for another group", "a proposal from a leaf off the end of the tree", "a proposal from a blank leaf", "a proposal signed by someone else", "a proposal with a bad membership tag", "a proposal from an unknown external sender", "an external proposal signed by someone else", "an external sender's self-remove", "a new member's proposal that is not an add", "a new member's add signed by someone else", "a proposal from a new_member_commit sender", "an external init sent on its own", "a proposal to remove a blank leaf", "a psk proposal with a short nonce", "a reinit proposal to an older version", "an update proposal that keeps its leaf's encryption key" |
 | A ProposalRef names a proposal that was sent this epoch | §12.4.2 | `MaliciousMemberTest` › "a reference to an unknown proposal", `AuditRegressionTest.aCommitCannotReferenceAProposalWeStagedButNeverSent` |
-| A commit that removes us gets every public check too | §12.4.2 | `MaliciousMemberTest` › "remove without a path" (carol is the one removed) |
+| A commit that removes us gets every public check too, but not the key schedule: we need not hold its PSKs | §12.4.2 | `MaliciousMemberTest` › "remove without a path" (carol is the one removed), `AuditRegressionTest.aMemberRemovedAlongsideAPskItLacksStillSeesItIsOut` |
 | A Welcome or GroupInfo: the right message, suite and version, signed by its signer, its confirmation tag matching the derived secrets, a successor starting at epoch 1 | §11, §12.4.3.1, §12.4.3.2 | `WelcomeValidationTest` (Welcomes only a malicious creator would write) |
 | A joined tree: tree hash, parent hashes, every leaf, credential support across leaves, unmerged leaves | §12.4.3.1 | `TreeValidationInteropTest.testFullTreeValidation`, `JoinedTreeValidationTest` (trees only a malicious GroupInfo signer could build) |
 | External commits: signer, path, resync identity | §12.4.3.2 | `RfcFlowsTest.externalResyncMustKeepTheCredential` |
@@ -51,8 +51,8 @@ and a PublicGroup view, agree on the group.
 
 Each check above is also tested for whether the tests would notice it gone.
 `tools/mutation/disable-checks.py` disables every `require` in the
-validation code in turn and runs the suites. Of 97 checks, 84 are caught by a
-test failing for that reason. The other 13 sit behind an earlier check that
+validation code in turn and runs the suites. Of 97 checks, 85 are caught by a
+test failing for that reason. The other 12 sit behind an earlier check that
 refuses the same input first, and the script lists each with why. The
 nightly fails if a check survives that is not on that list.
 
