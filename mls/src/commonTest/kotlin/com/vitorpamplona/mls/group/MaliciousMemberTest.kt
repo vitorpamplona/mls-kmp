@@ -171,7 +171,8 @@ class MaliciousMemberTest {
     /** dave's honest external commit, its proposal list replaced by [edit] and re-signed by dave. */
     private fun forgeExternal(
         w: World,
-        edit: (List<ProposalOrRef>) -> List<ProposalOrRef>,
+        signingKey: ByteArray? = null,
+        edit: (List<ProposalOrRef>) -> List<ProposalOrRef> = { it },
     ): ByteArray {
         val joined = MlsGroup.externalJoin(w.alice.groupInfoMessage(), "dave".encodeToByteArray())
         val pub = PublicMessage.decodeTls(TlsReader(MlsMessage.decodeTls(TlsReader(joined.framedCommitBytes)).payload))
@@ -179,7 +180,7 @@ class MaliciousMemberTest {
         val content = FramedContent(pub.groupId, pub.epoch, pub.sender, pub.authenticatedData, ContentType.COMMIT, Commit(edit(honest.proposals), honest.updatePath).toTlsBytes())
         val signature =
             Framing.sign(
-                joined.group.saveState().signingPrivateKey,
+                signingKey ?: joined.group.saveState().signingPrivateKey,
                 WireFormat.PUBLIC_MESSAGE,
                 content,
                 w.alice
@@ -243,6 +244,7 @@ class MaliciousMemberTest {
                 forge(w.alice, listOf(shared(w, w.bob, Proposal.SelfRemove())) + inline(Proposal.Remove(w.bob.leafIndex)))
             },
             Case("the committer's own self-remove", "its own SelfRemove") { w -> forge(w.alice, inline(Proposal.SelfRemove())) },
+            Case("an external commit not signed by its new leaf", "signature on external commit") { w -> forgeExternal(w, signingKey = Ed25519.generateKeyPair().privateKey) },
             Case("an external commit without an external init", "exactly one ExternalInit") { w -> forgeExternal(w) { p -> p.filterNot { (it as? ProposalOrRef.Inline)?.proposal is Proposal.ExternalInit } } },
             Case("an external commit with two external inits", "exactly one ExternalInit") { w -> forgeExternal(w) { p -> p + p } },
             Case("an external commit that removes two members", "at most one leaf") { w -> forgeExternal(w) { p -> p + inline(Proposal.Remove(w.bob.leafIndex), Proposal.Remove(w.carol.leafIndex)) } },
