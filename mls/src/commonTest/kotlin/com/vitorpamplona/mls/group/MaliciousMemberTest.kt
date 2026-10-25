@@ -52,8 +52,9 @@ import kotlin.test.assertTrue
 import kotlin.test.fail
 
 /**
- * One commit per validation rule, each breaking only that rule and sent by a
- * real member: signed with its key, MACed with the epoch's membership key.
+ * One commit or standalone proposal per validation rule, each breaking only
+ * that rule and sent by a real member (signed with its key, MACed with the
+ * epoch's membership key), the group's external sender or a would-be member.
  * Every other member and a [PublicGroup] view must refuse each one, for that
  * rule, and stay exactly where they were. The view is excused only from the
  * two checks that need the epoch's secrets.
@@ -66,6 +67,8 @@ class MaliciousMemberTest {
         val alice: MlsGroup,
         val bob: MlsGroup,
         val carol: MlsGroup,
+        /** The group's one external sender. */
+        val ds: Ed25519KeyPair,
     ) {
         /** Who must refuse the commit; a case that removes someone first takes them off. */
         val receivers = mutableListOf("bob" to bob, "carol" to carol)
@@ -79,12 +82,31 @@ class MaliciousMemberTest {
         capabilities: Capabilities = Capabilities(),
     ) = MlsGroup.createKeyPackage(name.encodeToByteArray(), capabilities = capabilities)
 
+    /** RFC 9420 §12.1.8.1 external_senders, naming [ds]. */
+    private fun externalSenders(ds: Ed25519KeyPair): com.vitorpamplona.mls.tree.Extension {
+        val sender =
+            com.vitorpamplona.mls.codec
+                .TlsWriter()
+                .apply {
+                    putOpaqueVarInt(ds.publicKey)
+                    Credential.Basic("ds".encodeToByteArray()).encodeTls(this)
+                }.toByteArray()
+        val list =
+            com.vitorpamplona.mls.codec
+                .TlsWriter()
+                .apply { putOpaqueVarInt(sender) }
+                .toByteArray()
+        return com.vitorpamplona.mls.tree
+            .Extension(0x0005, list)
+    }
+
     private fun world(capabilities: Capabilities = Capabilities()): World {
-        val alice = MlsGroup.create("alice".encodeToByteArray(), capabilities = capabilities)
+        val ds = Ed25519.generateKeyPair()
+        val alice = MlsGroup.create("alice".encodeToByteArray(), capabilities = capabilities, initialExtensions = listOf(externalSenders(ds)))
         val b = bundle("bob", capabilities)
         val c = bundle("carol", capabilities)
         val add = alice.addMembers(listOf(b.keyPackage.toTlsBytes(), c.keyPackage.toTlsBytes()))
-        return World(alice, MlsGroup.processWelcome(add.welcomeBytes!!, b), MlsGroup.processWelcome(add.welcomeBytes!!, c))
+        return World(alice, MlsGroup.processWelcome(add.welcomeBytes!!, b), MlsGroup.processWelcome(add.welcomeBytes!!, c), ds)
     }
 
     /**
@@ -113,6 +135,29 @@ class MaliciousMemberTest {
     }
 
     private fun inline(vararg p: Proposal) = p.map { ProposalOrRef.Inline(it) }
+
+    /**
+     * A standalone proposal as a PublicMessage, from alice's seat unless
+     * [sender] says otherwise. A member signs over the GroupContext and adds
+     * a membership tag; an external sender or new member signs without either.
+     */
+    private fun forgeProposal(
+        w: World,
+        proposal: Proposal,
+        sender: Sender = Sender(SenderType.MEMBER, w.alice.leafIndex),
+        epoch: Long = w.alice.epoch,
+        groupId: ByteArray = w.alice.groupId,
+        signingKey: ByteArray = w.alice.saveState().signingPrivateKey,
+        membershipTag: ByteArray? = null,
+        withMembershipTag: Boolean = sender.senderType == SenderType.MEMBER,
+    ): ByteArray {
+        val state = w.alice.saveState()
+        val ctx = state.groupContext.toTlsBytes()
+        val content = FramedContent(groupId, epoch, sender, ByteArray(0), ContentType.PROPOSAL, proposal.toTlsBytes())
+        val signature = Framing.sign(signingKey, WireFormat.PUBLIC_MESSAGE, content, if (sender.senderType == SenderType.MEMBER || sender.senderType == SenderType.NEW_MEMBER_COMMIT) ctx else null)
+        val tag = if (withMembershipTag) membershipTag ?: Framing.membershipTag(state.epochSecrets.membershipKey, content, ctx, signature, null) else null
+        return MlsMessage.fromPublicMessage(Framing.publicMessage(content, signature, null, tag)).toTlsBytes()
+    }
 
     /** alice's honest commit, re-framed with [confirmationTag] and a membership tag that matches it. */
     private fun honestButTagged(
@@ -344,6 +389,35 @@ class MaliciousMemberTest {
                 val honest = w.alice.stageCommit().also { w.alice.clearPendingCommit() }
                 val path = Commit.decodeTls(TlsReader(honest.commitBytes)).updatePath!!
                 forge(w.alice, inline(), path.copy(nodes = path.nodes.toMutableList().also { it[1] = it[1].copy(encryptionKey = it[0].encryptionKey) }))
+            },
+            // Standalone proposals: refused before they reach the pending pool.
+            Case("a proposal from another epoch", "Proposal epoch") { w -> forgeProposal(w, Proposal.Remove(w.carol.leafIndex), epoch = w.alice.epoch + 1) },
+            Case("a proposal for another group", "Proposal group_id") { w -> forgeProposal(w, Proposal.Remove(w.carol.leafIndex), groupId = ByteArray(32) { 1 }) },
+            Case("a proposal from a leaf off the end of the tree", "out of range") { w -> forgeProposal(w, Proposal.Remove(w.carol.leafIndex), sender = Sender(SenderType.MEMBER, 99)) },
+            Case("a proposal from a blank leaf", "Sender leaf is blank") { w ->
+                val honest = w.alice.removeMember(w.bob.leafIndex)
+                w.carol.processMessage(honest.framedCommitBytes)
+                w.receivers.removeAll { it.first == "bob" }
+                forgeProposal(w, Proposal.Remove(w.carol.leafIndex), sender = Sender(SenderType.MEMBER, w.bob.leafIndex))
+            },
+            Case("a proposal signed by someone else", "signature on PublicMessage proposal") { w -> forgeProposal(w, Proposal.Remove(w.carol.leafIndex), signingKey = Ed25519.generateKeyPair().privateKey) },
+            Case("a proposal with a bad membership tag", "Invalid membership_tag", viewRefuses = false) { w -> forgeProposal(w, Proposal.Remove(w.carol.leafIndex), membershipTag = ByteArray(32) { 7 }) },
+            Case("a proposal from an unknown external sender", "Unknown external sender") { w -> forgeProposal(w, Proposal.Remove(w.carol.leafIndex), sender = Sender(SenderType.EXTERNAL, 5), signingKey = w.ds.privateKey) },
+            Case("an external proposal signed by someone else", "from external sender") { w -> forgeProposal(w, Proposal.Remove(w.carol.leafIndex), sender = Sender(SenderType.EXTERNAL, 0), signingKey = Ed25519.generateKeyPair().privateKey) },
+            Case("an external sender's self-remove", "external sender cannot propose") { w -> forgeProposal(w, Proposal.SelfRemove(), sender = Sender(SenderType.EXTERNAL, 0), signingKey = w.ds.privateKey) },
+            Case("a new member's proposal that is not an add", "only propose its own Add") { w -> forgeProposal(w, Proposal.Remove(w.carol.leafIndex), sender = Sender(SenderType.NEW_MEMBER_PROPOSAL)) },
+            Case("a new member's add signed by someone else", "signature on new member's Add") { w ->
+                forgeProposal(w, Proposal.Add(bundle("dave").keyPackage), sender = Sender(SenderType.NEW_MEMBER_PROPOSAL), signingKey = Ed25519.generateKeyPair().privateKey)
+            },
+            Case("a proposal from a new_member_commit sender", "cannot send a proposal") { w -> forgeProposal(w, Proposal.Remove(w.carol.leafIndex), sender = Sender(SenderType.NEW_MEMBER_COMMIT)) },
+            Case("an external init sent on its own", "never sent on its own") { w -> forgeProposal(w, Proposal.ExternalInit(ByteArray(32))) },
+            Case("a proposal to remove a blank leaf", "Cannot remove blank leaf") { w -> forgeProposal(w, Proposal.Remove(7)) },
+            Case("a psk proposal with a short nonce", "psk_nonce") { w -> forgeProposal(w, Proposal.Psk(PreSharedKeyId.External("x".encodeToByteArray(), ByteArray(3)))) },
+            Case("a reinit proposal to an older version", "older protocol version") { w -> forgeProposal(w, Proposal.ReInit(ByteArray(32), 0, 1, emptyList())) },
+            Case("an update proposal that keeps its leaf's encryption key", "Update proposal reuses") { w ->
+                val unsigned = leafOf(w, w.alice).copy(leafNodeSource = LeafNodeSource.UPDATE, lifetime = null, parentHash = null)
+                val leaf = unsigned.copy(signature = MlsCryptoProvider.signWithLabel(w.alice.saveState().signingPrivateKey, "LeafNodeTBS", unsigned.encodeTbs(w.alice.groupId, w.alice.leafIndex)))
+                forgeProposal(w, Proposal.Update(leaf))
             },
             Case("an update path that reuses the committer's encryption key", "reuses the committer's encryption key") { w ->
                 val honest = w.alice.stageCommit().also { w.alice.clearPendingCommit() }

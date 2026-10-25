@@ -5,8 +5,9 @@
 Every check below runs on our own commits before they are sent, and on every
 commit and proposal we receive before it is applied. A failure throws and
 leaves the group unchanged. Each row names the test that breaks the rule on
-purpose. The `MaliciousMemberTest` cases are commits from a real member,
-signed and MACed with its keys, that break only that one rule. Every other
+purpose. The `MaliciousMemberTest` cases are commits and proposals from a
+real member (or the group's external sender, or a would-be member), signed
+and MACed with its keys, that break only that one rule. Every other
 member and a [PublicGroup](public-group.md) view must refuse each one for that
 reason and stay where they were.
 
@@ -29,6 +30,7 @@ reason and stay where they were.
 | Every proposal type supported by every member, and never a GREASE one | §12.2, §13.5 | `MaliciousMemberTest` › "a proposal type some member does not support", "a grease proposal" |
 | An UpdatePath wherever one is required | §12.4.2 | `MaliciousMemberTest` › "remove without a path", "empty commit without a path" |
 | UpdatePath parent hashes, fresh and distinct public keys, and derived keys matching the path | §7.9, §12.4.2 | `MaliciousMemberTest` › "a tampered update path", "an update path that reuses a key already in the tree", "an update path that repeats a key", `TreeKemInteropTest` |
+| A standalone proposal: this group and epoch; from a live member (signature and membership tag), a listed external sender (its signature, and only Add, Remove, PreSharedKey, ReInit or GroupContextExtensions), or a new member's own Add (signed by its leaf); valid on its own | §6, §12.1 | `MaliciousMemberTest` › "a proposal from another epoch", "a proposal for another group", "a proposal from a leaf off the end of the tree", "a proposal from a blank leaf", "a proposal signed by someone else", "a proposal with a bad membership tag", "a proposal from an unknown external sender", "an external proposal signed by someone else", "an external sender's self-remove", "a new member's proposal that is not an add", "a new member's add signed by someone else", "a proposal from a new_member_commit sender", "an external init sent on its own", "a proposal to remove a blank leaf", "a psk proposal with a short nonce", "a reinit proposal to an older version", "an update proposal that keeps its leaf's encryption key" |
 | A ProposalRef names a proposal that was sent this epoch | §12.4.2 | `MaliciousMemberTest` › "a reference to an unknown proposal", `AuditRegressionTest.aCommitCannotReferenceAProposalWeStagedButNeverSent` |
 | A commit that removes us gets every public check too | §12.4.2 | `MaliciousMemberTest` › "remove without a path" (carol is the one removed) |
 | A joined tree: tree hash, parent hashes, every leaf, credential support across leaves, unmerged leaves | §12.4.3.1 | `TreeValidationInteropTest.testFullTreeValidation`, `JoinedTreeValidationTest` (trees only a malicious GroupInfo signer could build) |
