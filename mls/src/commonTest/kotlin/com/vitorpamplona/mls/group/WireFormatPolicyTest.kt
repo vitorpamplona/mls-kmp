@@ -173,6 +173,9 @@ class WireFormatPolicyTest {
             )
         val error = assertFailsWith<IllegalArgumentException> { bob.processMessage(impostor.encrypt("hi".encodeToByteArray())) }
         assertContains(error.message.orEmpty(), "signature")
+        val proposal = impostor.proposalMessage(impostor.proposeGroupContextExtensions(emptyList()), wireFormat = WireFormat.PRIVATE_MESSAGE)
+        val refused = assertFailsWith<IllegalArgumentException> { bob.processMessage(proposal) }
+        assertContains(refused.message.orEmpty(), "signature verification failed on PrivateMessage proposal")
     }
 
     @Test
