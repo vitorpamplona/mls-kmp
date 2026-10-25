@@ -1,5 +1,12 @@
 # MLS for Kotlin Multiplatform
 
+[![GitHub downloads](https://img.shields.io/github/downloads/vitorpamplona/mls-kmp/total?label=Downloads&labelColor=27303D&color=0D1117&logo=github&logoColor=FFFFFF&style=flat)](https://github.com/vitorpamplona/mls-kmp/releases)
+[![Last Version](https://img.shields.io/github/release/vitorpamplona/mls-kmp.svg?maxAge=3600&label=Stable&labelColor=06599d&color=043b69)](https://github.com/vitorpamplona/mls-kmp/releases/latest)
+[![Maven Central](https://img.shields.io/maven-central/v/com.vitorpamplona.mls/mls?label=Maven%20Central&labelColor=27303D&color=0877d2)](https://central.sonatype.com/artifact/com.vitorpamplona.mls/mls)
+[![JitPack snapshots](https://img.shields.io/badge/snapshots-JitPack-27303D?labelColor=27303D&color=0877d2)](https://jitpack.io/#vitorpamplona/mls-kmp)
+[![CI](https://img.shields.io/github/actions/workflow/status/vitorpamplona/mls-kmp/build.yml?labelColor=27303D)](https://github.com/vitorpamplona/mls-kmp/actions/workflows/build.yml)
+[![License: MIT](https://img.shields.io/github/license/vitorpamplona/mls-kmp?labelColor=27303D&color=0877d2)](LICENSE)
+
 A Messaging Layer Security ([RFC 9420](https://www.rfc-editor.org/rfc/rfc9420)) engine in
 pure Kotlin Multiplatform: TLS presentation-language codec, HPKE, the
 ratchet tree, the key schedule, the secret tree, message framing, proposals, commits,
