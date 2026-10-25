@@ -67,7 +67,7 @@ def requires(text, ranges):
     return out
 
 
-# Checks no test can reach, by the start of their condition: each sits behind
+# Checks no test can reach, by their condition (see unreachable()): each sits behind
 # an earlier check that refuses the same input first. They stay as defence in
 # depth; the report lists them apart from the survivors that need a test.
 UNREACHABLE = {
@@ -85,13 +85,16 @@ UNREACHABLE = {
     "content.contentType == ContentType.COMMIT": "every caller routes by content type before applyCommit",
     "wireFormat == WireFormat.PUBLIC_MESSAGE":
         "a PrivateMessage's sender data is a leaf index, so it can only carry a member's commit",
+    "proposal is Proposal.Add$":
+        "receivePublicProposal refuses a new member's non-Add first, with the same message",
     "tree.leafCount > 0":
         "an empty tree has no GroupInfo signer, which is refused first",
 }
 
 
 def unreachable(cond):
-    return next((why for key, why in UNREACHABLE.items() if cond.startswith(key)), None)
+    """Keys match the start of a condition; one ending in `$` the whole of it."""
+    return next((why for key, why in UNREACHABLE.items() if (cond == key[:-1] if key.endswith("$") else cond.startswith(key))), None)
 
 
 def run_tests():
