@@ -87,6 +87,10 @@ UNREACHABLE = {
         "a PrivateMessage's sender data is a leaf index, so it can only carry a member's commit",
     "proposal is Proposal.Add$":
         "receivePublicProposal refuses a new member's non-Add first, with the same message",
+    "keyPackage.version == groupContext.version":
+        "MlsKeyPackage.decodeTls refuses any version but 1, and suite 1 is the only group there is",
+    "keyPackage.cipherSuite == groupContext.cipherSuite":
+        "MlsKeyPackage.decodeTls refuses any ciphersuite but 1, and suite 1 is the only group there is",
     "tree.leafCount > 0":
         "an empty tree has no GroupInfo signer, which is refused first",
 }

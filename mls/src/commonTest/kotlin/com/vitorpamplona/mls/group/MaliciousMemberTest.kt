@@ -344,8 +344,8 @@ class MaliciousMemberTest {
             Case("an add that reuses a member's encryption key", "Duplicate encryption key: leaf 1 already uses it") { w ->
                 add(w, keyPackage(leaf = { it.copy(encryptionKey = leafOf(w, w.bob).encryptionKey) }))
             },
-            Case("an add of a key package for another protocol version", "version") { w -> add(w, keyPackage(edit = { it.copy(version = 2) })) },
-            Case("an add of a key package for another suite", "ciphersuite") { w -> add(w, keyPackage(edit = { it.copy(cipherSuite = 2) })) },
+            Case("an add of a key package for another protocol version", "Unsupported MLS version: 2") { w -> add(w, keyPackage(edit = { it.copy(version = 2) })) },
+            Case("an add of a key package for another suite", "Unsupported ciphersuite: 2") { w -> add(w, keyPackage(edit = { it.copy(cipherSuite = 2) })) },
             Case("an add whose init key is its encryption key", "init_key equals") { w -> add(w, keyPackage(edit = { it.copy(initKey = it.leafNode.encryptionKey) })) },
             Case("an add of a member already in the group", "Duplicate signature key") { w ->
                 val bobsKey =
