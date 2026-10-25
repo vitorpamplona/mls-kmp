@@ -76,10 +76,13 @@ UNREACHABLE = {
     "proposals.count { (it.proposal as? Proposal.Psk)?.psk.let":
         "only a new group's first commit may carry a reinit/branch PSK, no receiver validates that commit, "
         "and its creator drops a PSK it cannot resolve before building it",
-    "pubMsg.groupId.contentEquals(groupId)":
-        "processPublicCommit checks it early for a clear error; processCommit checks the same again",
-    "pubMsg.epoch == epoch":
-        "processPublicCommit checks it early for a clear error; processCommit checks the same again",
+    # Every entry point checks the envelope's group and epoch, and applyCommit
+    # checks them again: either copy alone refuses the same input.
+    "pubMsg.groupId.contentEquals(groupId)": "applyCommit checks the same again",
+    "pubMsg.epoch == epoch": "applyCommit checks the same again",
+    "content.groupId.contentEquals(groupId)": "every entry point checks it before applyCommit",
+    "content.epoch == epoch": "every entry point checks it before applyCommit",
+    "content.contentType == ContentType.COMMIT": "every caller routes by content type before applyCommit",
     "tree.leafCount > 0":
         "an empty tree has no GroupInfo signer, which is refused first",
 }

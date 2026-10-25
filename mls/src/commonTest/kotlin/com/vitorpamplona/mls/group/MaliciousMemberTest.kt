@@ -215,6 +215,7 @@ class MaliciousMemberTest {
             Case("wrong epoch", "epoch") { w -> forge(w.alice, inline(), epoch = w.alice.epoch + 1) },
             Case("wrong group", "group") { w -> forge(w.alice, inline(), groupId = ByteArray(32) { 1 }) },
             Case("bad membership tag", "membership_tag", viewRefuses = false) { w -> forge(w.alice, inline(), membershipTag = ByteArray(32) { 7 }) },
+            Case("no confirmation tag", "Confirmation tag missing") { w -> forge(w.alice, inline(), confirmationTag = ByteArray(0)) },
             Case("bad confirmation tag", "Confirmation tag", viewRefuses = false) { w -> honestButTagged(w) { t -> t.copyOf().also { it[0] = (it[0].toInt() xor 1).toByte() } } },
             Case("remove without a path", "required UpdatePath") { w -> forge(w.alice, inline(Proposal.Remove(w.carol.leafIndex))) },
             Case("empty commit without a path", "required UpdatePath") { w -> forge(w.alice, inline()) },
