@@ -206,6 +206,11 @@ must follow epoch by epoch. CI runs all three, and also has mls-kmp join
 ts-mls groups by external commit from ts-mls GroupInfos
 (`tools/tsmls-vector-gen/external-join.mjs`), with ts-mls then following
 mls-kmp's commits and messages.
+Live interop goes through the mlswg test-runner: `interop-client/` is the gRPC
+client it drives, and the nightly runs it alone and against OpenMLS's
+([interop-client/README.md](interop-client/README.md)). CI also has mls-rs
+write fresh passive-client vectors and mls-kmp replay them
+(`ForeignPassiveClientVectorsTest`).
 `MdkWelcomeInteropTest` and `TsMlsWelcomeInteropTest` join groups created by
 OpenMLS (via MDK) and ts-mls, and `TsMlsExternalJoinInteropTest` joins
 ts-mls groups by external commit. `group/MlsGroupPolicySeamTest` pins the policy seam

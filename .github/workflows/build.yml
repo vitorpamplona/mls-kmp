@@ -46,7 +46,7 @@ jobs:
         run: ./gradlew checkKotlinAbi
 
       - name: Check JVM
-        run: ./gradlew jvmTest
+        run: ./gradlew jvmTest :interop-client:test
 
       - name: Check Android (host)
         if: matrix.os == 'ubuntu-latest'
@@ -119,6 +119,19 @@ jobs:
 
       - name: mls-rs replays them
         run: tools/mlsrs-verifier/run.sh $RUNNER_TEMP/mls-kmp-passive.json
+
+      # The other direction with fresh randomness: mls-rs regenerates its own
+      # welcome, handle-commit and random passive-client suites (it writes them
+      # when the files are missing, and checks itself against them), and
+      # mls-kmp replays them.
+      - name: mls-rs writes fresh vectors, mls-kmp replays them
+        run: |
+          d=tools/mlsrs-verifier/build/mls-rs-0.56.0
+          rm -f $d/mls-rs/test_data/interop_passive_client_*.json
+          (cd $d && cargo test -p mls-rs --lib --features test_util interop_passive_client)
+          v=$d/mls-rs/test_data/interop_passive_client
+          MLSKMP_FOREIGN_PASSIVE_VECTORS=$PWD/${v}_welcome.json:$PWD/${v}_handle_commit.json:$PWD/${v}_random.json \
+            ./gradlew :mls:jvmTest --rerun --tests com.vitorpamplona.mls.ForeignPassiveClientVectorsTest
 
   # The bindings built on this engine, run against THIS checkout: a change that
   # breaks Marmot or cordn shows up here, before a release does. Non-blocking
