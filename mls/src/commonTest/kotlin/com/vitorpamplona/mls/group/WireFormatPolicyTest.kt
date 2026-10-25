@@ -123,4 +123,14 @@ class WireFormatPolicyTest {
         assertFailsWith<IllegalArgumentException> { WireFormatPolicy(WireFormat.PUBLIC_MESSAGE, WireFormatPolicy.Incoming.PRIVATE_ONLY) }
         assertFailsWith<IllegalArgumentException> { WireFormatPolicy(WireFormat.WELCOME, WireFormatPolicy.Incoming.MIXED) }
     }
+
+    @Test
+    fun decryptOnlyOpensPrivateMessages() {
+        val (alice, bob) = pair(MlsGroupPolicy.Permissive.wireFormatPolicy)
+        val public = alice.stageCommit().framedCommitBytes
+        for (open in listOf(bob::decrypt, bob::decryptFormerEpoch)) {
+            val error = assertFailsWith<IllegalArgumentException> { open(public) }
+            assertEquals("Expected PrivateMessage", error.message)
+        }
+    }
 }

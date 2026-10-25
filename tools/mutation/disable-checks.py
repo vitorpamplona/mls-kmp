@@ -7,7 +7,7 @@ validation-focused tests, and record whether they failed ("killed") or not
 ("survived": no test notices that check is gone). Restores every file
 afterwards, whatever happens.
 
-  tools/mutation/disable-checks.py [--limit N] [--report out.md]
+  tools/mutation/disable-checks.py [--limit N] [--report out.md] [--strict]
 
 Run it in a scratch worktree: it edits sources while it runs. A mutant that
 does not compile is reported as such, not as killed.
@@ -59,8 +59,30 @@ def requires(text, ranges):
         while i < len(text) and depth:
             depth += {"(": 1, ")": -1}.get(text[i], 0)
             i += 1
-        out.append((m.end(), i - 1))
+        end = i - 1
+        # ktlint leaves a trailing comma after a multi-line argument
+        while text[end - 1] in " \n,":
+            end -= 1
+        out.append((m.end(), end))
     return out
+
+
+# Checks no test can reach, by the start of their condition: each sits behind
+# an earlier check that refuses the same input first. They stay as defence in
+# depth; the report lists them apart from the survivors that need a test.
+UNREACHABLE = {
+    "p.senderType == SenderType.MEMBER && isLiveLeaf(p.senderLeafIndex)":
+        "Update and SelfRemove proposals are refused on receipt unless a live member sent them this epoch",
+    "proposals.count { (it.proposal as? Proposal.Psk)?.psk.let":
+        "only a new group's first commit may carry a reinit/branch PSK, no receiver validates that commit, "
+        "and its creator drops a PSK it cannot resolve before building it",
+    "tree.leafCount > 0":
+        "an empty tree has no GroupInfo signer, which is refused first",
+}
+
+
+def unreachable(cond):
+    return next((why for key, why in UNREACHABLE.items() if cond.startswith(key)), None)
 
 
 def run_tests():
@@ -78,6 +100,7 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--limit", type=int, default=0)
     ap.add_argument("--report", default=os.path.join(ROOT, "mutation-report.md"))
+    ap.add_argument("--strict", action="store_true", help="exit 1 if a check survives that is not listed as unreachable")
     args = ap.parse_args()
 
     mutants = []
@@ -105,16 +128,25 @@ def main():
         results.append((rel, line, cond, outcome))
         print(f"[{n}/{len(mutants)}] {outcome:>16}  {rel}:{line}  {cond}  ({time.time() - t:.0f}s)", flush=True)
 
+    killed = sum(r[3] == "killed" for r in results)
+    survived = [r for r in results if r[3] == "survived" and not unreachable(r[2])]
+    shadowed = [r for r in results if r[3] == "survived" and unreachable(r[2])]
+    broken = [r for r in results if r[3] == "does not compile"]
     with open(args.report, "w") as f:
-        killed = sum(r[3] == "killed" for r in results)
-        survived = [r for r in results if r[3] == "survived"]
         f.write(f"# Disabled-check mutants\n\n{killed} killed, {len(survived)} survived, "
-                f"{sum(r[3] == 'does not compile' for r in results)} did not compile, of {len(results)}.\n\n")
+                f"{len(shadowed)} unreachable, {len(broken)} did not compile, of {len(results)}.\n\n")
         f.write("## Survivors: checks no test notices\n\n")
         for rel, line, cond, _ in survived:
             f.write(f"- `{rel}:{line}` `require({cond})`\n")
+        f.write("\n## Unreachable: refused earlier by another check\n\n")
+        for rel, line, cond, _ in shadowed:
+            f.write(f"- `{rel}:{line}` `require({cond})`: {unreachable(cond)}\n")
+        if broken:
+            f.write("\n## Did not compile (the script could not disable these)\n\n")
+            for rel, line, cond, _ in broken:
+                f.write(f"- `{rel}:{line}` `require({cond})`\n")
     print(f"report: {args.report}")
-    sys.exit(0)
+    sys.exit(1 if args.strict and (survived or broken) else 0)
 
 
 if __name__ == "__main__":

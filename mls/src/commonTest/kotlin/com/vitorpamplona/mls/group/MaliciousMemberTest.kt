@@ -34,12 +34,20 @@ import com.vitorpamplona.mls.framing.SenderType
 import com.vitorpamplona.mls.framing.WireFormat
 import com.vitorpamplona.mls.framing.framedContent
 import com.vitorpamplona.mls.messages.Commit
+import com.vitorpamplona.mls.messages.MlsKeyPackage
 import com.vitorpamplona.mls.messages.PreSharedKeyId
 import com.vitorpamplona.mls.messages.Proposal
 import com.vitorpamplona.mls.messages.ProposalOrRef
 import com.vitorpamplona.mls.messages.UpdatePath
 import com.vitorpamplona.mls.toHexKey
+import com.vitorpamplona.mls.tree.Capabilities
+import com.vitorpamplona.mls.tree.Credential
+import com.vitorpamplona.mls.tree.LeafNode
+import com.vitorpamplona.mls.tree.LeafNodeSource
+import com.vitorpamplona.mls.tree.Lifetime
 import kotlin.test.Test
+import kotlin.test.assertContains
+import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 import kotlin.test.fail
 
@@ -61,14 +69,20 @@ class MaliciousMemberTest {
     ) {
         /** Who must refuse the commit; a case that removes someone first takes them off. */
         val receivers = mutableListOf("bob" to bob, "carol" to carol)
+
+        /** Proposals sent before the commit, which the view must see too. */
+        val sent = mutableListOf<ByteArray>()
     }
 
-    private fun bundle(name: String) = MlsGroup.createKeyPackage(name.encodeToByteArray())
+    private fun bundle(
+        name: String,
+        capabilities: Capabilities = Capabilities(),
+    ) = MlsGroup.createKeyPackage(name.encodeToByteArray(), capabilities = capabilities)
 
-    private fun world(): World {
-        val alice = MlsGroup.create("alice".encodeToByteArray())
-        val b = bundle("bob")
-        val c = bundle("carol")
+    private fun world(capabilities: Capabilities = Capabilities()): World {
+        val alice = MlsGroup.create("alice".encodeToByteArray(), capabilities = capabilities)
+        val b = bundle("bob", capabilities)
+        val c = bundle("carol", capabilities)
         val add = alice.addMembers(listOf(b.keyPackage.toTlsBytes(), c.keyPackage.toTlsBytes()))
         return World(alice, MlsGroup.processWelcome(add.welcomeBytes!!, b), MlsGroup.processWelcome(add.welcomeBytes!!, c))
     }
@@ -115,12 +129,81 @@ class MaliciousMemberTest {
         return MlsMessage.fromPublicMessage(pub.copy(confirmationTag = tag, membershipTag = membership)).toTlsBytes()
     }
 
+    /**
+     * dave's KeyPackage with [leaf] and [edit] applied, re-signed so only the
+     * edit is wrong ([resignLeaf] false keeps the leaf's old signature).
+     */
+    private fun keyPackage(
+        resignLeaf: Boolean = true,
+        leaf: (LeafNode) -> LeafNode = { it },
+        edit: (MlsKeyPackage) -> MlsKeyPackage = { it },
+    ): MlsKeyPackage {
+        val b = bundle("dave")
+        val edited = leaf(b.keyPackage.leafNode)
+        val signed = if (resignLeaf) edited.copy(signature = MlsCryptoProvider.signWithLabel(b.signaturePrivateKey, "LeafNodeTBS", edited.encodeTbs())) else edited
+        val kp = edit(b.keyPackage.copy(leafNode = signed))
+        return kp.copy(signature = MlsCryptoProvider.signWithLabel(b.signaturePrivateKey, "KeyPackageTBS", kp.encodeTbs()))
+    }
+
+    private fun add(
+        w: World,
+        kp: MlsKeyPackage,
+    ) = forge(w.alice, inline(Proposal.Add(kp)))
+
+    /** [from] sends [proposal] by reference and every other member stages it; returns its ref. */
+    private fun shared(
+        w: World,
+        from: MlsGroup,
+        proposal: Proposal,
+    ): ProposalOrRef {
+        val message = from.proposalMessage(proposal).also { w.sent += it }
+        for (g in listOf(w.alice, w.bob, w.carol)) if (g !== from) g.processMessage(message)
+        return ProposalOrRef.Reference(
+            w.alice
+                .pendingProposalsSnapshot()
+                .last()
+                .proposalRef!!,
+        )
+    }
+
+    /** dave's honest external commit, its proposal list replaced by [edit] and re-signed by dave. */
+    private fun forgeExternal(
+        w: World,
+        edit: (List<ProposalOrRef>) -> List<ProposalOrRef>,
+    ): ByteArray {
+        val joined = MlsGroup.externalJoin(w.alice.groupInfoMessage(), "dave".encodeToByteArray())
+        val pub = PublicMessage.decodeTls(TlsReader(MlsMessage.decodeTls(TlsReader(joined.framedCommitBytes)).payload))
+        val honest = Commit.decodeTls(TlsReader(pub.content))
+        val content = FramedContent(pub.groupId, pub.epoch, pub.sender, pub.authenticatedData, ContentType.COMMIT, Commit(edit(honest.proposals), honest.updatePath).toTlsBytes())
+        val signature =
+            Framing.sign(
+                joined.group.saveState().signingPrivateKey,
+                WireFormat.PUBLIC_MESSAGE,
+                content,
+                w.alice
+                    .saveState()
+                    .groupContext
+                    .toTlsBytes(),
+            )
+        return MlsMessage.fromPublicMessage(Framing.publicMessage(content, signature, pub.confirmationTag, null)).toTlsBytes()
+    }
+
+    private fun leafOf(
+        w: World,
+        g: MlsGroup,
+    ) = w.alice
+        .members()
+        .first { it.first == g.leafIndex }
+        .second
+
     private class Case(
         val name: String,
         /** A substring of the refusal: proves the intended rule caught it. */
         val reason: String,
         /** False for the checks only a member can make (membership and confirmation tags). */
         val viewRefuses: Boolean = true,
+        /** The members' leaf capabilities, for a case that needs them to support more. */
+        val capabilities: Capabilities = Capabilities(),
         val build: (World) -> ByteArray,
     )
 
@@ -146,6 +229,33 @@ class MaliciousMemberTest {
             },
             Case("two removes of one leaf", "Multiple Update/Remove") { w -> forge(w.alice, inline(Proposal.Remove(w.carol.leafIndex), Proposal.Remove(w.carol.leafIndex))) },
             Case("the committer's own update", "committer's own Update") { w -> forge(w.alice, inline(w.alice.proposeSigningKeyRotation())) },
+            Case("two updates from one member", "Multiple Update/Remove") { w ->
+                listOf(shared(w, w.bob, w.bob.proposeSigningKeyRotation()), shared(w, w.bob, w.bob.proposeSigningKeyRotation())).let { forge(w.alice, it) }
+            },
+            Case("an update and a remove of one member", "Multiple Update/Remove") { w ->
+                forge(w.alice, listOf(shared(w, w.bob, w.bob.proposeSigningKeyRotation())) + inline(Proposal.Remove(w.bob.leafIndex)))
+            },
+            Case("a self-remove and a remove of one member", "Multiple Update/Remove") { w ->
+                forge(w.alice, listOf(shared(w, w.bob, Proposal.SelfRemove())) + inline(Proposal.Remove(w.bob.leafIndex)))
+            },
+            Case("the committer's own self-remove", "its own SelfRemove") { w -> forge(w.alice, inline(Proposal.SelfRemove())) },
+            Case("an external commit without an external init", "exactly one ExternalInit") { w -> forgeExternal(w) { p -> p.filterNot { (it as? ProposalOrRef.Inline)?.proposal is Proposal.ExternalInit } } },
+            Case("an external commit with two external inits", "exactly one ExternalInit") { w -> forgeExternal(w) { p -> p + p } },
+            Case("an external commit that removes two members", "at most one leaf") { w -> forgeExternal(w) { p -> p + inline(Proposal.Remove(w.bob.leafIndex), Proposal.Remove(w.carol.leafIndex)) } },
+            Case("an external commit that adds someone", "only ExternalInit, Remove and PreSharedKey") { w -> forgeExternal(w) { p -> p + inline(Proposal.Add(bundle("erin").keyPackage)) } },
+            Case("group context extensions no member supports", "Unsupported extension type") { w ->
+                forge(
+                    w.alice,
+                    inline(
+                        Proposal.GroupContextExtensions(
+                            listOf(
+                                com.vitorpamplona.mls.tree
+                                    .Extension(0xF0F2, ByteArray(1)),
+                            ),
+                        ),
+                    ),
+                )
+            },
             Case("two group context extensions", "Multiple GroupContextExtensions") { w -> forge(w.alice, inline(Proposal.GroupContextExtensions(emptyList()), Proposal.GroupContextExtensions(emptyList()))) },
             Case("reinit with other proposals", "ReInit proposal must be committed alone") { w -> forge(w.alice, inline(Proposal.ReInit(ByteArray(32), 1, 1, emptyList()), Proposal.Remove(w.carol.leafIndex))) },
             Case("external init in a member commit", "Only an external commit") { w -> forge(w.alice, inline(Proposal.ExternalInit(ByteArray(32)))) },
@@ -154,6 +264,37 @@ class MaliciousMemberTest {
                 val kp = bundle("dave").keyPackage
                 forge(w.alice, inline(Proposal.Add(kp.copy(signature = kp.signature.copyOf().also { it[0] = (it[0] + 1).toByte() }))))
             },
+            Case("an add whose leaf is not a key_package leaf", "leaf_node_source") { w ->
+                add(w, keyPackage(resignLeaf = false, leaf = { it.copy(leafNodeSource = LeafNodeSource.UPDATE, lifetime = null) }))
+            },
+            Case("an add whose leaf signature is forged", "Invalid LeafNode signature") { w ->
+                add(w, keyPackage(resignLeaf = false, leaf = { it.copy(signature = it.signature.copyOf().also { s -> s[0] = (s[0] + 1).toByte() }) }))
+            },
+            Case("an add whose leaf does not support MLS 1.0", "protocol version") { w ->
+                add(w, keyPackage(leaf = { it.copy(capabilities = it.capabilities.copy(versions = listOf(2))) }))
+            },
+            Case("an add whose leaf does not support the group's suite", "ciphersuite 0x0001") { w ->
+                add(w, keyPackage(leaf = { it.copy(capabilities = it.capabilities.copy(ciphersuites = listOf(2))) }))
+            },
+            Case("an add whose leaf does not support its own credential", "its own credential type") { w ->
+                add(w, keyPackage(leaf = { it.copy(capabilities = it.capabilities.copy(credentials = emptyList())) }))
+            },
+            Case("an add with a credential the members do not support", "does not support credential type") { w ->
+                add(w, keyPackage(leaf = { it.copy(credential = Credential.Custom(OTHER_CREDENTIAL, ByteArray(4)), capabilities = it.capabilities.copy(credentials = listOf(1, OTHER_CREDENTIAL))) }))
+            },
+            Case(
+                "an add that does not support the members' credential",
+                "used by leaf",
+                capabilities = Capabilities(credentials = listOf(1, OTHER_CREDENTIAL)),
+            ) { w ->
+                add(w, keyPackage(leaf = { it.copy(credential = Credential.Custom(OTHER_CREDENTIAL, ByteArray(4)), capabilities = it.capabilities.copy(credentials = listOf(OTHER_CREDENTIAL))) }))
+            },
+            Case("an add that reuses a member's encryption key", "Duplicate encryption key") { w ->
+                add(w, keyPackage(leaf = { it.copy(encryptionKey = leafOf(w, w.bob).encryptionKey) }))
+            },
+            Case("an add of a key package for another protocol version", "version") { w -> add(w, keyPackage(edit = { it.copy(version = 2) })) },
+            Case("an add of a key package for another suite", "ciphersuite") { w -> add(w, keyPackage(edit = { it.copy(cipherSuite = 2) })) },
+            Case("an add whose init key is its encryption key", "init_key equals") { w -> add(w, keyPackage(edit = { it.copy(initKey = it.leafNode.encryptionKey) })) },
             Case("an add of a member already in the group", "Duplicate signature key") { w ->
                 val bobsKey =
                     Ed25519KeyPair(
@@ -176,6 +317,11 @@ class MaliciousMemberTest {
                 val psk = Proposal.Psk(PreSharedKeyId.External("x".encodeToByteArray(), ByteArray(32)))
                 forge(w.alice, inline(psk, psk))
             },
+            Case("a branch psk outside a new group's first commit", "new group's first commit") { w ->
+                forge(w.alice, inline(Proposal.Psk(PreSharedKeyId.Resumption(PreSharedKeyId.USAGE_BRANCH, w.alice.groupId, 0, ByteArray(32)))))
+            },
+            Case("a reinit to an older protocol version", "older protocol version") { w -> forge(w.alice, inline(Proposal.ReInit(ByteArray(32), 0, 1, emptyList()))) },
+            Case("a grease proposal", "GREASE proposal type") { w -> forge(w.alice, inline(Proposal.Custom(0x0A0A, ByteArray(1)))) },
             Case("a reference to an unknown proposal", "unknown proposal") { w -> forge(w.alice, listOf(ProposalOrRef.Reference(ByteArray(32) { 9 }))) },
             Case("a tampered update path", "Parent hash verification failed") { w ->
                 val honest = w.alice.stageCommit().also { w.alice.clearPendingCommit() }
@@ -203,7 +349,7 @@ class MaliciousMemberTest {
     fun everyMemberAndTheViewRefuseEveryViolation() {
         val problems = mutableListOf<String>()
         for (case in cases) {
-            val w = world()
+            val w = world(case.capabilities)
             val commit = case.build(w)
             for ((who, group) in w.receivers) {
                 val before = group.fingerprint()
@@ -216,6 +362,7 @@ class MaliciousMemberTest {
                 }
             }
             val view = PublicGroup.fromGroupInfo(w.alice.groupInfoMessage())
+            for (m in w.sent) view.processMessage(m)
             val before = view.saveState().encodeTls().toHexKey()
             val error = runCatching { view.processMessage(commit) }.exceptionOrNull()
             if (case.viewRefuses) {
@@ -229,6 +376,20 @@ class MaliciousMemberTest {
         if (problems.isNotEmpty()) fail(problems.joinToString("\n"))
     }
 
+    /** Receivers no longer check an Add's lifetime (an old commit stays valid); its committer does. */
+    @Test
+    fun theCommitterRefusesAnExpiredKeyPackage() {
+        val alice = MlsGroup.create("alice".encodeToByteArray())
+        val expired = MlsGroup.createKeyPackage("dave".encodeToByteArray(), lifetime = Lifetime(0, 1))
+        val error = assertFailsWith<IllegalArgumentException> { alice.proposeAdd(expired.keyPackage.toTlsBytes()) }
+        assertContains(error.message.orEmpty(), "lifetime")
+    }
+
     @Test
     fun theCaseNamesAreUnique() = assertTrue(cases.map { it.name }.toSet().size == cases.size)
+
+    private companion object {
+        /** A credential type no default leaf lists. */
+        const val OTHER_CREDENTIAL = 0xF0F1
+    }
 }

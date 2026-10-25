@@ -53,7 +53,7 @@ jobs:
         run: ./gradlew :mls:jvmTest --tests com.vitorpamplona.mls.group.*
 
       - name: Disable each validation check in turn
-        run: python3 tools/mutation/disable-checks.py --report mutation-report.md
+        run: python3 tools/mutation/disable-checks.py --strict --report mutation-report.md
 
       - name: Report
         if: always()
