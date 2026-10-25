@@ -314,6 +314,21 @@ data class PassiveClientVector(
     @SerialName("ratchet_tree") val ratchetTree: String? = null,
     @SerialName("initial_epoch_authenticator") val initialEpochAuthenticator: String,
     val epochs: List<PassiveClientEpoch> = emptyList(),
+    /** mls-kmp extension: after the last epoch, join this ReInit/branch successor group. */
+    val successor: PassiveClientSuccessor? = null,
+)
+
+/** A successor group (RFC 9420 §11) the passive member joins once the epochs are done. */
+@Serializable
+data class PassiveClientSuccessor(
+    /** "reinit" or "branch". */
+    val usage: String,
+    @SerialName("key_package") val keyPackage: String,
+    @SerialName("signature_priv") val signaturePriv: String,
+    @SerialName("encryption_priv") val encryptionPriv: String,
+    @SerialName("init_priv") val initPriv: String,
+    val welcome: String,
+    @SerialName("epoch_authenticator") val epochAuthenticator: String,
 )
 
 @Serializable

@@ -81,6 +81,19 @@ MlsGroup.externalJoin(groupInfo, identity,
 joiners; `commit(includeRatchetTreeInWelcome = false)` leaves the tree out of
 Welcomes for applications that deliver it separately.
 
+### ReInit and branches
+
+```kotlin
+group.proposeReInit(newGroupId = id, newExtensions = exts); group.commit()
+val next = group.reinit(otherMembersKeyPackages)       // RFC 9420 §11.2
+val sub  = group.branch(someMembersKeyPackages)         // RFC 9420 §11.3
+MlsGroup.joinSuccessor(next.commit.welcomeBytes!!, myNewBundle, predecessor = group)
+```
+
+The successor's first commit carries the predecessor's resumption PSK, and
+`joinSuccessor` checks that the new group is what the ReInit asked for (or,
+for a branch, only holds members of the predecessor).
+
 ### Validation
 
 Every LeafNode, KeyPackage, proposal list, UpdatePath and joined tree is held
@@ -101,7 +114,9 @@ the spec defers to the application:
 | `authorizeCommit` | `commit()` and both inbound commit paths | MIP-03 proposal-set rules + admin depletion |
 | `authorizeSelfRemove` | `proposeSelfRemove`, `buildSelfRemoveProposalMessage` | admin must self-demote first |
 | `authorizeProposal` | every standalone proposal received | — |
+| `authorizeExternalCommit` | every inbound external commit | — |
 | `validateCredential` | every LeafNode validated | — |
+| `validateCredentialSuccession` | every replaced leaf (Update, UpdatePath, resync) | — (default: same type and Basic identity) |
 | `validateJoin` | `processWelcome` | `required_member_roles` on the agent-text-stream component |
 | `defaultLeafCapabilities` | every leaf the engine builds | `0xF2EE` + `self_remove` |
 | `defaultRequiredCapabilities` | `create()`, epoch 0 | the MIP-era interop set |
@@ -152,13 +167,18 @@ together.
   resumption PSKs work.
 - **External commits** are signed by the joiner with sender `new_member_commit`
   and start from the GroupInfo's transcript; receivers verify that signature.
+  The joiner's init secret uses HPKE `Export` as RFC 9180 defines it (the
+  exporter context was hashed first), and `external_pub` is an `opaque<V>`
+  key (it was the bare key), so external joins work across implementations.
 - **Lifetimes** are compared as the uint64s they are: a `not_after` of 2^64-1
   used to read as expired.
 - `commit()` folds our own Update into the UpdatePath instead of committing it
   (§12.2 forbids that), and refuses to commit our own SelfRemove.
 - Standalone proposals of every type are accepted, not only SelfRemove — see
   `authorizeProposal` above.
-- `MlsGroupState` is at version 8; older blobs still restore.
+- Default extensions are checked for placement, structure and duplicates:
+  `application_id` belongs in a LeafNode, not the GroupContext.
+- `MlsGroupState` is at version 9; older blobs still restore.
 
 ## Crypto
 
@@ -181,6 +201,13 @@ JVM/Android-only suites. `interop/` replays the RFC 9420 test vectors from
 passive-client vectors end to end through `MlsGroup` (joining, every commit
 shape, a 200-epoch random run), plus TreeKEM, message protection, tree
 validation, PSK secrets and the rest.
+
+The other direction is covered too: `MlsKmpAuthoredVectors` has mls-kmp
+members run a group through every epoch change — commits of every shape,
+proposals by reference, external joins and resyncs, PSKs, ReInit and branch
+successors — and records it as passive-client vectors, which ts-mls
+(`tools/tsmls-vector-gen/verify-passive-client.mjs`) and OpenMLS
+(`tools/openmls-verifier/run.sh`) must follow epoch by epoch. CI runs both.
 `MdkWelcomeInteropTest` and `TsMlsWelcomeInteropTest` join groups created by
 OpenMLS (via MDK) and ts-mls. `group/MlsGroupPolicySeamTest` pins the policy seam
 itself with a recording policy.

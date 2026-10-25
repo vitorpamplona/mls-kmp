@@ -271,10 +271,48 @@ internal object MlsKmpAuthoredVectors {
         return finish()
     }
 
+    /**
+     * A few epochs, then a ReInit (or nothing, for a branch), then the
+     * successor group the passive member joins with a fresh KeyPackage.
+     */
+    private fun successor(usage: String): PassiveClientVector {
+        val (s, _, finish) = start("mls-kmp: $usage successor group", includeTreeInWelcome = true)
+        val alice = s.member("alice")
+        val bob = s.member("bob")
+        s.commit(bob)
+        s.propose(bob, bob.proposalMessage(bob.proposeSigningKeyRotation()))
+        s.commit(alice)
+        if (usage == "reinit") {
+            s.commit(alice) { it.apply { proposeReInit(newGroupId = "mls-kmp reinit".encodeToByteArray(), newExtensions = it.extensions) }.commit() }
+        }
+        val passive = s.keyPackage("passive")
+        val others = s.members.filter { it !== alice && (usage == "reinit" || it === bob) }.map { it to s.keyPackage(it.memberName()) }
+        val packages = listOf(passive.keyPackage.toTlsBytes()) + others.map { it.second.keyPackage.toTlsBytes() }
+        val result = if (usage == "reinit") alice.reinit(packages) else alice.branch(packages)
+        // The other members follow too, so the scenario is the real thing.
+        for ((member, kp) in others) MlsGroup.joinSuccessor(result.commit.welcomeBytes!!, kp, predecessor = member)
+        return finish().copy(
+            successor =
+                PassiveClientSuccessor(
+                    usage = usage,
+                    keyPackage = MlsMessage(wireFormat = WireFormat.KEY_PACKAGE, payload = passive.keyPackage.toTlsBytes()).toTlsBytes().toHexKey(),
+                    signaturePriv = passive.signaturePrivateKey.copyOf(32).toHexKey(),
+                    encryptionPriv = passive.encryptionPrivateKey.toHexKey(),
+                    initPriv = passive.initPrivateKey.toHexKey(),
+                    welcome = result.commit.welcomeBytes!!.toHexKey(),
+                    epochAuthenticator = result.group.epochAuthenticator.toHexKey(),
+                ),
+        )
+    }
+
+    private fun MlsGroup.memberName(): String = (members().first { it.first == leafIndex }.second.credential as com.vitorpamplona.mls.tree.Credential.Basic).identity.decodeToString()
+
     fun generate(): List<PassiveClientVector> =
         listOf(
             scripted(includeTreeInWelcome = true),
             scripted(includeTreeInWelcome = false),
             random(seed = 9420, epochs = 60),
+            successor("reinit"),
+            successor("branch"),
         )
 }

@@ -451,4 +451,59 @@ class RfcFlowsTest {
         assertFailsWith<IllegalStateException> { alice.processFramedCommit(join.framedCommitBytes) }
         assertEquals(0L, alice.epoch)
     }
+
+    @Test
+    fun reinitMovesEveryMemberToTheSuccessorGroup() {
+        val t = trio()
+        val newId = ByteArray(32) { 42 }
+        t.alice.proposeReInit(newGroupId = newId, newExtensions = listOf(requiredBasicCredentials()))
+        t.alice.commit().also {
+            t.bob.processFramedCommit(it.framedCommitBytes)
+            t.carol.processFramedCommit(it.framedCommitBytes)
+        }
+        assertFailsWith<IllegalStateException> { t.alice.encrypt("old group".encodeToByteArray()) }
+
+        val bobKp = t.bob.createKeyPackage("bob".encodeToByteArray(), ByteArray(0))
+        val carolKp = t.carol.createKeyPackage("carol".encodeToByteArray(), ByteArray(0))
+        val successor = t.alice.reinit(listOf(bobKp.keyPackage.toTlsBytes(), carolKp.keyPackage.toTlsBytes()))
+        val bob = MlsGroup.joinSuccessor(successor.commit.welcomeBytes!!, bobKp, predecessor = t.bob)
+        val carol = MlsGroup.joinSuccessor(successor.commit.welcomeBytes!!, carolKp, predecessor = t.carol)
+
+        assertContentEquals(newId, bob.groupId)
+        assertEquals(1L, bob.epoch)
+        assertSameEpoch(successor.group, bob, carol)
+        assertTalk(bob, carol)
+        assertTalk(successor.group, bob)
+    }
+
+    @Test
+    fun aSuccessorMustMatchItsPredecessor() {
+        val t = trio()
+        // No ReInit was committed, so a "reinit" Welcome has nothing to resume.
+        val bobKp = t.bob.createKeyPackage("bob".encodeToByteArray(), ByteArray(0))
+        val branch = t.alice.branch(listOf(bobKp.keyPackage.toTlsBytes()))
+        // A branch joined as a member of an unrelated group is refused.
+        val stranger = MlsGroup.create("bob".encodeToByteArray())
+        assertFailsWith<Exception> { MlsGroup.joinSuccessor(branch.commit.welcomeBytes!!, bobKp, predecessor = stranger) }
+
+        // A branch that adds someone who was never a member is refused by members.
+        val dave = keyPackage("dave")
+        val bobKp2 = t.bob.createKeyPackage("bob".encodeToByteArray(), ByteArray(0))
+        val widened = t.alice.branch(listOf(bobKp2.keyPackage.toTlsBytes(), dave.keyPackage.toTlsBytes()))
+        val error = assertFailsWith<IllegalArgumentException> { MlsGroup.joinSuccessor(widened.commit.welcomeBytes!!, bobKp2, predecessor = t.bob) }
+        assertTrue(error.message!!.contains("only hold members"))
+    }
+
+    @Test
+    fun aBranchLeavesItsPredecessorRunning() {
+        val t = trio()
+        val bobKp = t.bob.createKeyPackage("bob".encodeToByteArray(), ByteArray(0))
+        val branch = t.alice.branch(listOf(bobKp.keyPackage.toTlsBytes()))
+        val bob = MlsGroup.joinSuccessor(branch.commit.welcomeBytes!!, bobKp, predecessor = t.bob)
+        assertSameEpoch(branch.group, bob)
+        assertEquals(2, bob.memberCount)
+        assertTalk(bob, branch.group)
+        // The original group is untouched.
+        assertTalk(t.carol, t.alice)
+    }
 }

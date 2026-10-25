@@ -24,6 +24,8 @@ import {
   defaultPaddingConfig,
   getCiphersuiteImpl,
   joinGroup,
+  joinGroupFromBranch,
+  joinGroupFromReinit,
   keyPackageDecoder,
   mlsMessageDecoder,
   processMessage,
@@ -93,6 +95,28 @@ async function run(v) {
     if (toHex(state.keySchedule.epochAuthenticator) !== epoch.epoch_authenticator) {
       return `epoch ${i} of ${v.epochs.length}: epoch_authenticator mismatch`;
     }
+  }
+
+  // mls-kmp extension: join the ReInit or branch successor group (RFC 9420 §11).
+  const next = v.successor;
+  if (next) {
+    const nextKp = decode(mlsMessageDecoder, hexToBytes(next.key_package)).keyPackage;
+    const privateKeyPackage = {
+      initPrivateKey: hexToBytes(next.init_priv),
+      hpkePrivateKey: hexToBytes(next.encryption_priv),
+      signaturePrivateKey: pkcs8(hexToBytes(next.signature_priv)),
+    };
+    const nextWelcome = decode(mlsMessageDecoder, hexToBytes(next.welcome)).welcome;
+    let joined;
+    try {
+      joined =
+        next.usage === "reinit"
+          ? await joinGroupFromReinit({ context, suspendedState: state, welcome: nextWelcome, keyPackage: nextKp, privateKeyPackage })
+          : await joinGroupFromBranch({ context, oldState: state, welcome: nextWelcome, keyPackage: nextKp, privateKeyPackage });
+    } catch (e) {
+      return `${next.usage} successor: ${e?.message ?? e}`;
+    }
+    if (toHex(joined.keySchedule.epochAuthenticator) !== next.epoch_authenticator) return `${next.usage} successor: epoch_authenticator mismatch`;
   }
   return null;
 }

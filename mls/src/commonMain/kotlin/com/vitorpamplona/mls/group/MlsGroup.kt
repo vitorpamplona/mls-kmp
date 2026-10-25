@@ -941,6 +941,114 @@ class MlsGroup private constructor(
         return proposal
     }
 
+    // --- Successor groups (RFC 9420 §11) ---
+
+    /** What creating a successor group produced: the new group, and the commit that took it to epoch 1. */
+    class SuccessorGroup(
+        val group: MlsGroup,
+        val commit: CommitResult,
+    )
+
+    /**
+     * Create the group a committed ReInit asks for (RFC 9420 §11.2), adding
+     * the members whose [keyPackages] are given — every other member of this
+     * group, in the new group's version and ciphersuite. Members join it with
+     * [joinSuccessor] on [CommitResult.welcomeBytes].
+     *
+     * The new group's first commit carries this group's final resumption PSK
+     * with usage `reinit`, which ties the two groups' key schedules together.
+     */
+    fun reinit(
+        keyPackages: List<ByteArray>,
+        includeRatchetTreeInWelcome: Boolean = true,
+    ): SuccessorGroup {
+        val reinit = checkNotNull(reInitPending) { "No ReInit has been committed in this group" }
+        require(reinit.version == GroupValidation.MLS_VERSION && reinit.cipherSuite == GroupValidation.CIPHER_SUITE) {
+            "This engine implements only MLS 1.0 with ciphersuite 0x0001"
+        }
+        return createSuccessor(reinit.groupId, reinit.extensions, PreSharedKeyId.USAGE_REINIT, keyPackages, includeRatchetTreeInWelcome)
+    }
+
+    /**
+     * Branch a new group off this one (RFC 9420 §11.3) with a subset of its
+     * members, whose [keyPackages] are given. This group carries on unchanged.
+     */
+    fun branch(
+        keyPackages: List<ByteArray>,
+        newGroupId: ByteArray = MlsCryptoProvider.randomBytes(32),
+        extensions: List<Extension> = groupContext.extensions,
+        includeRatchetTreeInWelcome: Boolean = true,
+    ): SuccessorGroup = createSuccessor(newGroupId, extensions, PreSharedKeyId.USAGE_BRANCH, keyPackages, includeRatchetTreeInWelcome)
+
+    private fun createSuccessor(
+        newGroupId: ByteArray,
+        extensions: List<Extension>,
+        usage: Int,
+        keyPackages: List<ByteArray>,
+        includeRatchetTreeInWelcome: Boolean,
+    ): SuccessorGroup {
+        val myLeaf = checkNotNull(tree.getLeaf(myLeafIndex)) { "Not a member of this group" }
+        val identity = (myLeaf.credential as? Credential.Basic)?.identity ?: throw IllegalStateException("Successor groups need a BasicCredential leaf")
+        val successor =
+            create(
+                identity = identity,
+                signingKey = signingPrivateKey,
+                initialExtensions = extensions,
+                leafExtensions = myLeaf.extensions,
+                policy = policy,
+                capabilities = myLeaf.capabilities,
+                requiredCapabilities = null,
+                groupId = newGroupId,
+            )
+        successor.pskStore[PreSharedKeyId.Resumption(PreSharedKeyId.USAGE_APPLICATION, groupId, epoch, ByteArray(0)).identityKey()] = epochSecrets.resumptionPsk
+        successor.pendingProposals.add(
+            PendingProposal(
+                Proposal.Psk(PreSharedKeyId.Resumption(usage, groupId, epoch, MlsCryptoProvider.randomBytes(MlsCryptoProvider.HASH_OUTPUT_LENGTH))),
+                successor.myLeafIndex,
+            ),
+        )
+        keyPackages.forEach { successor.proposeAdd(it) }
+        val commit = successor.commit(includeRatchetTreeInWelcome = includeRatchetTreeInWelcome)
+        return SuccessorGroup(successor, commit)
+    }
+
+    /** The resumption PSK [id] names in THIS group, for a successor's Welcome. */
+    private fun predecessorResumptionPsk(id: PreSharedKeyId.Resumption): ByteArray? {
+        if (!id.pskGroupId.contentEquals(groupId)) return null
+        return if (id.pskEpoch == epoch) epochSecrets.resumptionPsk else resumptionPsks[id.pskEpoch]
+    }
+
+    /** RFC 9420 §12.4.3.1: the joined group is the successor its reinit/branch PSK says it is. */
+    private fun verifySuccessor(
+        newContext: GroupContext,
+        newTree: RatchetTree,
+        psks: List<PreSharedKeyId>,
+    ) {
+        val links = psks.filterIsInstance<PreSharedKeyId.Resumption>().filter { it.usage != PreSharedKeyId.USAGE_APPLICATION }
+        val link = links.singleOrNull() ?: throw IllegalArgumentException("The Welcome names no single reinit or branch PSK")
+        require(link.pskGroupId.contentEquals(groupId)) { "The Welcome resumes a different group" }
+
+        val oldMembers = members().map { it.second.credential }.toSet()
+        val newMembers = (0 until newTree.leafCount).mapNotNull { newTree.getLeaf(it)?.credential }.toSet()
+        when (link.usage) {
+            PreSharedKeyId.USAGE_REINIT -> {
+                val reinit = requireNotNull(reInitPending) { "The predecessor's last commit carried no ReInit" }
+                require(link.pskEpoch == epoch) { "A reinit PSK names the predecessor's final epoch" }
+                require(newContext.groupId.contentEquals(reinit.groupId)) { "The new group_id isn't the one ReInit asked for" }
+                require(newContext.version == reinit.version && newContext.cipherSuite == reinit.cipherSuite) { "The new version or ciphersuite isn't the one ReInit asked for" }
+                require(newContext.extensions == reinit.extensions) { "The new GroupContext extensions aren't the ones ReInit asked for" }
+                require(newMembers.containsAll(oldMembers)) { "A reinit group must keep every member of its predecessor" }
+            }
+
+            PreSharedKeyId.USAGE_BRANCH -> {
+                require(newContext.version == groupContext.version && newContext.cipherSuite == groupContext.cipherSuite) {
+                    "A branch keeps its predecessor's version and ciphersuite"
+                }
+                require(oldMembers.containsAll(newMembers)) { "A branch may only hold members of its predecessor" }
+            }
+        }
+    }
+
     // --- Commit ---
 
     /** A commit built by [stageCommit] that has not been merged or cleared yet. */
@@ -1442,8 +1550,14 @@ class MlsGroup private constructor(
                     require(pskIds.add(q.psk.identityKey())) { "Multiple PreSharedKey proposals for ${q.psk.identityKey()}" }
                     require(q.psk.pskNonce.size == MlsCryptoProvider.HASH_OUTPUT_LENGTH) { "psk_nonce must be KDF.Nh bytes" }
                     val psk = q.psk
-                    if (psk is PreSharedKeyId.Resumption) {
-                        require(psk.usage == PreSharedKeyId.USAGE_APPLICATION) { "A regular commit only takes resumption PSKs of usage application" }
+                    if (psk is PreSharedKeyId.Resumption && psk.usage != PreSharedKeyId.USAGE_APPLICATION) {
+                        // RFC 9420 §11: reinit and branch PSKs start a successor group.
+                        require(committer != null && groupContext.epoch == 0L) {
+                            "A resumption PSK of usage reinit or branch only appears in a new group's first commit"
+                        }
+                        require(proposals.count { (it.proposal as? Proposal.Psk)?.psk.let { r -> r is PreSharedKeyId.Resumption && r.usage != PreSharedKeyId.USAGE_APPLICATION } } == 1) {
+                            "A commit carries at most one reinit or branch PSK"
+                        }
                     }
                     requireNotNull(resolvePsk(q.psk)) { "PSK not available: ${q.psk.identityKey()}" }
                 }
@@ -3042,6 +3156,44 @@ class MlsGroup private constructor(
             policy: MlsGroupPolicy = MlsGroupPolicy.Permissive,
             ratchetTree: ByteArray? = null,
             psks: (PreSharedKeyId) -> ByteArray? = { null },
+        ): MlsGroup = joinFromWelcome(welcomeBytes, bundle, policy, ratchetTree, psks, successorOf = null)
+
+        /**
+         * Join the group a ReInit or a branch of [predecessor] created
+         * (RFC 9420 §11.2, §11.3), from its Welcome.
+         *
+         * Beyond [processWelcome]'s checks: the Welcome must name exactly one
+         * resumption PSK of usage `reinit` or `branch` from [predecessor] —
+         * which supplies it — and the new group must be what that usage
+         * promises. A reinit group has the group_id, version, ciphersuite and
+         * extensions [predecessor]'s committed ReInit asked for, and every
+         * member of [predecessor]; a branch keeps the version and ciphersuite
+         * and holds only members of [predecessor]. Members are compared by
+         * credential.
+         */
+        fun joinSuccessor(
+            welcomeBytes: ByteArray,
+            bundle: KeyPackageBundle,
+            predecessor: MlsGroup,
+            policy: MlsGroupPolicy = MlsGroupPolicy.Permissive,
+            ratchetTree: ByteArray? = null,
+        ): MlsGroup =
+            joinFromWelcome(
+                welcomeBytes,
+                bundle,
+                policy,
+                ratchetTree,
+                psks = { id -> (id as? PreSharedKeyId.Resumption)?.let { predecessor.predecessorResumptionPsk(it) } },
+                successorOf = predecessor,
+            )
+
+        private fun joinFromWelcome(
+            welcomeBytes: ByteArray,
+            bundle: KeyPackageBundle,
+            policy: MlsGroupPolicy,
+            ratchetTree: ByteArray?,
+            psks: (PreSharedKeyId) -> ByteArray?,
+            successorOf: MlsGroup?,
         ): MlsGroup {
             val mlsMsg = MlsMessage.decodeTls(TlsReader(welcomeBytes))
             require(mlsMsg.wireFormat == WireFormat.WELCOME) { "Expected Welcome message" }
@@ -3123,6 +3275,7 @@ class MlsGroup private constructor(
             if (groupSecrets.psks.any { it is PreSharedKeyId.Resumption && it.usage != PreSharedKeyId.USAGE_APPLICATION }) {
                 require(groupContext.epoch == 1L) { "A ReInit/branch Welcome must start the group at epoch 1" }
             }
+            successorOf?.verifySuccessor(groupContext, tree, groupSecrets.psks)
 
             val epochSecrets = KeySchedule(groupContext.toTlsBytes()).fromJoinerSecret(groupSecrets.joinerSecret, pskSecret)
 

@@ -115,6 +115,25 @@ internal object PassiveClientRunner {
             }
             if (group.epochAuthenticator.toHexKey() != epoch.epochAuthenticator) return "epoch $i of ${v.epochs.size}: epoch_authenticator mismatch"
         }
+        val successor = v.successor ?: return null
+        val successorKp = MlsKeyPackage.decodeTls(TlsReader(MlsMessage.decodeTls(TlsReader(successor.keyPackage.hexToByteArray())).payload))
+        val joined =
+            try {
+                MlsGroup.joinSuccessor(
+                    welcomeBytes = successor.welcome.hexToByteArray(),
+                    bundle =
+                        KeyPackageBundle(
+                            keyPackage = successorKp,
+                            initPrivateKey = successor.initPriv.hexToByteArray(),
+                            encryptionPrivateKey = successor.encryptionPriv.hexToByteArray(),
+                            signaturePrivateKey = successor.signaturePriv.hexToByteArray() + successorKp.leafNode.signatureKey,
+                        ),
+                    predecessor = group,
+                )
+            } catch (t: Throwable) {
+                return "${successor.usage} successor: ${t::class.simpleName}: ${t.message}"
+            }
+        if (joined.epochAuthenticator.toHexKey() != successor.epochAuthenticator) return "${successor.usage} successor: epoch_authenticator mismatch"
         return null
     }
 }
