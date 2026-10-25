@@ -174,4 +174,12 @@ class WireFormatPolicyTest {
         val error = assertFailsWith<IllegalArgumentException> { bob.processMessage(impostor.encrypt("hi".encodeToByteArray())) }
         assertContains(error.message.orEmpty(), "signature")
     }
+
+    @Test
+    fun aPolicyMustSendAHandshakeFormatItAccepts() {
+        val welcome = assertFailsWith<IllegalArgumentException> { WireFormatPolicy(WireFormat.WELCOME, WireFormatPolicy.Incoming.MIXED) }
+        assertContains(welcome.message.orEmpty(), "not WELCOME")
+        val refused = assertFailsWith<IllegalArgumentException> { WireFormatPolicy(WireFormat.PUBLIC_MESSAGE, WireFormatPolicy.Incoming.PRIVATE_ONLY) }
+        assertContains(refused.message.orEmpty(), "must accept it")
+    }
 }
