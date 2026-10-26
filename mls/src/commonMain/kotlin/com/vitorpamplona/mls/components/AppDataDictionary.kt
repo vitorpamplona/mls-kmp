@@ -65,11 +65,11 @@ import com.vitorpamplona.mls.tree.Extension
  * GroupContext, a signature, a conformance snapshot — would then disagree with
  * a peer that rejected one of them.
  */
-class AppDataDictionary(
+public class AppDataDictionary(
     entries: Collection<ComponentData>,
 ) : TlsSerializable {
     /** Entries in ascending component-id order, at most one per id. */
-    val entries: List<ComponentData> = entries.sortedBy { it.componentId }
+    public val entries: List<ComponentData> = entries.sortedBy { it.componentId }
 
     init {
         for (i in 1 until this.entries.size) {
@@ -80,16 +80,16 @@ class AppDataDictionary(
         }
     }
 
-    val isEmpty: Boolean get() = entries.isEmpty()
+    public val isEmpty: Boolean get() = entries.isEmpty()
 
-    val componentIds: List<Int> get() = entries.map { it.componentId }
+    public val componentIds: List<Int> get() = entries.map { it.componentId }
 
-    operator fun get(componentId: Int): ByteArray? = entries.firstOrNull { it.componentId == componentId }?.data
+    public operator fun get(componentId: Int): ByteArray? = entries.firstOrNull { it.componentId == componentId }?.data
 
-    fun contains(componentId: Int): Boolean = entries.any { it.componentId == componentId }
+    public fun contains(componentId: Int): Boolean = entries.any { it.componentId == componentId }
 
     /** A copy with [componentId] set to [data], replacing any existing entry. */
-    fun with(
+    public fun with(
         componentId: Int,
         data: ByteArray,
     ): AppDataDictionary =
@@ -98,20 +98,20 @@ class AppDataDictionary(
         )
 
     /** A copy without [componentId]. Removing an absent id is a no-op. */
-    fun without(componentId: Int): AppDataDictionary = AppDataDictionary(entries.filterNot { it.componentId == componentId })
+    public fun without(componentId: Int): AppDataDictionary = AppDataDictionary(entries.filterNot { it.componentId == componentId })
 
     override fun encodeTls(writer: TlsWriter) {
         writer.putVectorVarInt(entries)
     }
 
-    fun toBytes(): ByteArray {
+    public fun toBytes(): ByteArray {
         val writer = TlsWriter()
         encodeTls(writer)
         return writer.toByteArray()
     }
 
     /** Wrap as the `0x0006` MLS extension, ready for a LeafNode/GroupContext/KeyPackage list. */
-    fun toExtension(): Extension = Extension(EXTENSION_TYPE, toBytes())
+    public fun toExtension(): Extension = Extension(EXTENSION_TYPE, toBytes())
 
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
@@ -126,17 +126,17 @@ class AppDataDictionary(
             "0x${it.componentId.toString(16).padStart(4, '0')}(${it.data.size}B)"
         }
 
-    companion object {
+    public companion object {
         /** MLS extension type, pinned by `foundation/registries.md`. */
-        const val EXTENSION_TYPE = 0x0006
+        public const val EXTENSION_TYPE: Int = 0x0006
 
-        val EMPTY = AppDataDictionary(emptyList())
+        public val EMPTY: AppDataDictionary = AppDataDictionary(emptyList())
 
         /**
          * Decode the extension body, enforcing the draft's ordering and
          * uniqueness rules on the wire bytes rather than normalizing them.
          */
-        fun decodeTls(reader: TlsReader): AppDataDictionary {
+        public fun decodeTls(reader: TlsReader): AppDataDictionary {
             val decoded = reader.readVectorVarInt { ComponentData.decodeTls(it) }
             for (i in 1 until decoded.size) {
                 val previous = decoded[i - 1].componentId
@@ -154,7 +154,7 @@ class AppDataDictionary(
             return AppDataDictionary(decoded)
         }
 
-        fun decode(bytes: ByteArray): AppDataDictionary {
+        public fun decode(bytes: ByteArray): AppDataDictionary {
             val reader = TlsReader(bytes)
             val dictionary = decodeTls(reader)
             require(!reader.hasRemaining) { "AppDataDictionary has trailing bytes" }
@@ -167,7 +167,7 @@ class AppDataDictionary(
          * forbids repeating an extension type — so this throws rather than
          * picking one.
          */
-        fun fromExtensions(extensions: List<Extension>): AppDataDictionary? {
+        public fun fromExtensions(extensions: List<Extension>): AppDataDictionary? {
             val matches = extensions.filter { it.extensionType == EXTENSION_TYPE }
             if (matches.isEmpty()) return null
             require(matches.size == 1) {
@@ -177,6 +177,6 @@ class AppDataDictionary(
         }
 
         /** [fromExtensions], treating an absent dictionary as an empty one. */
-        fun fromExtensionsOrEmpty(extensions: List<Extension>): AppDataDictionary = fromExtensions(extensions) ?: EMPTY
+        public fun fromExtensionsOrEmpty(extensions: List<Extension>): AppDataDictionary = fromExtensions(extensions) ?: EMPTY
     }
 }

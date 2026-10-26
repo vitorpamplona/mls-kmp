@@ -360,7 +360,7 @@ class MlsGroupLifecycleTest {
      * whitenoise-rs: the interop log showed quartz rejecting wn's commit
      * with "Failed to apply commit: UpdatePath node count (1) doesn't match
      * direct path length (2)". That error comes from
-     * `RatchetTree.applyUpdatePath` comparing the received node count against
+     * the UpdatePath merge (now `TreeKem.mergePathKeys`) comparing the received node count against
      * the CURRENT tree's direct-path length — the two sides disagree on the
      * post-proposal leaf_count, so the path-length invariant breaks.
      *

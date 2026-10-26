@@ -24,7 +24,10 @@ import com.vitorpamplona.mls.JsonMapper
 import com.vitorpamplona.mls.TestResourceLoader
 import com.vitorpamplona.mls.codec.TlsReader
 import com.vitorpamplona.mls.codec.TlsWriter
+import com.vitorpamplona.mls.group.GroupValidation
+import com.vitorpamplona.mls.group.MlsGroupPolicy
 import com.vitorpamplona.mls.hexToByteArray
+import com.vitorpamplona.mls.messages.GroupContext
 import com.vitorpamplona.mls.toHexKey
 import com.vitorpamplona.mls.tree.BinaryTree
 import com.vitorpamplona.mls.tree.RatchetTree
@@ -110,6 +113,31 @@ class TreeValidationInteropTest {
                         "Resolution mismatch at vector $idx, node $nodeIdx",
                     )
                 }
+            }
+        }
+    }
+
+    /**
+     * Every vector tree is valid under the full RFC 9420 §12.4.3.1 check a
+     * joiner runs: tree hash, parent hashes, every leaf's signature and
+     * capabilities, unmerged leaves and key uniqueness.
+     */
+    @Test
+    fun testFullTreeValidation() {
+        assertTrue(vectors.isNotEmpty(), "No cipher_suite==1 tree-validation vectors found")
+        for ((idx, v) in vectors.withIndex()) {
+            val tree = RatchetTree.decodeTls(TlsReader(v.tree.hexToByteArray()))
+            val context =
+                GroupContext(
+                    groupId = v.groupId.hexToByteArray(),
+                    epoch = 0,
+                    treeHash = tree.treeHash(),
+                    confirmedTranscriptHash = ByteArray(0),
+                )
+            try {
+                GroupValidation.validateTree(tree, context, MlsGroupPolicy.Permissive)
+            } catch (e: Exception) {
+                throw AssertionError("vector $idx: ${e.message}", e)
             }
         }
     }

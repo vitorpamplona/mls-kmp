@@ -173,14 +173,14 @@ class MlsGroupStateTest {
         val state = group.saveState()
         val bytes = state.encodeTls()
 
-        // First two bytes are the state version (uint16). v7 appends the
-        // secret-tree node secrets; older blobs still decode, so the version
-        // only ever moves forward when the layout gains a field.
+        // First two bytes are the state version (uint16). v9 appends the
+        // removal flag and a staged commit; older blobs still decode, so the
+        // version only ever moves forward when the layout gains a field.
         val reader =
             com.vitorpamplona.mls.codec
                 .TlsReader(bytes)
         val version = reader.readUint16()
-        assertEquals(7, version)
+        assertEquals(10, version)
     }
 
     @Test

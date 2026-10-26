@@ -23,10 +23,14 @@ package com.vitorpamplona.mls.group
 import com.vitorpamplona.crypto.sha2.sha256
 import com.vitorpamplona.mls.codec.TlsReader
 import com.vitorpamplona.mls.codec.TlsWriter
+import com.vitorpamplona.mls.framing.SenderType
+import com.vitorpamplona.mls.messages.CommitResult
 import com.vitorpamplona.mls.messages.GroupContext
 import com.vitorpamplona.mls.messages.Proposal
 import com.vitorpamplona.mls.schedule.EpochSecrets
 import com.vitorpamplona.mls.schedule.SenderRatchetState
+import com.vitorpamplona.mls.tree.Capabilities
+import com.vitorpamplona.mls.tree.Extension
 
 /**
  * Serializable snapshot of an MLS group's complete state.
@@ -51,7 +55,7 @@ import com.vitorpamplona.mls.schedule.SenderRatchetState
  * It is optional (empty for STATE_VERSION 1 blobs) so older persisted state
  * still decodes.
  */
-data class MlsGroupState(
+public data class MlsGroupState(
     val groupContext: GroupContext,
     val treeBytes: ByteArray,
     val myLeafIndex: Int,
@@ -106,12 +110,47 @@ data class MlsGroupState(
      * does. A state imported from ts-mls has these instead of a root.
      */
     val nodeSecrets: Map<Int, ByteArray> = emptyMap(),
+    /**
+     * `resumption_psk` of this group's former epochs, by epoch (STATE_VERSION
+     * 8+), so a resumption PreSharedKey proposal naming one still resolves
+     * after a restart.
+     */
+    val resumptionPsks: Map<Long, ByteArray> = emptyMap(),
+    /**
+     * Private keys for our own Update proposals that another member may still
+     * commit (STATE_VERSION 8+): the leaf encryption key, its private half,
+     * and the signature private key of that leaf.
+     */
+    val pendingUpdateKeys: List<PendingUpdateKeys> = emptyList(),
+    /** The ReInit proposal a committed commit carried, if any (STATE_VERSION 8+). */
+    val reInitPending: Proposal.ReInit? = null,
+    /** Whether a commit removed us (STATE_VERSION 9+); our old leaf may hold someone else. */
+    val removedFromGroup: Boolean = false,
+    /** A commit staged by [MlsGroup.stageCommit] and not yet merged (STATE_VERSION 9+). */
+    val pendingCommit: StagedCommitState? = null,
+    /**
+     * The new leaf keys a [MlsGroup.proposeSigningKeyRotation] staged for our
+     * next commit, and what [MlsGroup.advertiseInNextCommit] asked that leaf
+     * to advertise (STATE_VERSION 10+).
+     */
+    val pendingSigningKey: ByteArray? = null,
+    val pendingEncryptionKey: ByteArray? = null,
+    val pendingLeafAdvertisement: Pair<Capabilities, List<Extension>>? = null,
 ) {
-    fun encodeTls(): ByteArray {
+    public fun encodeTls(): ByteArray = encodeTls(STATE_VERSION)
+
+    /**
+     * The state in the layout of an older [version]: each version only
+     * appends, so this is the current encoding cut after that version's
+     * fields. For the frozen fixtures that check every old layout still
+     * restores.
+     */
+    internal fun encodeTls(version: Int): ByteArray {
+        require(version in 1..STATE_VERSION) { "No state version $version" }
         val writer = TlsWriter()
 
         // Version tag for future-proofing
-        writer.putUint16(STATE_VERSION)
+        writer.putUint16(version)
 
         // GroupContext
         groupContext.encodeTls(writer)
@@ -120,7 +159,8 @@ data class MlsGroupState(
         writer.putOpaqueVarInt(treeBytes)
 
         // Local member state
-        writer.putUint32(myLeafIndex.toLong())
+        // A PublicGroup has no leaf (-1): written as 0xFFFFFFFF, read back as -1.
+        writer.putUint32(myLeafIndex.toLong() and 0xFFFFFFFFL)
 
         // Epoch secrets (all 12 fields)
         writer.putOpaqueVarInt(epochSecrets.joinerSecret)
@@ -149,6 +189,7 @@ data class MlsGroupState(
         // Encryption secret for SecretTree reconstruction
         writer.putOpaqueVarInt(encryptionSecret)
 
+        if (version < 2) return writer.toByteArray()
         // Per-sender SecretTree ratchet positions (STATE_VERSION 2+).
         // Preserving the local sender's generation counter is what prevents
         // AEAD key+nonce reuse (and strict-receiver rejection) after a restore.
@@ -161,6 +202,7 @@ data class MlsGroupState(
             writer.putUint32(ratchet.applicationGeneration.toLong())
         }
 
+        if (version < 3) return writer.toByteArray()
         // Direct-path node private keys (STATE_VERSION 3+).
         writer.putUint32(pathPrivateKeys.size.toLong())
         for ((nodeIndex, key) in pathPrivateKeys) {
@@ -168,6 +210,7 @@ data class MlsGroupState(
             writer.putOpaqueVarInt(key)
         }
 
+        if (version < 4) return writer.toByteArray()
         // Staged proposals (STATE_VERSION 4+). The AuthenticatedContent bytes
         // travel with each entry because they, not the bare proposal, are what
         // a later `ProposalRef` hashes (RFC 9420 §5.2) — a restored pool that
@@ -179,18 +222,69 @@ data class MlsGroupState(
             writer.putOpaqueVarInt(pending.authenticatedContentBytes ?: ByteArray(0))
         }
 
+        if (version < 5) return writer.toByteArray()
         // Skipped-generation secrets (STATE_VERSION 5+).
         writeSkippedSecrets(writer, skippedApplicationSecrets)
         writeSkippedSecrets(writer, skippedHandshakeSecrets)
 
+        if (version < 6) return writer.toByteArray()
         // Retained former epochs (STATE_VERSION 6+).
         writer.putUint32(retainedEpochs.size.toLong())
         for (retained in retainedEpochs) retained.encodeTls(writer)
 
+        if (version < 7) return writer.toByteArray()
         // Secret-tree node secrets (STATE_VERSION 7+), the current epoch's,
         // then each retained epoch's in the same order as above.
         writeNodeSecrets(writer, nodeSecrets)
         for (retained in retainedEpochs) writeNodeSecrets(writer, retained.nodeSecrets)
+
+        if (version < 8) return writer.toByteArray()
+        // STATE_VERSION 8+: who sent each staged proposal (v4 kept only a leaf
+        // index, which cannot tell an external sender's index from a member's),
+        // former epochs' resumption PSKs, our uncommitted Updates' keys, and a
+        // committed ReInit.
+        for (pending in pendingProposals) writer.putUint8(pending.senderType.value)
+        writer.putUint32(resumptionPsks.size.toLong())
+        for ((epoch, psk) in resumptionPsks) {
+            writer.putUint64(epoch)
+            writer.putOpaqueVarInt(psk)
+        }
+        writer.putUint32(pendingUpdateKeys.size.toLong())
+        for (keys in pendingUpdateKeys) {
+            writer.putOpaqueVarInt(keys.encryptionKey)
+            writer.putOpaqueVarInt(keys.encryptionPrivateKey)
+            writer.putOpaqueVarInt(keys.signaturePrivateKey)
+        }
+        writer.putOpaqueVarInt(reInitPending?.toTlsBytes() ?: ByteArray(0))
+
+        if (version < 9) return writer.toByteArray()
+        // STATE_VERSION 9+: removal flag and a staged commit, saved as the
+        // CommitResult plus the whole state merging it leads to.
+        writer.putUint8(if (removedFromGroup) 1 else 0)
+        if (pendingCommit == null) {
+            writer.putUint8(0)
+        } else {
+            writer.putUint8(1)
+            writer.putUint64(pendingCommit.fromEpoch)
+            writer.putOpaqueVarInt(pendingCommit.result.commitBytes)
+            writer.putOpaqueVarInt(pendingCommit.result.framedCommitBytes)
+            writer.putOpaqueVarInt(pendingCommit.result.welcomeBytes ?: ByteArray(0))
+            writer.putOpaqueVarInt(pendingCommit.result.groupInfoBytes ?: ByteArray(0))
+            writer.putOpaqueVarInt(pendingCommit.result.preCommitExporterSecret)
+            writer.putOpaqueVarInt(pendingCommit.after.encodeTls())
+        }
+
+        if (version < 10) return writer.toByteArray()
+        // STATE_VERSION 10+: what our next commit does to our own leaf.
+        writer.putOpaqueVarInt(pendingSigningKey ?: ByteArray(0))
+        writer.putOpaqueVarInt(pendingEncryptionKey ?: ByteArray(0))
+        if (pendingLeafAdvertisement == null) {
+            writer.putUint8(0)
+        } else {
+            writer.putUint8(1)
+            pendingLeafAdvertisement.first.encodeTls(writer)
+            writer.putVectorVarInt(pendingLeafAdvertisement.second)
+        }
 
         return writer.toByteArray()
     }
@@ -207,7 +301,7 @@ data class MlsGroupState(
         return result
     }
 
-    companion object {
+    public companion object {
         /**
          * v1: original layout (no SecretTree ratchet positions).
          * v2: appends [senderRatchetStates] so restores don't reset the
@@ -226,10 +320,19 @@ data class MlsGroupState(
          * v7: appends the secret tree's [nodeSecrets], current and retained
          *     epochs, so a state whose root secret is gone (imported from
          *     ts-mls) restores. Older blobs derive from the root, as before.
+         * v8: appends each staged proposal's sender type, former epochs'
+         *     resumption PSKs, the keys of our uncommitted Update proposals and
+         *     a committed ReInit. Older blobs decode with member senders and
+         *     none of the rest.
+         * v9: appends whether a commit removed us and a staged commit (its
+         *     CommitResult and the state merging it leads to). Older blobs
+         *     decode as still members with nothing staged.
+         * v10: appends the leaf keys and advertisement staged for our next
+         *     commit. Older blobs decode with none.
          */
-        private const val STATE_VERSION = 7
+        private const val STATE_VERSION = 10
 
-        fun decodeTls(data: ByteArray): MlsGroupState {
+        public fun decodeTls(data: ByteArray): MlsGroupState {
             val reader = TlsReader(data)
 
             val version = reader.readUint16()
@@ -237,7 +340,16 @@ data class MlsGroupState(
 
             val groupContext = GroupContext.decodeTls(reader)
             val treeBytes = reader.readOpaqueVarInt()
-            val myLeafIndex = reader.readUint32().toInt()
+            // 0xFFFFFFFF is a PublicGroup's -1; anything else is a real leaf.
+            val myLeafIndex =
+                reader.readUint32().let {
+                    if (it == 0xFFFFFFFFL) {
+                        -1
+                    } else {
+                        require(it <= Int.MAX_VALUE) { "Leaf index $it out of range" }
+                        it.toInt()
+                    }
+                }
 
             val epochSecrets =
                 EpochSecrets(
@@ -265,14 +377,14 @@ data class MlsGroupState(
             // empty count) for v1 blobs, which restore at generation 0.
             val senderRatchetStates =
                 if (version >= 2 && reader.hasRemaining) {
-                    val count = reader.readUint32().toInt()
+                    val count = reader.readCount()
                     buildMap {
                         repeat(count) {
-                            val leafIndex = reader.readUint32().toInt()
+                            val leafIndex = reader.readIndex()
                             val handshakeSecret = reader.readOpaqueVarInt()
-                            val handshakeGeneration = reader.readUint32().toInt()
+                            val handshakeGeneration = reader.readIndex()
                             val applicationSecret = reader.readOpaqueVarInt()
-                            val applicationGeneration = reader.readUint32().toInt()
+                            val applicationGeneration = reader.readIndex()
                             put(
                                 leafIndex,
                                 SenderRatchetState(
@@ -293,10 +405,10 @@ data class MlsGroupState(
             // own leaf until the next commit refills the path.
             val pathPrivateKeys =
                 if (version >= 3 && reader.hasRemaining) {
-                    val count = reader.readUint32().toInt()
+                    val count = reader.readCount()
                     buildMap {
                         repeat(count) {
-                            val nodeIndex = reader.readUint32().toInt()
+                            val nodeIndex = reader.readIndex()
                             put(nodeIndex, reader.readOpaqueVarInt())
                         }
                     }
@@ -309,10 +421,10 @@ data class MlsGroupState(
             // every version before this one had.
             val pendingProposals =
                 if (version >= 4 && reader.hasRemaining) {
-                    val count = reader.readUint32().toInt()
+                    val count = reader.readCount()
                     buildList {
                         repeat(count) {
-                            val senderLeafIndex = reader.readUint32().toInt()
+                            val senderLeafIndex = reader.readIndex()
                             val proposal = Proposal.decodeTls(TlsReader(reader.readOpaqueVarInt()))
                             val authenticatedContentBytes = reader.readOpaqueVarInt()
                             add(
@@ -335,7 +447,7 @@ data class MlsGroupState(
             // v6+: retained former epochs. Absent for older blobs.
             val retainedEpochs =
                 if (version >= 6 && reader.hasRemaining) {
-                    val count = reader.readUint32().toInt()
+                    val count = reader.readCount()
                     List(count) { RetainedEpochReceiverData.decodeTls(reader) }
                 } else {
                     emptyList()
@@ -347,6 +459,58 @@ data class MlsGroupState(
             if (version >= 7 && reader.hasRemaining) {
                 nodeSecrets = readNodeSecrets(reader)
                 retainedWithNodes = retainedEpochs.map { it.copy(nodeSecrets = readNodeSecrets(reader)) }
+            }
+
+            // v8+: sender types, resumption PSKs, Update keys, ReInit.
+            var pendingWithSenders = pendingProposals
+            var resumptionPsks = emptyMap<Long, ByteArray>()
+            var pendingUpdateKeys = emptyList<PendingUpdateKeys>()
+            var reInitPending: Proposal.ReInit? = null
+            if (version >= 8 && reader.hasRemaining) {
+                pendingWithSenders = pendingProposals.map { it.copy(senderType = SenderType.fromValue(reader.readUint8())) }
+                resumptionPsks =
+                    buildMap {
+                        repeat(reader.readCount()) { put(reader.readUint64(), reader.readOpaqueVarInt()) }
+                    }
+                pendingUpdateKeys =
+                    List(reader.readCount()) {
+                        PendingUpdateKeys(reader.readOpaqueVarInt(), reader.readOpaqueVarInt(), reader.readOpaqueVarInt())
+                    }
+                reInitPending =
+                    reader.readOpaqueVarInt().takeIf { it.isNotEmpty() }?.let { requireNotNull(Proposal.decodeTls(TlsReader(it)) as? Proposal.ReInit) { "Saved reInitPending is not a ReInit proposal" } }
+            }
+
+            // v9+: removal flag and a staged commit.
+            var removedFromGroup = false
+            var pendingCommit: StagedCommitState? = null
+            if (version >= 9 && reader.hasRemaining) {
+                removedFromGroup = reader.readUint8() == 1
+                if (reader.readUint8() == 1) {
+                    val fromEpoch = reader.readUint64()
+                    val result =
+                        CommitResult(
+                            commitBytes = reader.readOpaqueVarInt(),
+                            framedCommitBytes = reader.readOpaqueVarInt(),
+                            welcomeBytes = reader.readOpaqueVarInt().takeIf { it.isNotEmpty() },
+                            groupInfoBytes = reader.readOpaqueVarInt().takeIf { it.isNotEmpty() },
+                            preCommitExporterSecret = reader.readOpaqueVarInt(),
+                        )
+                    pendingCommit = StagedCommitState(fromEpoch, result, decodeTls(reader.readOpaqueVarInt()))
+                }
+            }
+
+            // v10+: what our next commit does to our own leaf.
+            var pendingSigningKey: ByteArray? = null
+            var pendingEncryptionKey: ByteArray? = null
+            var pendingLeafAdvertisement: Pair<Capabilities, List<Extension>>? = null
+            if (version >= 10 && reader.hasRemaining) {
+                pendingSigningKey = reader.readOpaqueVarInt().takeIf { it.isNotEmpty() }
+                pendingEncryptionKey = reader.readOpaqueVarInt().takeIf { it.isNotEmpty() }
+                val advertised = reader.readUint8()
+                require(advertised == 0 || advertised == 1) { "Invalid pending advertisement flag: $advertised" }
+                if (advertised == 1) {
+                    pendingLeafAdvertisement = Capabilities.decodeTls(reader) to reader.readVectorVarInt { Extension.decodeTls(it) }
+                }
             }
 
             return MlsGroupState(
@@ -361,11 +525,19 @@ data class MlsGroupState(
                 encryptionSecret = encryptionSecret,
                 senderRatchetStates = senderRatchetStates,
                 pathPrivateKeys = pathPrivateKeys,
-                pendingProposals = pendingProposals,
+                pendingProposals = pendingWithSenders,
                 skippedApplicationSecrets = skippedApplicationSecrets,
                 skippedHandshakeSecrets = skippedHandshakeSecrets,
                 retainedEpochs = retainedWithNodes,
                 nodeSecrets = nodeSecrets,
+                resumptionPsks = resumptionPsks,
+                pendingUpdateKeys = pendingUpdateKeys,
+                reInitPending = reInitPending,
+                removedFromGroup = removedFromGroup,
+                pendingCommit = pendingCommit,
+                pendingSigningKey = pendingSigningKey,
+                pendingEncryptionKey = pendingEncryptionKey,
+                pendingLeafAdvertisement = pendingLeafAdvertisement,
             )
         }
 
@@ -393,21 +565,21 @@ data class MlsGroupState(
         }
 
         private fun readNodeSecrets(reader: TlsReader): Map<Int, ByteArray> {
-            val count = reader.readUint32().toInt()
+            val count = reader.readCount()
             return buildMap {
                 repeat(count) {
-                    val nodeIndex = reader.readUint32().toInt()
+                    val nodeIndex = reader.readIndex()
                     put(nodeIndex, reader.readOpaqueVarInt())
                 }
             }
         }
 
         internal fun readSkippedSecrets(reader: TlsReader): Map<Pair<Int, Int>, ByteArray> {
-            val count = reader.readUint32().toInt()
+            val count = reader.readCount()
             return buildMap {
                 repeat(count) {
-                    val leafIndex = reader.readUint32().toInt()
-                    val generation = reader.readUint32().toInt()
+                    val leafIndex = reader.readIndex()
+                    val generation = reader.readIndex()
                     put(Pair(leafIndex, generation), reader.readOpaqueVarInt())
                 }
             }
@@ -425,7 +597,7 @@ data class MlsGroupState(
  * derived in that epoch, and a resumption PSK for it (RFC 9420 §8.6), stay
  * available for as long as the epoch is retained.
  */
-data class RetainedEpochReceiverData(
+public data class RetainedEpochReceiverData(
     val epoch: Long,
     val senderDataSecret: ByteArray,
     val encryptionSecret: ByteArray,
@@ -446,7 +618,7 @@ data class RetainedEpochReceiverData(
 
     override fun hashCode(): Int = epoch.hashCode()
 
-    fun encodeTls(writer: TlsWriter) {
+    public fun encodeTls(writer: TlsWriter) {
         writer.putUint64(epoch)
         writer.putOpaqueVarInt(senderDataSecret)
         writer.putOpaqueVarInt(encryptionSecret)
@@ -465,8 +637,8 @@ data class RetainedEpochReceiverData(
         MlsGroupState.writeSkippedSecrets(writer, skippedApplicationSecrets)
     }
 
-    companion object {
-        fun decodeTls(reader: TlsReader): RetainedEpochReceiverData {
+    public companion object {
+        public fun decodeTls(reader: TlsReader): RetainedEpochReceiverData {
             val epoch = reader.readUint64()
             val senderDataSecret = reader.readOpaqueVarInt()
             val encryptionSecret = reader.readOpaqueVarInt()
@@ -474,15 +646,15 @@ data class RetainedEpochReceiverData(
             val resumptionPsk = reader.readOpaqueVarInt()
             val groupContext = GroupContext.decodeTls(TlsReader(reader.readOpaqueVarInt()))
             val treeBytes = reader.readOpaqueVarInt()
-            val count = reader.readUint32().toInt()
+            val count = reader.readCount()
             val senderRatchetStates =
                 buildMap {
                     repeat(count) {
-                        val leafIndex = reader.readUint32().toInt()
+                        val leafIndex = reader.readIndex()
                         val handshakeSecret = reader.readOpaqueVarInt()
-                        val handshakeGeneration = reader.readUint32().toInt()
+                        val handshakeGeneration = reader.readIndex()
                         val applicationSecret = reader.readOpaqueVarInt()
-                        val applicationGeneration = reader.readUint32().toInt()
+                        val applicationGeneration = reader.readIndex()
                         put(leafIndex, SenderRatchetState(handshakeSecret, handshakeGeneration, applicationSecret, applicationGeneration))
                     }
                 }
@@ -508,7 +680,7 @@ data class RetainedEpochReceiverData(
  * in a bounded window so messages that arrive out of order can still be
  * decrypted. Only the minimum secrets needed for decryption are retained.
  */
-data class RetainedEpochSecrets(
+public data class RetainedEpochSecrets(
     val epoch: Long,
     val senderDataSecret: ByteArray,
     val encryptionSecret: ByteArray,
@@ -523,7 +695,7 @@ data class RetainedEpochSecrets(
 
     override fun hashCode(): Int = epoch.hashCode()
 
-    fun encodeTls(writer: TlsWriter) {
+    public fun encodeTls(writer: TlsWriter) {
         writer.putUint64(epoch)
         writer.putOpaqueVarInt(senderDataSecret)
         writer.putOpaqueVarInt(encryptionSecret)
@@ -531,12 +703,12 @@ data class RetainedEpochSecrets(
         writer.putOpaqueVarInt(exporterSecret)
     }
 
-    companion object {
-        fun decodeTls(reader: TlsReader): RetainedEpochSecrets {
+    public companion object {
+        public fun decodeTls(reader: TlsReader): RetainedEpochSecrets {
             val epoch = reader.readUint64()
             val senderDataSecret = reader.readOpaqueVarInt()
             val encryptionSecret = reader.readOpaqueVarInt()
-            val leafCount = reader.readUint32().toInt()
+            val leafCount = reader.readIndex()
             // exporterSecret was added later; tolerate its absence in older serialized data
             val exporterSecret =
                 if (reader.hasRemaining) {
@@ -586,7 +758,7 @@ data class RetainedEpochSecrets(
  * handshake message sent between two full persists would otherwise be the one
  * case this silently failed to cover.
  */
-data class OwnSenderRatchet(
+public data class OwnSenderRatchet(
     val epoch: Long,
     val leafIndex: Int,
     /** Identifies the SecretTree this position belongs to; see the class doc. */
@@ -601,7 +773,7 @@ data class OwnSenderRatchet(
         if (other !is OwnSenderRatchet) return false
         return epoch == other.epoch &&
             leafIndex == other.leafIndex &&
-            treeBinder.contentEquals(other.treeBinder) &&
+            constantTimeEquals(treeBinder, other.treeBinder) &&
             handshakeGeneration == other.handshakeGeneration &&
             applicationGeneration == other.applicationGeneration &&
             handshakeSecret.contentEquals(other.handshakeSecret) &&
@@ -616,7 +788,7 @@ data class OwnSenderRatchet(
         return result
     }
 
-    fun encodeTls(): ByteArray {
+    public fun encodeTls(): ByteArray {
         val writer = TlsWriter()
         writer.putUint64(epoch)
         writer.putUint32(leafIndex.toLong())
@@ -628,26 +800,26 @@ data class OwnSenderRatchet(
         return writer.toByteArray()
     }
 
-    companion object {
+    public companion object {
         /** How a tree binder is derived from the epoch's encryption secret. */
-        fun binderFor(encryptionSecret: ByteArray): ByteArray = sha256(encryptionSecret).copyOfRange(0, BINDER_LENGTH)
+        public fun binderFor(encryptionSecret: ByteArray): ByteArray = sha256(encryptionSecret).copyOfRange(0, BINDER_LENGTH)
 
         private const val BINDER_LENGTH = 16
 
-        fun decodeTls(bytes: ByteArray): OwnSenderRatchet {
+        public fun decodeTls(bytes: ByteArray): OwnSenderRatchet {
             val reader = TlsReader(bytes)
             return OwnSenderRatchet(
                 epoch = reader.readUint64(),
-                leafIndex = reader.readUint32().toInt(),
+                leafIndex = reader.readIndex(),
                 treeBinder = reader.readOpaqueVarInt(),
                 handshakeSecret = reader.readOpaqueVarInt(),
-                handshakeGeneration = reader.readUint32().toInt(),
+                handshakeGeneration = reader.readIndex(),
                 applicationSecret = reader.readOpaqueVarInt(),
-                applicationGeneration = reader.readUint32().toInt(),
+                applicationGeneration = reader.readIndex(),
             )
         }
 
-        fun decodeTlsOrNull(bytes: ByteArray): OwnSenderRatchet? =
+        public fun decodeTlsOrNull(bytes: ByteArray): OwnSenderRatchet? =
             try {
                 decodeTls(bytes)
             } catch (_: Exception) {
@@ -658,3 +830,18 @@ data class OwnSenderRatchet(
             }
     }
 }
+
+/** The private keys behind one of our own Update proposals, kept until a commit applies it or the epoch ends. */
+public class PendingUpdateKeys(
+    /** The new leaf's encryption public key, which identifies the Update. */
+    public val encryptionKey: ByteArray,
+    public val encryptionPrivateKey: ByteArray,
+    public val signaturePrivateKey: ByteArray,
+)
+
+/** A staged, unmerged commit as persisted: where it was built, what it produced, and the state it leads to. */
+public class StagedCommitState(
+    public val fromEpoch: Long,
+    public val result: CommitResult,
+    public val after: MlsGroupState,
+)

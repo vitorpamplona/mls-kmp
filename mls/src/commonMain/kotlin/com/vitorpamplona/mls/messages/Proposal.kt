@@ -34,8 +34,8 @@ import com.vitorpamplona.mls.tree.LeafNode
  *
  * Marmot uses: Add, Remove, Update, SelfRemove (custom), GroupContextExtensions.
  */
-enum class ProposalType(
-    val value: Int,
+public enum class ProposalType(
+    public val value: Int,
 ) {
     ADD(1),
     UPDATE(2),
@@ -56,10 +56,13 @@ enum class ProposalType(
     // openmls / mdk encode it as 0x000A on the wire; quartz was writing
     // 0xF001, which strict receivers reject as "Unknown ProposalType".
     SELF_REMOVE(0x000A),
+
+    /** Any other type: see [Proposal.Custom]. Never on the wire as -1. */
+    CUSTOM(-1),
     ;
 
-    companion object {
-        fun fromValue(value: Int): ProposalType =
+    public companion object {
+        public fun fromValue(value: Int): ProposalType =
             entries.find { it.value == value }
                 ?: throw IllegalArgumentException("Unknown ProposalType: $value")
     }
@@ -68,16 +71,50 @@ enum class ProposalType(
 /**
  * MLS Proposal (RFC 9420 Section 12).
  */
-sealed class Proposal : TlsSerializable {
-    abstract val proposalType: ProposalType
+public sealed class Proposal : TlsSerializable {
+    public abstract val proposalType: ProposalType
+
+    /** The `proposal_type` on the wire. */
+    public open val proposalTypeValue: Int get() = proposalType.value
+
+    /**
+     * A proposal type this engine has no struct for, carried as its type and
+     * an opaque<V> body — the encoding OpenMLS and ts-mls use for custom
+     * proposals. It has no effect on the tree or GroupContext; an
+     * application that defines it reads it from the commit (see
+     * [com.vitorpamplona.mls.group.MlsGroupPolicy.authorizeCommit]). Every
+     * member that processes a commit carrying one must list its type in its
+     * capabilities, as RFC 9420 §12.2 requires for any non-default type.
+     */
+    public class Custom(
+        override val proposalTypeValue: Int,
+        public val data: ByteArray,
+    ) : Proposal() {
+        override val proposalType: ProposalType = ProposalType.CUSTOM
+
+        init {
+            require(proposalTypeValue in 0..0xFFFF && ProposalType.entries.none { it.value == proposalTypeValue }) {
+                "0x${proposalTypeValue.toString(16)} is not a custom proposal type"
+            }
+        }
+
+        override fun encodeTls(writer: TlsWriter) {
+            writer.putUint16(proposalTypeValue)
+            writer.putOpaqueVarInt(data)
+        }
+
+        override fun equals(other: Any?): Boolean = other is Custom && proposalTypeValue == other.proposalTypeValue && data.contentEquals(other.data)
+
+        override fun hashCode(): Int = 31 * proposalTypeValue + data.contentHashCode()
+    }
 
     /**
      * Add proposal: includes a KeyPackage for the member to be added.
      */
-    data class Add(
+    public data class Add(
         val keyPackage: MlsKeyPackage,
     ) : Proposal() {
-        override val proposalType = ProposalType.ADD
+        override val proposalType: ProposalType = ProposalType.ADD
 
         override fun encodeTls(writer: TlsWriter) {
             writer.putUint16(proposalType.value)
@@ -88,10 +125,10 @@ sealed class Proposal : TlsSerializable {
     /**
      * Update proposal: member updates their own LeafNode (new encryption key, etc.)
      */
-    data class Update(
+    public data class Update(
         val leafNode: LeafNode,
     ) : Proposal() {
-        override val proposalType = ProposalType.UPDATE
+        override val proposalType: ProposalType = ProposalType.UPDATE
 
         override fun encodeTls(writer: TlsWriter) {
             writer.putUint16(proposalType.value)
@@ -102,10 +139,10 @@ sealed class Proposal : TlsSerializable {
     /**
      * Remove proposal: remove a member by their leaf index.
      */
-    data class Remove(
+    public data class Remove(
         val removedLeafIndex: Int,
     ) : Proposal() {
-        override val proposalType = ProposalType.REMOVE
+        override val proposalType: ProposalType = ProposalType.REMOVE
 
         override fun encodeTls(writer: TlsWriter) {
             writer.putUint16(proposalType.value)
@@ -117,8 +154,8 @@ sealed class Proposal : TlsSerializable {
      * SelfRemove proposal (Marmot extension): member removes themselves.
      * Sent as a PublicMessage since the sender needs to authenticate it.
      */
-    class SelfRemove : Proposal() {
-        override val proposalType = ProposalType.SELF_REMOVE
+    public class SelfRemove : Proposal() {
+        override val proposalType: ProposalType = ProposalType.SELF_REMOVE
 
         override fun encodeTls(writer: TlsWriter) {
             writer.putUint16(proposalType.value)
@@ -129,10 +166,10 @@ sealed class Proposal : TlsSerializable {
      * GroupContextExtensions proposal: update the group's extensions
      * (e.g., change group name/description via MarmotGroupData extension).
      */
-    data class GroupContextExtensions(
+    public data class GroupContextExtensions(
         val extensions: List<Extension>,
     ) : Proposal() {
-        override val proposalType = ProposalType.GROUP_CONTEXT_EXTENSIONS
+        override val proposalType: ProposalType = ProposalType.GROUP_CONTEXT_EXTENSIONS
 
         override fun encodeTls(writer: TlsWriter) {
             writer.putUint16(proposalType.value)
@@ -165,11 +202,11 @@ sealed class Proposal : TlsSerializable {
      * component's own validation rules. None of that is expressed here — this
      * type is the wire format, not the policy.
      */
-    data class AppDataUpdate(
+    public data class AppDataUpdate(
         val componentId: Int,
         val operation: Operation,
     ) : Proposal() {
-        override val proposalType = ProposalType.APP_DATA_UPDATE
+        override val proposalType: ProposalType = ProposalType.APP_DATA_UPDATE
 
         init {
             require(componentId in 0..0xFFFF) {
@@ -177,9 +214,9 @@ sealed class Proposal : TlsSerializable {
             }
         }
 
-        sealed class Operation {
+        public sealed class Operation {
             /** Set the component's data, creating the entry if absent. */
-            data class Update(
+            public data class Update(
                 val data: ByteArray,
             ) : Operation() {
                 override fun equals(other: Any?): Boolean {
@@ -192,11 +229,11 @@ sealed class Proposal : TlsSerializable {
             }
 
             /** Drop the component's entry entirely. */
-            object Remove : Operation()
+            public object Remove : Operation()
 
-            companion object {
-                const val TYPE_UPDATE = 1
-                const val TYPE_REMOVE = 2
+            public companion object {
+                public const val TYPE_UPDATE: Int = 1
+                public const val TYPE_REMOVE: Int = 2
             }
         }
 
@@ -215,52 +252,60 @@ sealed class Proposal : TlsSerializable {
             }
         }
 
-        companion object {
-            fun update(
+        public companion object {
+            public fun update(
                 componentId: Int,
                 data: ByteArray,
-            ) = AppDataUpdate(componentId, Operation.Update(data))
+            ): AppDataUpdate = AppDataUpdate(componentId, Operation.Update(data))
 
-            fun remove(componentId: Int) = AppDataUpdate(componentId, Operation.Remove)
+            public fun remove(componentId: Int): AppDataUpdate = AppDataUpdate(componentId, Operation.Remove)
         }
     }
 
     /**
-     * PSK proposal: include a pre-shared key in the epoch.
+     * PreSharedKey proposal (RFC 9420 §12.1.4): fold the PSK named by [psk]
+     * into the next epoch's key schedule.
      */
-    data class Psk(
-        val pskType: Int,
-        val pskId: ByteArray,
-        val pskNonce: ByteArray,
+    public class Psk(
+        public val psk: PreSharedKeyId,
     ) : Proposal() {
-        override val proposalType = ProposalType.PSK
+        override val proposalType: ProposalType = ProposalType.PSK
+
+        /** An external PSK, the only kind the old three-field shape could name. */
+        public constructor(pskType: Int, pskId: ByteArray, pskNonce: ByteArray) : this(
+            run {
+                require(pskType == PreSharedKeyId.TYPE_EXTERNAL) { "Use Psk(PreSharedKeyId.Resumption(...)) for psktype $pskType" }
+                PreSharedKeyId.External(pskId, pskNonce)
+            },
+        )
+
+        public val pskType: Int get() = psk.pskType
+
+        /** The external `psk_id`, or empty for a resumption PSK. */
+        public val pskId: ByteArray get() = (psk as? PreSharedKeyId.External)?.pskId ?: ByteArray(0)
+
+        public val pskNonce: ByteArray get() = psk.pskNonce
 
         override fun encodeTls(writer: TlsWriter) {
             writer.putUint16(proposalType.value)
-            writer.putUint8(pskType)
-            writer.putOpaqueVarInt(pskId)
-            writer.putOpaqueVarInt(pskNonce)
+            psk.encodeTls(writer)
         }
 
-        override fun equals(other: Any?): Boolean {
-            if (this === other) return true
-            if (other !is Psk) return false
-            return pskId.contentEquals(other.pskId)
-        }
+        override fun equals(other: Any?): Boolean = other is Psk && psk == other.psk
 
-        override fun hashCode(): Int = pskId.contentHashCode()
+        override fun hashCode(): Int = psk.hashCode()
     }
 
     /**
      * ReInit proposal: reinitialize the group with new parameters (RFC 9420 Section 12.1.5).
      */
-    data class ReInit(
+    public data class ReInit(
         val groupId: ByteArray,
         val version: Int,
         val cipherSuite: Int,
         val extensions: List<Extension>,
     ) : Proposal() {
-        override val proposalType = ProposalType.REINIT
+        override val proposalType: ProposalType = ProposalType.REINIT
 
         override fun encodeTls(writer: TlsWriter) {
             writer.putUint16(proposalType.value)
@@ -282,10 +327,10 @@ sealed class Proposal : TlsSerializable {
     /**
      * ExternalInit proposal: allows an external party to join via external commit (RFC 9420 Section 12.1.6).
      */
-    data class ExternalInit(
+    public data class ExternalInit(
         val kemOutput: ByteArray,
     ) : Proposal() {
-        override val proposalType = ProposalType.EXTERNAL_INIT
+        override val proposalType: ProposalType = ProposalType.EXTERNAL_INIT
 
         override fun encodeTls(writer: TlsWriter) {
             writer.putUint16(proposalType.value)
@@ -301,10 +346,15 @@ sealed class Proposal : TlsSerializable {
         override fun hashCode(): Int = kemOutput.contentHashCode()
     }
 
-    companion object {
-        fun decodeTls(reader: TlsReader): Proposal {
-            val type = ProposalType.fromValue(reader.readUint16())
+    public companion object {
+        public fun decodeTls(reader: TlsReader): Proposal {
+            val typeValue = reader.readUint16()
+            val type = ProposalType.entries.find { it.value == typeValue } ?: return Custom(typeValue, reader.readOpaqueVarInt())
             return when (type) {
+                ProposalType.CUSTOM -> {
+                    throw IllegalStateException("unreachable")
+                }
+
                 ProposalType.ADD -> {
                     Add(MlsKeyPackage.decodeTls(reader))
                 }
@@ -314,7 +364,7 @@ sealed class Proposal : TlsSerializable {
                 }
 
                 ProposalType.REMOVE -> {
-                    Remove(reader.readUint32().toInt())
+                    Remove(reader.readIndex())
                 }
 
                 ProposalType.SELF_REMOVE -> {
@@ -340,7 +390,7 @@ sealed class Proposal : TlsSerializable {
                 }
 
                 ProposalType.PSK -> {
-                    Psk(reader.readUint8(), reader.readOpaqueVarInt(), reader.readOpaqueVarInt())
+                    Psk(PreSharedKeyId.decodeTls(reader))
                 }
 
                 ProposalType.REINIT -> {
@@ -363,8 +413,8 @@ sealed class Proposal : TlsSerializable {
 /**
  * ProposalOrRef: a Proposal can be included inline or by reference (hash).
  */
-sealed class ProposalOrRef : TlsSerializable {
-    data class Inline(
+public sealed class ProposalOrRef : TlsSerializable {
+    public data class Inline(
         val proposal: Proposal,
     ) : ProposalOrRef() {
         override fun encodeTls(writer: TlsWriter) {
@@ -373,7 +423,7 @@ sealed class ProposalOrRef : TlsSerializable {
         }
     }
 
-    data class Reference(
+    public data class Reference(
         val proposalRef: ByteArray,
     ) : ProposalOrRef() {
         override fun encodeTls(writer: TlsWriter) {
@@ -390,8 +440,8 @@ sealed class ProposalOrRef : TlsSerializable {
         override fun hashCode(): Int = proposalRef.contentHashCode()
     }
 
-    companion object {
-        fun decodeTls(reader: TlsReader): ProposalOrRef {
+    public companion object {
+        public fun decodeTls(reader: TlsReader): ProposalOrRef {
             val type = reader.readUint8()
             return when (type) {
                 1 -> Inline(Proposal.decodeTls(reader))

@@ -43,7 +43,7 @@ import com.vitorpamplona.mls.tree.Extension
  * } Welcome;
  * ```
  */
-data class Welcome(
+public data class Welcome(
     val cipherSuite: Int,
     val secrets: List<EncryptedGroupSecrets>,
     val encryptedGroupInfo: ByteArray,
@@ -62,8 +62,8 @@ data class Welcome(
 
     override fun hashCode(): Int = encryptedGroupInfo.contentHashCode()
 
-    companion object {
-        fun decodeTls(reader: TlsReader): Welcome =
+    public companion object {
+        public fun decodeTls(reader: TlsReader): Welcome =
             Welcome(
                 cipherSuite = reader.readUint16(),
                 secrets = reader.readVectorVarInt { EncryptedGroupSecrets.decodeTls(it) },
@@ -82,7 +82,7 @@ data class Welcome(
  * } EncryptedGroupSecrets;
  * ```
  */
-data class EncryptedGroupSecrets(
+public data class EncryptedGroupSecrets(
     val newMember: ByteArray,
     val encryptedGroupSecrets: HpkeCiphertext,
 ) : TlsSerializable {
@@ -99,8 +99,8 @@ data class EncryptedGroupSecrets(
 
     override fun hashCode(): Int = newMember.contentHashCode()
 
-    companion object {
-        fun decodeTls(reader: TlsReader): EncryptedGroupSecrets =
+    public companion object {
+        public fun decodeTls(reader: TlsReader): EncryptedGroupSecrets =
             EncryptedGroupSecrets(
                 newMember = reader.readOpaqueVarInt(),
                 encryptedGroupSecrets = HpkeCiphertext.decodeTls(reader),
@@ -123,7 +123,7 @@ data class EncryptedGroupSecrets(
  * } GroupInfo;
  * ```
  */
-data class GroupInfo(
+public data class GroupInfo(
     val groupContext: GroupContext,
     val extensions: List<Extension>,
     val confirmationTag: ByteArray,
@@ -142,7 +142,7 @@ data class GroupInfo(
      * Encode the TBS (to-be-signed) portion for signature verification.
      * GroupInfoTBS = GroupContext || extensions || confirmationTag || signer
      */
-    fun encodeTbs(): ByteArray {
+    public fun encodeTbs(): ByteArray {
         val writer = TlsWriter()
         groupContext.encodeTls(writer)
         writer.putVectorVarInt(extensions)
@@ -157,7 +157,7 @@ data class GroupInfo(
      *
      * @param signerSignatureKey the public signature key of the signer (from the ratchet tree)
      */
-    fun verifySignature(signerSignatureKey: ByteArray): Boolean {
+    public fun verifySignature(signerSignatureKey: ByteArray): Boolean {
         val tbs = encodeTbs()
         return MlsCryptoProvider.verifyWithLabel(
             signerSignatureKey,
@@ -175,13 +175,13 @@ data class GroupInfo(
 
     override fun hashCode(): Int = groupContext.hashCode()
 
-    companion object {
-        fun decodeTls(reader: TlsReader): GroupInfo =
+    public companion object {
+        public fun decodeTls(reader: TlsReader): GroupInfo =
             GroupInfo(
                 groupContext = GroupContext.decodeTls(reader),
                 extensions = reader.readVectorVarInt { Extension.decodeTls(it) },
                 confirmationTag = reader.readOpaqueVarInt(),
-                signer = reader.readUint32().toInt(),
+                signer = reader.readIndex(),
                 signature = reader.readOpaqueVarInt(),
             )
     }
@@ -204,7 +204,7 @@ data class GroupInfo(
  * } GroupContext;
  * ```
  */
-data class GroupContext(
+public data class GroupContext(
     val version: Int = 1,
     val cipherSuite: Int = 1,
     val groupId: ByteArray,
@@ -235,8 +235,8 @@ data class GroupContext(
         return result
     }
 
-    companion object {
-        fun decodeTls(reader: TlsReader): GroupContext =
+    public companion object {
+        public fun decodeTls(reader: TlsReader): GroupContext =
             GroupContext(
                 version = reader.readUint16(),
                 cipherSuite = reader.readUint16(),
@@ -250,20 +250,20 @@ data class GroupContext(
 }
 
 /**
- * GroupSecrets: the secrets encrypted per-recipient in Welcome messages.
+ * RFC 9420 §12.4.3.1 GroupSecrets, HPKE-sealed to each joiner's init_key:
  *
  * ```
  * struct {
- *     opaque joiner_secret<V>;
- *     optional<PathSecret> path_secret;
- *     PreSharedKeyID psks<V>;
+ *   opaque joiner_secret<V>;
+ *   optional<PathSecret> path_secret;
+ *   PreSharedKeyID psks<V>;
  * } GroupSecrets;
  * ```
  */
-data class GroupSecrets(
+public data class GroupSecrets(
     val joinerSecret: ByteArray,
     val pathSecret: ByteArray?,
-    val psks: List<ByteArray> = emptyList(),
+    val psks: List<PreSharedKeyId> = emptyList(),
 ) : TlsSerializable {
     override fun encodeTls(writer: TlsWriter) {
         writer.putOpaqueVarInt(joinerSecret)
@@ -273,11 +273,7 @@ data class GroupSecrets(
         } else {
             writer.putUint8(0)
         }
-        val pskWriter = TlsWriter()
-        for (psk in psks) {
-            pskWriter.putOpaqueVarInt(psk)
-        }
-        writer.putOpaqueVarInt(pskWriter.toByteArray())
+        writer.putVectorVarInt(psks)
     }
 
     override fun equals(other: Any?): Boolean {
@@ -288,16 +284,11 @@ data class GroupSecrets(
 
     override fun hashCode(): Int = joinerSecret.contentHashCode()
 
-    companion object {
-        fun decodeTls(reader: TlsReader): GroupSecrets {
+    public companion object {
+        public fun decodeTls(reader: TlsReader): GroupSecrets {
             val joinerSecret = reader.readOpaqueVarInt()
             val pathSecret = reader.readOptional { it.readOpaqueVarInt() }
-            val pskBytes = reader.readOpaqueVarInt()
-            val pskReader = TlsReader(pskBytes)
-            val psks = mutableListOf<ByteArray>()
-            while (pskReader.hasRemaining) {
-                psks.add(pskReader.readOpaqueVarInt())
-            }
+            val psks = reader.readVectorVarInt { PreSharedKeyId.decodeTls(it) }
             return GroupSecrets(joinerSecret, pathSecret, psks)
         }
     }

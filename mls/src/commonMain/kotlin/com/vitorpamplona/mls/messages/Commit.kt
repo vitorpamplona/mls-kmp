@@ -39,7 +39,7 @@ import com.vitorpamplona.mls.tree.UpdatePathNode
  * } Commit;
  * ```
  */
-data class Commit(
+public data class Commit(
     val proposals: List<ProposalOrRef>,
     val updatePath: UpdatePath?,
 ) : TlsSerializable {
@@ -48,8 +48,8 @@ data class Commit(
         writer.putOptional(updatePath)
     }
 
-    companion object {
-        fun decodeTls(reader: TlsReader): Commit =
+    public companion object {
+        public fun decodeTls(reader: TlsReader): Commit =
             Commit(
                 proposals = reader.readVectorVarInt { ProposalOrRef.decodeTls(it) },
                 updatePath = reader.readOptional { UpdatePath.decodeTls(it) },
@@ -71,7 +71,7 @@ data class Commit(
  * } UpdatePath;
  * ```
  */
-data class UpdatePath(
+public data class UpdatePath(
     val leafNode: LeafNode,
     val nodes: List<UpdatePathNode>,
 ) : TlsSerializable {
@@ -80,8 +80,8 @@ data class UpdatePath(
         writer.putVectorVarInt(nodes)
     }
 
-    companion object {
-        fun decodeTls(reader: TlsReader): UpdatePath =
+    public companion object {
+        public fun decodeTls(reader: TlsReader): UpdatePath =
             UpdatePath(
                 leafNode = LeafNode.decodeTls(reader),
                 nodes = reader.readVectorVarInt { UpdatePathNode.decodeTls(it) },
@@ -98,7 +98,7 @@ data class UpdatePath(
  * [framedCommitBytes] (the MlsMessage(PublicMessage(FramedContent(commit))) envelope)
  * so that receivers can parse the sender's leaf index and confirmation tag.
  */
-data class CommitResult(
+public data class CommitResult(
     val commitBytes: ByteArray,
     val welcomeBytes: ByteArray?,
     val groupInfoBytes: ByteArray?,
@@ -139,7 +139,7 @@ data class CommitResult(
  * confirmation_tag and process the commit via
  * [com.vitorpamplona.mls.group.MlsGroup.processFramedCommit].
  */
-data class ExternalJoinResult(
+public data class ExternalJoinResult(
     val group: com.vitorpamplona.mls.group.MlsGroup,
     val commitBytes: ByteArray,
     val framedCommitBytes: ByteArray,
