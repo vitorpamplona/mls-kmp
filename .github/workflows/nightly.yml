@@ -101,7 +101,8 @@ jobs:
           cd interop
           export PATH=$PATH:$(go env GOPATH)/bin
           protoc --go_out=proto --go_opt=paths=source_relative --go-grpc_out=proto --go-grpc_opt=paths=source_relative -I proto mls_client.proto
-          cd test-runner && go build -o $RUNNER_TEMP/test-runner .
+          # The repo pins no go.sum entries for these imports; let go fill them in.
+          cd test-runner && go build -mod=mod -o $RUNNER_TEMP/test-runner .
 
       - name: Start the mls-kmp client
         run: |

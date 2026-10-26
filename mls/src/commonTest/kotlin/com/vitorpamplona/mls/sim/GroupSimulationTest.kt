@@ -60,9 +60,17 @@ import kotlin.test.fail
  */
 @OptIn(InternalMlsApi::class)
 class GroupSimulationTest {
-    private val seed = testEnv("MLSKMP_SIM_SEED")?.toLong() ?: Random.nextLong()
+    /** A replayed simulation's own seed, as a failure prints it: run exactly that one. */
+    private val replay = testEnv("MLSKMP_SIM_SEED")?.toLong()
+    private val seed = Random.nextLong()
     private val steps = testEnv("MLSKMP_SIM_STEPS")?.toInt() ?: 120
-    private val runs = testEnv("MLSKMP_SIM_RUNS")?.toInt() ?: 1
+    private val runs = if (replay != null) 1 else testEnv("MLSKMP_SIM_RUNS")?.toInt() ?: 1
+
+    /** Run [run] of a test; [offset] keeps the two tests' seeds apart. */
+    private fun seedOf(
+        run: Int,
+        offset: Int,
+    ) = replay ?: (seed + 2 * run + offset)
 
     /** Capabilities every member advertises, so SelfRemove can be used. */
     private object SimPolicy : MlsGroupPolicy {
@@ -75,10 +83,10 @@ class GroupSimulationTest {
     }
 
     @Test
-    fun publicHandshakesFollowedByADeliveryServiceView() = repeat(runs) { Simulation(seed + 2 * it, steps, SimPolicy, withView = true).run() }
+    fun publicHandshakesFollowedByADeliveryServiceView() = repeat(runs) { Simulation(seedOf(it, 0), steps, SimPolicy, withView = true).run() }
 
     @Test
-    fun privateHandshakes() = repeat(runs) { Simulation(seed + 2 * it + 1, steps, CiphertextPolicy, withView = false).run() }
+    fun privateHandshakes() = repeat(runs) { Simulation(seedOf(it, 1), steps, CiphertextPolicy, withView = false).run() }
 
     private class Member(
         val name: String,
@@ -339,8 +347,11 @@ class GroupSimulationTest {
             commit(committer, "commit pending")
         }
 
+        /** It asked to leave and waits for another member to commit that: it cannot commit until then. */
+        fun waitsToLeave(m: Member) = m.group.pendingProposalsSnapshot().any { it.isFrom(m.group.leafIndex) && it.proposal is Proposal.SelfRemove }
+
         fun concurrentCommits() {
-            val racers = current.shuffled(random).take(2 + random.nextInt(2))
+            val racers = current.filterNot(::waitsToLeave).shuffled(random).take(2 + random.nextInt(2))
             if (racers.size < 2) return
             val epoch = racers.first().group.epoch
             val staged =

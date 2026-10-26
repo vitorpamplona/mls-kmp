@@ -477,7 +477,7 @@ public data class MlsGroupState(
                         PendingUpdateKeys(reader.readOpaqueVarInt(), reader.readOpaqueVarInt(), reader.readOpaqueVarInt())
                     }
                 reInitPending =
-                    reader.readOpaqueVarInt().takeIf { it.isNotEmpty() }?.let { Proposal.decodeTls(TlsReader(it)) as Proposal.ReInit }
+                    reader.readOpaqueVarInt().takeIf { it.isNotEmpty() }?.let { requireNotNull(Proposal.decodeTls(TlsReader(it)) as? Proposal.ReInit) { "Saved reInitPending is not a ReInit proposal" } }
             }
 
             // v9+: removal flag and a staged commit.
