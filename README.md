@@ -184,8 +184,10 @@ CommonCrypto on Apple where it has the primitive, and constant-time pure Kotlin
 elsewhere, and depends on nothing but the Kotlin stdlib. So does this library,
 apart from crypto-kmp.
 
-JS and Wasm are not targets yet: AES-GCM there is only available through the
-asynchronous WebCrypto API, and the engine is synchronous.
+JS and Wasm are not targets yet. The engine is synchronous and WebCrypto's
+ciphers are async-only, but crypto-kmp 2.1 brings synchronous, constant-time
+Kotlin primitives to both, so nothing in the crypto layer stands in the way
+any more.
 
 ## Tests
 

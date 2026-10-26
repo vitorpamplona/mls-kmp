@@ -7,7 +7,7 @@ mavenPublish = "0.37.0"
 spotless = "8.10.4"
 kotlinxSerialization = "1.12.0"
 # SHA, HMAC, HKDF, AES-GCM, X25519, Ed25519 and secure random: vitorpamplona/crypto-kmp.
-cryptoKmp = "2.0.0"
+cryptoKmp = "2.1.0"
 # The mlswg interop test-runner client (interop-client/, JVM only, never published).
 grpc = "1.71.0"
 protobuf = "4.29.3"
