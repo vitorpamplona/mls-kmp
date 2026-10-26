@@ -18,6 +18,8 @@ Quartz's `mls` package and moved here so the engine has no Nostr in it.
   `mls/src/commonTest/resources/mls/`.
 - `tools/tsmls-vector-gen`: the ts-mls vector generator. The OpenMLS (MDK) one is marmot-kmp's
   `marmot/tools/mdk-vector-gen`, because it shares an MDK pin with Marmot's vectors.
+- `interop-client/`: the gRPC client the mlswg interop test-runner drives. Never published.
+- `docs/guide/`: the user guide; update the page a behaviour change touches.
 
 ## Rules
 
@@ -29,8 +31,12 @@ Quartz's `mls` package and moved here so the engine has no Nostr in it.
   primitive here; add it there. No other runtime dependency beyond the Kotlin stdlib.
 - **Constant time** for anything touching secrets, and wipe secret temporaries once done.
 - Anything public only so the bindings' tests can reach it is `@InternalMlsApi`, not stable API.
+- **Explicit API mode** is on and `mls/api/` holds the public ABI dump: an API change runs
+  `./gradlew updateKotlinAbi` and commits the new dump, or `checkKotlinAbi` fails in CI.
 - `MlsGroupState`'s serialized bytes are API: the bindings persist them, and a change that the next
-  version cannot read is a group a user has lost.
+  version cannot read is a group a user has lost. Every saved layout is frozen in
+  `mls/src/commonTest/resources/mls/persisted-formats.json`; a new layout adds an entry
+  (`PersistedFormatFixtureWriter`), and the old ones never change.
 - `commonMain` and `commonTest` stay free of JVM-only APIs: use `kotlin.concurrent.Volatile`, and
   `assertTrue`, not `assert`, in tests.
 - JVM target is 17. Releases follow semantic versioning: marmot-kmp, cordn-kmp and Amethyst pin a
