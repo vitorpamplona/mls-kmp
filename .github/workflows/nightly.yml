@@ -92,8 +92,11 @@ jobs:
       - name: Build the test-runner
         run: |
           sudo apt-get update -q && sudo apt-get install -y protobuf-compiler
-          go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.36.5
-          go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@v1.5.1
+          # The generators must match the runtimes mls-implementations' go.mod pins
+          # (protobuf v1.33.0, grpc v1.56.3): protoc-gen-go-grpc 1.5 emits
+          # SupportPackageIsVersion9 and grpc.StaticMethod, which need grpc 1.64.
+          go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.33.0
+          go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@v1.3.0
           git init -q $RUNNER_TEMP/mls-implementations
           cd $RUNNER_TEMP/mls-implementations
           git fetch -q --depth 1 https://github.com/mlswg/mls-implementations.git $MLS_IMPLEMENTATIONS_REV
