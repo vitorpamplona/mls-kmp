@@ -8,8 +8,8 @@ protocol client that runs in the browser / Node / Bun / Deno).
 Produces `mls/src/commonTest/resources/mls/tsmls-welcome.json`, which
 `TsMlsWelcomeInteropTest` consumes to prove this engine can parse and
 decrypt a Welcome + application messages authored by the TypeScript
-side. Together with `mdk-vector-gen` (OpenMLS/Rust, in Amethyst's
-`quartz/tools/`) the engine has cross-implementation KATs from two
+side. Together with `mdk-vector-gen` (OpenMLS/Rust, in marmot-kmp's
+`marmot/tools/`) the engine has cross-implementation KATs from two
 independent MLS backends.
 
 ## Regenerating
