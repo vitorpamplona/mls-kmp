@@ -25,8 +25,11 @@
   confirmation tag, as RFC 9420 §11 says (§8.2 says it is empty; OpenMLS
   follows §11). It used to be empty, so an external join into a group still
   at epoch 0 failed across implementations, and fails between this version
-  and older ones. A group an older release saved at epoch 0 is repaired when
-  its creator restores it.
+  and older ones. A group an older release saved at epoch 0 keeps the old
+  hash, so external joins into it fail until its first commit.
+- An external commit can carry a resumption PSK of the group it joins (a
+  former member proving it held an earlier epoch); the joiner used to look
+  for it among epochs it never had.
 - A new group's first epoch secret is random (§11). It was derived from the
   GroupContext alone.
 - `MlsGroupState` is at version 10: a key rotation or leaf advertisement

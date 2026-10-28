@@ -657,9 +657,11 @@ public class MlsGroup private constructor(
             }
 
             is PreSharedKeyId.Resumption -> {
-                // A reinit or branch PSK names the predecessor, which a ReInit may leave our group_id.
-                if (id.usage == PreSharedKeyId.USAGE_APPLICATION && id.pskGroupId.contentEquals(groupId)) {
-                    if (id.pskEpoch == epoch) epochSecrets.resumptionPsk else resumptionPsks[id.pskEpoch]
+                // A member's own epochs, otherwise what it was given: a reinit or branch PSK names
+                // the predecessor, which a ReInit may leave our group_id, and an external joiner
+                // (no leaf yet) holds no epochs of the group it joins.
+                if (id.usage == PreSharedKeyId.USAGE_APPLICATION && myLeafIndex >= 0 && id.pskGroupId.contentEquals(groupId)) {
+                    ownResumptionPsk(id)
                 } else {
                     pskStore[PreSharedKeyId.Resumption(PreSharedKeyId.USAGE_APPLICATION, id.pskGroupId, id.pskEpoch, ByteArray(0)).identityKey()]
                 }
@@ -1088,8 +1090,8 @@ public class MlsGroup private constructor(
         return SuccessorGroup(successor, commit)
     }
 
-    /** The resumption PSK [id] names in THIS group, for a successor's Welcome. */
-    private fun predecessorResumptionPsk(id: PreSharedKeyId.Resumption): ByteArray? {
+    /** The resumption PSK [id] names in THIS group, if we still hold that epoch. */
+    private fun ownResumptionPsk(id: PreSharedKeyId.Resumption): ByteArray? {
         if (!id.pskGroupId.contentEquals(groupId)) return null
         return if (id.pskEpoch == epoch) epochSecrets.resumptionPsk else resumptionPsks[id.pskEpoch]
     }
@@ -3316,7 +3318,11 @@ public class MlsGroup private constructor(
                 // RFC 9420 §11, over §8.2's interim_transcript_hash_[0] = "": the
                 // interim hash follows from a confirmation tag over the empty
                 // confirmed transcript, the tag the GroupInfo carries, so an
-                // external joiner of epoch 0 derives the same one.
+                // external joiner of epoch 0 derives the same one (as OpenMLS's
+                // PublicGroup::new does). A group saved at epoch 0 by 1.3.0 or
+                // older keeps its empty one until its first commit: repairing it
+                // on restore would fork an observer saved alongside it, which
+                // cannot redo the hash without the tag.
                 interimTranscriptHash = interimTranscriptHashOf(ByteArray(0), computeConfirmationTag(epochSecrets.confirmationKey, ByteArray(0))),
                 policy = policy,
             )
@@ -3380,7 +3386,7 @@ public class MlsGroup private constructor(
                 bundle,
                 policy,
                 ratchetTree,
-                psks = { id -> (id as? PreSharedKeyId.Resumption)?.let { predecessor.predecessorResumptionPsk(it) } },
+                psks = { id -> (id as? PreSharedKeyId.Resumption)?.let { predecessor.ownResumptionPsk(it) } },
                 successorOf = predecessor,
             ).join()
 
@@ -3783,13 +3789,7 @@ public class MlsGroup private constructor(
                 initSecret = state.initSecret,
                 signingPrivateKey = state.signingPrivateKey,
                 encryptionPrivateKey = state.encryptionPrivateKey,
-                // Up to 1.3.0 a new group's interim hash was empty (see create); its creator can redo it.
-                interimTranscriptHash =
-                    if (state.groupContext.epoch == 0L && state.interimTranscriptHash.isEmpty() && !observer) {
-                        interimTranscriptHashOf(ByteArray(0), computeConfirmationTag(state.epochSecrets.confirmationKey, ByteArray(0)))
-                    } else {
-                        state.interimTranscriptHash
-                    },
+                interimTranscriptHash = state.interimTranscriptHash,
                 pathPrivateKeys = state.pathPrivateKeys.toMutableMap(),
                 pendingProposals = state.pendingProposals.toMutableList(),
                 retainedEpochs = ArrayDeque(state.retainedEpochs),

@@ -453,13 +453,6 @@ class RfcFlowsTest {
     }
 
     @Test
-    fun aNewGroupSavedWithTheOldEmptyInterimHashIsRepairedOnRestore() {
-        val alice = MlsGroup.create("alice".encodeToByteArray())
-        val restored = MlsGroup.restore(alice.saveState().copy(interimTranscriptHash = ByteArray(0)))
-        assertContentEquals(alice.saveState().interimTranscriptHash, restored.saveState().interimTranscriptHash)
-    }
-
-    @Test
     fun aNewGroupsEpochSecretIsNotDerivedFromItsGroupContext() {
         // RFC 9420 §11: the first epoch secret is fresh randomness, not a
         // function of the (non-secret) GroupContext.
@@ -477,6 +470,23 @@ class RfcFlowsTest {
         restored.processFramedCommit(join.framedCommitBytes)
         assertSameEpoch(restored, join.group)
         assertTalk(restored, join.group)
+    }
+
+    @Test
+    fun anExternalJoinCanCarryAResumptionPskOfTheGroup() {
+        // A former member rejoining by external commit proves it held an earlier epoch.
+        val t = trio()
+        val epoch = t.alice.epoch
+        val psk = t.alice.resumptionPsk
+        t.alice.commit().also {
+            t.bob.processFramedCommit(it.framedCommitBytes)
+            t.carol.processFramedCommit(it.framedCommitBytes)
+        }
+        val id = PreSharedKeyId.Resumption(PreSharedKeyId.USAGE_APPLICATION, t.alice.groupId, epoch, ByteArray(32) { 9 })
+        val join = MlsGroup.externalJoin(t.alice.groupInfo().toTlsBytes(), "zara".encodeToByteArray(), psks = listOf(id to psk))
+        t.alice.processFramedCommit(join.framedCommitBytes)
+        assertSameEpoch(t.alice, join.group)
+        assertTalk(t.alice, join.group)
     }
 
     @Test

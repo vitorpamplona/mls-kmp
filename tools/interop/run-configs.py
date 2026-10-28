@@ -59,12 +59,11 @@ def run_config(args, name, out_dir):
 
     client = None
     if args.fresh_client:
-        log = open(os.path.join(out_dir, f"{name}-client.log"), "w")
-        client = subprocess.Popen(shlex.split(args.fresh_client), stdout=log, stderr=subprocess.STDOUT)
-        if not wait_for_port(args.fresh_port):
-            client.kill()
-            return skipped, {}, f"the client on port {args.fresh_port} didn't start"
+        with open(os.path.join(out_dir, f"{name}-client.log"), "w") as log:
+            client = subprocess.Popen(shlex.split(args.fresh_client), stdout=log, stderr=subprocess.STDOUT)
     try:
+        if client and not wait_for_port(args.fresh_port):
+            return skipped, {}, f"the client on port {args.fresh_port} didn't start"
         cmd = [args.runner, "-suite", str(args.suite), "-fail-fast", "-config", config_path]
         for c in args.client:
             cmd += ["-client", c]
@@ -82,7 +81,9 @@ def run_config(args, name, out_dir):
     try:
         return skipped, json.loads(run.stdout)["scripts"], None
     except (ValueError, KeyError):
-        return skipped, {}, (run.stderr.strip().splitlines() or [f"exit {run.returncode}"])[-1]
+        # A Go panic ends in stack frames: report its message, else the last line (log.Fatal).
+        lines = run.stderr.strip().splitlines() or [f"exit {run.returncode}"]
+        return skipped, {}, next((l for l in lines if l.startswith("panic:")), lines[-1])
 
 
 def main():
@@ -113,7 +114,10 @@ def main():
             lines.append(f"- **{name}**: FAILED to run: {error}")
         for script, runs in results.items():
             bad = next((r for r in runs if r.get("failed_step") is not None), None)
-            if bad is None:
+            if not runs:
+                failed += 1
+                lines.append(f"- **{name}/{script}: FAILED**: the runner ran it for no assignment of clients")
+            elif bad is None:
                 passed += 1
                 lines.append(f"- {name}/{script}: passed ({len(runs)} runs)")
             else:
