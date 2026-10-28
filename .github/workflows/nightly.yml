@@ -92,8 +92,9 @@ jobs:
       - name: Build the test-runner
         run: |
           sudo apt-get update -q && sudo apt-get install -y protobuf-compiler
-          go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.36.5
-          go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@v1.5.1
+          # The generators that match the protobuf and grpc versions mls-implementations' go.mod pins.
+          go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.33.0
+          go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@v1.3.0
           git init -q $RUNNER_TEMP/mls-implementations
           cd $RUNNER_TEMP/mls-implementations
           git fetch -q --depth 1 https://github.com/mlswg/mls-implementations.git $MLS_IMPLEMENTATIONS_REV
@@ -103,6 +104,24 @@ jobs:
           protoc --go_out=proto --go_opt=paths=source_relative --go-grpc_out=proto --go-grpc_opt=paths=source_relative -I proto mls_client.proto
           # The repo pins no go.sum entries for these imports; let go fill them in.
           cd test-runner && go build -mod=mod -o $RUNNER_TEMP/test-runner .
+          # mls-kmp implements only ciphersuite 0x0001, so the scripts that move
+          # a group to another ciphersuite can't run: leave them out.
+          cd ../configs
+          python3 - *.json <<'EOF'
+          import json, sys
+          for path in sys.argv[1:]:
+              with open(path) as f:
+                  config = json.load(f)
+              scripts = config.get("scripts", {})
+              # The runner reads both spellings, changeCipherSuite and changeCiphersuite.
+              dropped = [name for name, steps in scripts.items() if '"changeciphersuite": true' in json.dumps(steps).lower()]
+              if dropped:
+                  for name in dropped:
+                      del scripts[name]
+                  with open(path, "w") as f:
+                      json.dump(config, f)
+                  print(f"{path}: skipping {', '.join(dropped)}")
+          EOF
 
       - name: Start the mls-kmp client
         run: |
