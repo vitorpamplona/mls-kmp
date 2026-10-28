@@ -19,6 +19,16 @@
   given, an Add whose KeyPackage expired in the pool) instead of failing.
 - A commit can only reference proposals that were sent; one we staged and
   never sent cannot be named by a guessed reference.
+- A ReInit that keeps the group_id works: the new group's first commit used
+  to leave out the reinit PSK, and every member refused its Welcome.
+- A new group's interim transcript hash follows from its epoch-0
+  confirmation tag, as RFC 9420 §11 says (§8.2 says it is empty; OpenMLS
+  follows §11). It used to be empty, so an external join into a group still
+  at epoch 0 failed across implementations, and fails between this version
+  and older ones. A group an older release saved at epoch 0 is repaired when
+  its creator restores it.
+- A new group's first epoch secret is random (§11). It was derived from the
+  GroupContext alone.
 - `MlsGroupState` is at version 10: a key rotation or leaf advertisement
   staged for the next commit survives a restart. Older blobs still restore;
   version 10 blobs do not restore on older releases.

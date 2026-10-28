@@ -3297,12 +3297,10 @@ public class MlsGroup private constructor(
                     extensions = baseExtensions + initialExtensions,
                 )
 
-            // Initial key schedule with zero secrets
-            val initSecret = ByteArray(MlsCryptoProvider.HASH_OUTPUT_LENGTH)
-            val commitSecret = ByteArray(MlsCryptoProvider.HASH_OUTPUT_LENGTH)
-
-            val keySchedule = KeySchedule(groupContext.toTlsBytes())
-            val epochSecrets = keySchedule.deriveEpochSecrets(commitSecret, initSecret)
+            // RFC 9420 §11: the first epoch secret is a fresh random value.
+            val seed = MlsCryptoProvider.randomBytes(MlsCryptoProvider.HASH_OUTPUT_LENGTH)
+            val epochSecrets = KeySchedule(groupContext.toTlsBytes()).deriveEpochSecrets(ByteArray(MlsCryptoProvider.HASH_OUTPUT_LENGTH), seed)
+            seed.fill(0)
 
             val secretTree = secretTreeFor(policy, epochSecrets.encryptionSecret, 1)
 
@@ -3315,7 +3313,11 @@ public class MlsGroup private constructor(
                 initSecret = epochSecrets.initSecret,
                 signingPrivateKey = sigKp.privateKey,
                 encryptionPrivateKey = encKp.privateKey,
-                interimTranscriptHash = ByteArray(0),
+                // RFC 9420 §11, over §8.2's interim_transcript_hash_[0] = "": the
+                // interim hash follows from a confirmation tag over the empty
+                // confirmed transcript, the tag the GroupInfo carries, so an
+                // external joiner of epoch 0 derives the same one.
+                interimTranscriptHash = interimTranscriptHashOf(ByteArray(0), computeConfirmationTag(epochSecrets.confirmationKey, ByteArray(0))),
                 policy = policy,
             )
         }
@@ -3619,8 +3621,7 @@ public class MlsGroup private constructor(
                 initSecret = none,
                 signingPrivateKey = ByteArray(0),
                 encryptionPrivateKey = ByteArray(0),
-                interimTranscriptHash =
-                    if (groupContext.epoch == 0L) ByteArray(0) else interimTranscriptHashOf(groupContext.confirmedTranscriptHash, groupInfo.confirmationTag),
+                interimTranscriptHash = interimTranscriptHashOf(groupContext.confirmedTranscriptHash, groupInfo.confirmationTag),
                 policy = policy,
                 observer = true,
             )
@@ -3722,10 +3723,8 @@ public class MlsGroup private constructor(
                     initSecret = externalInitSecret,
                     signingPrivateKey = sigKp.privateKey,
                     encryptionPrivateKey = ByteArray(0),
-                    // RFC 9420 §8.2: interim_transcript_hash_[0] is the empty string;
-                    // every later epoch's follows from the GroupInfo's transcript and tag.
-                    interimTranscriptHash =
-                        if (groupContext.epoch == 0L) ByteArray(0) else interimTranscriptHashOf(groupContext.confirmedTranscriptHash, groupInfo.confirmationTag),
+                    // Epoch 0 included: a new group's interim hash follows from its tag too (see create).
+                    interimTranscriptHash = interimTranscriptHashOf(groupContext.confirmedTranscriptHash, groupInfo.confirmationTag),
                     policy = policy,
                 )
             for ((id, value) in psks) joiner.pskStore[id.identityKey()] = value
@@ -3784,7 +3783,13 @@ public class MlsGroup private constructor(
                 initSecret = state.initSecret,
                 signingPrivateKey = state.signingPrivateKey,
                 encryptionPrivateKey = state.encryptionPrivateKey,
-                interimTranscriptHash = state.interimTranscriptHash,
+                // Up to 1.3.0 a new group's interim hash was empty (see create); its creator can redo it.
+                interimTranscriptHash =
+                    if (state.groupContext.epoch == 0L && state.interimTranscriptHash.isEmpty() && !observer) {
+                        interimTranscriptHashOf(ByteArray(0), computeConfirmationTag(state.epochSecrets.confirmationKey, ByteArray(0)))
+                    } else {
+                        state.interimTranscriptHash
+                    },
                 pathPrivateKeys = state.pathPrivateKeys.toMutableMap(),
                 pendingProposals = state.pendingProposals.toMutableList(),
                 retainedEpochs = ArrayDeque(state.retainedEpochs),
