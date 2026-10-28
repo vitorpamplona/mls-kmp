@@ -479,6 +479,26 @@ class RfcFlowsTest {
     }
 
     @Test
+    fun reinitCanSetEmptyRequiredCapabilitiesAndExternalSenders() {
+        // The mlswg interop runner's reinit/change_extensions script.
+        val t = trio()
+        val extensions = listOf(Extension(3, byteArrayOf(0, 0, 0)), Extension(5, byteArrayOf(0)))
+        t.alice.proposeReInit(newGroupId = t.alice.groupId, newExtensions = extensions)
+        t.alice.commit().also {
+            t.bob.processFramedCommit(it.framedCommitBytes)
+            t.carol.processFramedCommit(it.framedCommitBytes)
+        }
+
+        val aliceKp = t.alice.createKeyPackage("alice".encodeToByteArray(), ByteArray(0))
+        val bobKp = t.bob.createKeyPackage("bob".encodeToByteArray(), ByteArray(0))
+        val successor = t.carol.reinit(listOf(aliceKp.keyPackage.toTlsBytes(), bobKp.keyPackage.toTlsBytes()))
+        val alice = MlsGroup.joinSuccessor(successor.commit.welcomeBytes!!, aliceKp, predecessor = t.alice)
+        val bob = MlsGroup.joinSuccessor(successor.commit.welcomeBytes!!, bobKp, predecessor = t.bob)
+        assertSameEpoch(successor.group, alice, bob)
+        assertTalk(alice, bob)
+    }
+
+    @Test
     fun aSuccessorMustMatchItsPredecessor() {
         val t = trio()
         // No ReInit was committed, so a "reinit" Welcome has nothing to resume.

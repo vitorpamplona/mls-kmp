@@ -657,7 +657,8 @@ public class MlsGroup private constructor(
             }
 
             is PreSharedKeyId.Resumption -> {
-                if (id.pskGroupId.contentEquals(groupId)) {
+                // A reinit or branch PSK names the predecessor, which a ReInit may leave our group_id.
+                if (id.usage == PreSharedKeyId.USAGE_APPLICATION && id.pskGroupId.contentEquals(groupId)) {
                     if (id.pskEpoch == epoch) epochSecrets.resumptionPsk else resumptionPsks[id.pskEpoch]
                 } else {
                     pskStore[PreSharedKeyId.Resumption(PreSharedKeyId.USAGE_APPLICATION, id.pskGroupId, id.pskEpoch, ByteArray(0)).identityKey()]
