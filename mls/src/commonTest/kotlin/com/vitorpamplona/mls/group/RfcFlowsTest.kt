@@ -479,8 +479,8 @@ class RfcFlowsTest {
     }
 
     @Test
-    fun reinitCanSetEmptyRequiredCapabilitiesAndExternalSenders() {
-        // The mlswg interop runner's reinit/change_extensions script.
+    fun aReinitCanKeepTheGroupId() {
+        // The mlswg interop runner's reinit/change_extensions script: same group_id, empty required_capabilities and external_senders.
         val t = trio()
         val extensions = listOf(Extension(3, byteArrayOf(0, 0, 0)), Extension(5, byteArrayOf(0)))
         t.alice.proposeReInit(newGroupId = t.alice.groupId, newExtensions = extensions)
