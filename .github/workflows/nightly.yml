@@ -75,6 +75,7 @@ jobs:
       # mls-implementations, at the commit interop-client/src/main/proto/mls_client.proto is vendored from.
       MLS_IMPLEMENTATIONS_REV: 2034fe72e0c805a683ba76165660c834f2a8142a
       OPENMLS_TAG: v0.9.2  # as tools/openmls-verifier/run.sh
+      INTEROP_CONFIGS: welcome_join application commit external_join external_proposals reinit branch
     steps:
       - name: Checkout code
         uses: actions/checkout@v7
@@ -92,8 +93,9 @@ jobs:
       - name: Build the test-runner
         run: |
           sudo apt-get update -q && sudo apt-get install -y protobuf-compiler
-          go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.36.5
-          go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@v1.5.1
+          # The generators that match the protobuf and grpc versions mls-implementations' go.mod pins.
+          go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.33.0
+          go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@v1.3.0
           git init -q $RUNNER_TEMP/mls-implementations
           cd $RUNNER_TEMP/mls-implementations
           git fetch -q --depth 1 https://github.com/mlswg/mls-implementations.git $MLS_IMPLEMENTATIONS_REV
@@ -110,30 +112,44 @@ jobs:
           interop-client/build/install/interop-client/bin/interop-client -port 50001 > $RUNNER_TEMP/mls-kmp-client.log 2>&1 &
           timeout 60 bash -c 'until (echo > /dev/tcp/localhost/50001) 2>/dev/null; do sleep 1; done'
 
+      # mls-kmp implements only ciphersuite 0x0001, so the scripts that move a
+      # group to another ciphersuite can't run.
       - name: mls-kmp in every role
         run: |
-          cd $RUNNER_TEMP/mls-implementations/interop/configs
-          for config in welcome_join application commit external_join external_proposals reinit branch; do
-            echo "::group::$config"
-            $RUNNER_TEMP/test-runner -client localhost:50001 -suite 1 -fail-fast -config $config.json
-            echo "::endgroup::"
-          done
+          python3 tools/interop/run-configs.py --title "mls-kmp in every role" \
+            --runner $RUNNER_TEMP/test-runner --configs $RUNNER_TEMP/mls-implementations/interop/configs \
+            --client localhost:50001 --skip-cipher-suite-changes \
+            --results $RUNNER_TEMP/results/mls-kmp --report $GITHUB_STEP_SUMMARY \
+            $INTEROP_CONFIGS
 
       # Not yet seen green: kept from failing the nightly until it has been.
+      # OpenMLS's interop client implements no ReInit, branch, external signer,
+      # NewMemberAdd or GroupContextExtensions RPC, and panics in HandleCommit
+      # on its own resumption PSK proposal (it doesn't record it as its own),
+      # which poisons its state for every later call. So those scripts are left
+      # out, and each config gets a fresh OpenMLS client.
       - name: mls-kmp with OpenMLS
         continue-on-error: true
         run: |
           git clone --quiet --depth 1 --branch $OPENMLS_TAG https://github.com/openmls/openmls.git $RUNNER_TEMP/openmls
           (cd $RUNNER_TEMP/openmls/interop_client && cargo build --release)
-          $RUNNER_TEMP/openmls/target/release/interop_client --port 50002 > $RUNNER_TEMP/openmls-client.log 2>&1 &
-          timeout 60 bash -c 'until (echo > /dev/tcp/localhost/50002) 2>/dev/null; do sleep 1; done'
-          cd $RUNNER_TEMP/mls-implementations/interop/configs
-          for config in welcome_join application commit external_join external_proposals reinit branch; do
-            echo "::group::$config"
-            $RUNNER_TEMP/test-runner -client localhost:50001 -client localhost:50002 -suite 1 -fail-fast -config $config.json
-            echo "::endgroup::"
-          done
+          python3 tools/interop/run-configs.py --title "mls-kmp with OpenMLS" \
+            --runner $RUNNER_TEMP/test-runner --configs $RUNNER_TEMP/mls-implementations/interop/configs \
+            --client localhost:50001 --client localhost:50002 --skip-cipher-suite-changes \
+            --fresh-client "$RUNNER_TEMP/openmls/target/release/interop_client --port 50002" --fresh-port 50002 \
+            --skip-action reinit --skip-action branch --skip-action newMemberAddProposal \
+            --skip-action addExternalSigner --skip-action externalSignerProposal \
+            --skip-action groupContextExtensionsProposal --skip-action resumptionPSKProposal \
+            --results $RUNNER_TEMP/results/openmls --report $GITHUB_STEP_SUMMARY \
+            $INTEROP_CONFIGS
 
       - name: Client logs
         if: always()
-        run: tail -n 200 $RUNNER_TEMP/*-client.log || true
+        run: tail -n 200 $RUNNER_TEMP/*-client.log $RUNNER_TEMP/results/openmls/*-client.log || true
+
+      - uses: actions/upload-artifact@v5
+        if: always()
+        with:
+          name: mlswg-interop-results
+          path: ${{ runner.temp }}/results
+          if-no-files-found: ignore

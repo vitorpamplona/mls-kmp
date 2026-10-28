@@ -657,8 +657,11 @@ public class MlsGroup private constructor(
             }
 
             is PreSharedKeyId.Resumption -> {
-                if (id.pskGroupId.contentEquals(groupId)) {
-                    if (id.pskEpoch == epoch) epochSecrets.resumptionPsk else resumptionPsks[id.pskEpoch]
+                // A member's own epochs, otherwise what it was given: a reinit or branch PSK names
+                // the predecessor, which a ReInit may leave our group_id, and an external joiner
+                // (no leaf yet) holds no epochs of the group it joins.
+                if (id.usage == PreSharedKeyId.USAGE_APPLICATION && myLeafIndex >= 0 && id.pskGroupId.contentEquals(groupId)) {
+                    ownResumptionPsk(id)
                 } else {
                     pskStore[PreSharedKeyId.Resumption(PreSharedKeyId.USAGE_APPLICATION, id.pskGroupId, id.pskEpoch, ByteArray(0)).identityKey()]
                 }
@@ -1087,8 +1090,8 @@ public class MlsGroup private constructor(
         return SuccessorGroup(successor, commit)
     }
 
-    /** The resumption PSK [id] names in THIS group, for a successor's Welcome. */
-    private fun predecessorResumptionPsk(id: PreSharedKeyId.Resumption): ByteArray? {
+    /** The resumption PSK [id] names in THIS group, if we still hold that epoch. */
+    private fun ownResumptionPsk(id: PreSharedKeyId.Resumption): ByteArray? {
         if (!id.pskGroupId.contentEquals(groupId)) return null
         return if (id.pskEpoch == epoch) epochSecrets.resumptionPsk else resumptionPsks[id.pskEpoch]
     }
@@ -3296,12 +3299,10 @@ public class MlsGroup private constructor(
                     extensions = baseExtensions + initialExtensions,
                 )
 
-            // Initial key schedule with zero secrets
-            val initSecret = ByteArray(MlsCryptoProvider.HASH_OUTPUT_LENGTH)
-            val commitSecret = ByteArray(MlsCryptoProvider.HASH_OUTPUT_LENGTH)
-
-            val keySchedule = KeySchedule(groupContext.toTlsBytes())
-            val epochSecrets = keySchedule.deriveEpochSecrets(commitSecret, initSecret)
+            // RFC 9420 §11: the first epoch secret is a fresh random value.
+            val seed = MlsCryptoProvider.randomBytes(MlsCryptoProvider.HASH_OUTPUT_LENGTH)
+            val epochSecrets = KeySchedule(groupContext.toTlsBytes()).deriveEpochSecrets(ByteArray(MlsCryptoProvider.HASH_OUTPUT_LENGTH), seed)
+            seed.fill(0)
 
             val secretTree = secretTreeFor(policy, epochSecrets.encryptionSecret, 1)
 
@@ -3314,7 +3315,15 @@ public class MlsGroup private constructor(
                 initSecret = epochSecrets.initSecret,
                 signingPrivateKey = sigKp.privateKey,
                 encryptionPrivateKey = encKp.privateKey,
-                interimTranscriptHash = ByteArray(0),
+                // RFC 9420 §11, over §8.2's interim_transcript_hash_[0] = "": the
+                // interim hash follows from a confirmation tag over the empty
+                // confirmed transcript, the tag the GroupInfo carries, so an
+                // external joiner of epoch 0 derives the same one (as OpenMLS's
+                // PublicGroup::new does). A group saved at epoch 0 by 1.3.0 or
+                // older keeps its empty one until its first commit: repairing it
+                // on restore would fork an observer saved alongside it, which
+                // cannot redo the hash without the tag.
+                interimTranscriptHash = interimTranscriptHashOf(ByteArray(0), computeConfirmationTag(epochSecrets.confirmationKey, ByteArray(0))),
                 policy = policy,
             )
         }
@@ -3377,7 +3386,7 @@ public class MlsGroup private constructor(
                 bundle,
                 policy,
                 ratchetTree,
-                psks = { id -> (id as? PreSharedKeyId.Resumption)?.let { predecessor.predecessorResumptionPsk(it) } },
+                psks = { id -> (id as? PreSharedKeyId.Resumption)?.let { predecessor.ownResumptionPsk(it) } },
                 successorOf = predecessor,
             ).join()
 
@@ -3618,8 +3627,7 @@ public class MlsGroup private constructor(
                 initSecret = none,
                 signingPrivateKey = ByteArray(0),
                 encryptionPrivateKey = ByteArray(0),
-                interimTranscriptHash =
-                    if (groupContext.epoch == 0L) ByteArray(0) else interimTranscriptHashOf(groupContext.confirmedTranscriptHash, groupInfo.confirmationTag),
+                interimTranscriptHash = interimTranscriptHashOf(groupContext.confirmedTranscriptHash, groupInfo.confirmationTag),
                 policy = policy,
                 observer = true,
             )
@@ -3721,10 +3729,8 @@ public class MlsGroup private constructor(
                     initSecret = externalInitSecret,
                     signingPrivateKey = sigKp.privateKey,
                     encryptionPrivateKey = ByteArray(0),
-                    // RFC 9420 §8.2: interim_transcript_hash_[0] is the empty string;
-                    // every later epoch's follows from the GroupInfo's transcript and tag.
-                    interimTranscriptHash =
-                        if (groupContext.epoch == 0L) ByteArray(0) else interimTranscriptHashOf(groupContext.confirmedTranscriptHash, groupInfo.confirmationTag),
+                    // Epoch 0 included: a new group's interim hash follows from its tag too (see create).
+                    interimTranscriptHash = interimTranscriptHashOf(groupContext.confirmedTranscriptHash, groupInfo.confirmationTag),
                     policy = policy,
                 )
             for ((id, value) in psks) joiner.pskStore[id.identityKey()] = value

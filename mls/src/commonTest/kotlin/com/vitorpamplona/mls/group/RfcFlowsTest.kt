@@ -23,6 +23,7 @@ package com.vitorpamplona.mls.group
 import com.vitorpamplona.crypto.curve25519.Ed25519
 import com.vitorpamplona.mls.codec.TlsReader
 import com.vitorpamplona.mls.codec.TlsWriter
+import com.vitorpamplona.mls.crypto.MlsCryptoProvider
 import com.vitorpamplona.mls.framing.ContentType
 import com.vitorpamplona.mls.framing.FramedContent
 import com.vitorpamplona.mls.framing.Framing
@@ -34,6 +35,7 @@ import com.vitorpamplona.mls.messages.Commit
 import com.vitorpamplona.mls.messages.PreSharedKeyId
 import com.vitorpamplona.mls.messages.Proposal
 import com.vitorpamplona.mls.messages.ProposalOrRef
+import com.vitorpamplona.mls.schedule.KeySchedule
 import com.vitorpamplona.mls.tree.Capabilities
 import com.vitorpamplona.mls.tree.Credential
 import com.vitorpamplona.mls.tree.Extension
@@ -439,6 +441,55 @@ class RfcFlowsTest {
     }
 
     @Test
+    fun aNewGroupsInterimTranscriptHashFollowsFromItsConfirmationTag() {
+        // RFC 9420 §11: a new group's interim transcript hash is computed from a
+        // confirmation tag over the empty confirmed transcript hash (§8.2), the
+        // tag its GroupInfo carries. An external joiner of epoch 0 derives it so.
+        val alice = MlsGroup.create("alice".encodeToByteArray())
+        val groupInfo = alice.groupInfo()
+        assertEquals(0, groupInfo.groupContext.confirmedTranscriptHash.size)
+        val input = TlsWriter().apply { putOpaqueVarInt(groupInfo.confirmationTag) }.toByteArray()
+        assertContentEquals(MlsCryptoProvider.hash(input), alice.saveState().interimTranscriptHash)
+    }
+
+    @Test
+    fun aNewGroupsEpochSecretIsNotDerivedFromItsGroupContext() {
+        // RFC 9420 §11: the first epoch secret is fresh randomness, not a
+        // function of the (non-secret) GroupContext.
+        val alice = MlsGroup.create("alice".encodeToByteArray())
+        val zero = ByteArray(MlsCryptoProvider.HASH_OUTPUT_LENGTH)
+        val fromContext = KeySchedule(alice.groupInfo().groupContext.toTlsBytes()).deriveEpochSecrets(zero, zero)
+        assertFalse(fromContext.epochSecret.contentEquals(alice.saveState().epochSecrets.epochSecret))
+    }
+
+    @Test
+    fun anExternalJoinerOfANewGroupAgreesOnItsTranscript() {
+        val alice = MlsGroup.create("alice".encodeToByteArray())
+        val restored = MlsGroup.restore(alice.saveState())
+        val join = MlsGroup.externalJoin(alice.groupInfo().toTlsBytes(), "bob".encodeToByteArray())
+        restored.processFramedCommit(join.framedCommitBytes)
+        assertSameEpoch(restored, join.group)
+        assertTalk(restored, join.group)
+    }
+
+    @Test
+    fun anExternalJoinCanCarryAResumptionPskOfTheGroup() {
+        // A former member rejoining by external commit proves it held an earlier epoch.
+        val t = trio()
+        val epoch = t.alice.epoch
+        val psk = t.alice.resumptionPsk
+        t.alice.commit().also {
+            t.bob.processFramedCommit(it.framedCommitBytes)
+            t.carol.processFramedCommit(it.framedCommitBytes)
+        }
+        val id = PreSharedKeyId.Resumption(PreSharedKeyId.USAGE_APPLICATION, t.alice.groupId, epoch, ByteArray(32) { 9 })
+        val join = MlsGroup.externalJoin(t.alice.groupInfo().toTlsBytes(), "zara".encodeToByteArray(), psks = listOf(id to psk))
+        t.alice.processFramedCommit(join.framedCommitBytes)
+        assertSameEpoch(t.alice, join.group)
+        assertTalk(t.alice, join.group)
+    }
+
+    @Test
     fun aPolicyCanRefuseExternalJoins() {
         val closed =
             object : MlsGroupPolicy {
@@ -476,6 +527,26 @@ class RfcFlowsTest {
         assertSameEpoch(successor.group, bob, carol)
         assertTalk(bob, carol)
         assertTalk(successor.group, bob)
+    }
+
+    @Test
+    fun aReinitCanKeepTheGroupId() {
+        // The mlswg interop runner's reinit/change_extensions script: same group_id, empty required_capabilities and external_senders.
+        val t = trio()
+        val extensions = listOf(Extension(3, byteArrayOf(0, 0, 0)), Extension(5, byteArrayOf(0)))
+        t.alice.proposeReInit(newGroupId = t.alice.groupId, newExtensions = extensions)
+        t.alice.commit().also {
+            t.bob.processFramedCommit(it.framedCommitBytes)
+            t.carol.processFramedCommit(it.framedCommitBytes)
+        }
+
+        val aliceKp = t.alice.createKeyPackage("alice".encodeToByteArray(), ByteArray(0))
+        val bobKp = t.bob.createKeyPackage("bob".encodeToByteArray(), ByteArray(0))
+        val successor = t.carol.reinit(listOf(aliceKp.keyPackage.toTlsBytes(), bobKp.keyPackage.toTlsBytes()))
+        val alice = MlsGroup.joinSuccessor(successor.commit.welcomeBytes!!, aliceKp, predecessor = t.alice)
+        val bob = MlsGroup.joinSuccessor(successor.commit.welcomeBytes!!, bobKp, predecessor = t.bob)
+        assertSameEpoch(successor.group, alice, bob)
+        assertTalk(alice, bob)
     }
 
     @Test
