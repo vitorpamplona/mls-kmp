@@ -66,6 +66,17 @@ and ships inside apps. Permissive (MIT, Apache-2.0, BSD, ISC, MPL-2.0, zlib): OK
 with a linking exception: WARN in your summary. Anything stricter: STOP and leave the decision to a
 maintainer.
 
+## Remotes and pull requests
+
+The repo is on GitHub, `github.com/vitorpamplona/mls-kmp`, which holds the canonical `main`, and on
+nostr as a NIP-34 repository,
+`nostr://npub1gcxzte5zlkncx26j68ez60fzkvtkm9e0vrwdcvsjakxf9mu9qewqlfnj5z/relay.ngit.dev/mls-kmp`: a
+push to that remote goes to its GRASP git servers and to GitHub. A PR can go out either way: a
+GitHub PR (`gh`), or a nostr proposal (`ngit`, a `pr/…` branch, reviewed on
+[gitworkshop.dev](https://gitworkshop.dev/npub1gcxzte5zlkncx26j68ez60fzkvtkm9e0vrwdcvsjakxf9mu9qewqlfnj5z/relay.ngit.dev/mls-kmp)).
+Remote names vary per clone, so identify them by URL. Open a PR only when the human you work for
+asks, and before opening, revising or merging one by either path, use the `ngit-pr` skill.
+
 ## Releasing
 
 Push a `v<version>` tag: `.github/workflows/create-release.yml` runs the tests and publishes to
