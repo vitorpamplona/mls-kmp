@@ -4,6 +4,7 @@ kotlin = "2.4.21"
 android-minSdk = "26"
 android-compileSdk = "37"
 mavenPublish = "0.37.0"
+magpie = "0.2.0"
 spotless = "8.10.4"
 kotlinxSerialization = "1.12.0"
 # SHA, HMAC, HKDF, AES-GCM, X25519, Ed25519 and secure random: vitorpamplona/crypto-kmp.
@@ -32,4 +33,5 @@ kotlinMultiplatform = { id = "org.jetbrains.kotlin.multiplatform", version.ref =
 androidKotlinMultiplatformLibrary = { id = "com.android.kotlin.multiplatform.library", version.ref = "agp" }
 serialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }
 vanniktech-mavenPublish = { id = "com.vanniktech.maven.publish", version.ref = "mavenPublish" }
+magpiePublish = { id = "com.vitorpamplona.magpie.publish", version.ref = "magpie" }
 diffplugSpotless = { id = "com.diffplug.spotless", version.ref = "spotless" }
