@@ -88,6 +88,49 @@ public interface MlsGroupPolicy {
     public fun validateJoin(group: GroupView): Unit = Unit
 
     /**
+     * Rejects, by throwing, a group this client should not finish joining,
+     * with the facts of the Welcome that only the joiner sees.
+     *
+     * [groupInfoSigner] is the leaf index that signed the Welcome's GroupInfo
+     * — the member that committed the Add — so a binding can require that
+     * whoever invited it had the authority to. [groupInfoExtensions] are the
+     * GroupInfo's own extensions, which never reach the GroupContext.
+     *
+     * The default runs [validateJoin], so a policy written against the older
+     * hook keeps its behaviour. A policy that overrides this one decides for
+     * itself whether to call [validateJoin] too.
+     */
+    public fun validateJoin(
+        group: GroupView,
+        groupInfoSigner: Int,
+        groupInfoExtensions: List<Extension>,
+    ): Unit = validateJoin(group)
+
+    /**
+     * Rejects, by throwing, a commit whose RESULT the application does not
+     * allow.
+     *
+     * [authorizeCommit] judges who may make a change against the state before
+     * it; some rules can only be judged on the state after it — a cap on how
+     * many leaves one identity may hold, a requirement every leaf must meet,
+     * a setting that may be turned on but never off. Those go here.
+     *
+     * Called for both directions, after every proposal in the commit has been
+     * applied and the committer's UpdatePath leaf merged, and before the new
+     * epoch's key schedule: [resulting] is the tree and GroupContext
+     * extensions the commit produces (its epoch number not yet advanced), and
+     * [parentExtensions] are the GroupContext extensions it started from.
+     * [proposals] are the commit's proposals as [authorizeCommit] saw them.
+     * Throwing leaves the group exactly as it was, for an inbound commit and a
+     * local one alike, so a committer refuses what its peers would refuse.
+     */
+    public fun validateResultingState(
+        parentExtensions: List<Extension>,
+        proposals: List<PendingProposal>,
+        resulting: GroupView,
+    ): Unit = Unit
+
+    /**
      * Rejects, by throwing, a standalone proposal this member should not hold.
      *
      * Called when a proposal arrives on its own (by reference, RFC 9420
@@ -259,12 +302,29 @@ public class GroupView(
     public val myLeafIndex: Int,
     private val identityAt: (Int) -> String?,
     private val capabilitiesAt: (Int) -> Capabilities?,
+    private val leafAt: (Int) -> LeafNode?,
 ) {
+    /** A view whose [leafNode] is always null, for callers built before it existed. */
+    public constructor(
+        extensions: List<Extension>,
+        leafCount: Int,
+        myLeafIndex: Int,
+        identityAt: (Int) -> String?,
+        capabilitiesAt: (Int) -> Capabilities?,
+    ) : this(extensions, leafCount, myLeafIndex, identityAt, capabilitiesAt, { null })
+
     /** Lowercase hex of the BasicCredential identity at [leafIndex], or null if blank. */
     public fun memberIdentityHex(leafIndex: Int): String? = identityAt(leafIndex)
 
     /** Capabilities advertised by the leaf at [leafIndex], or null if blank. */
     public fun leafCapabilities(leafIndex: Int): Capabilities? = capabilitiesAt(leafIndex)
+
+    /**
+     * The whole LeafNode at [leafIndex], or null if blank — for a rule that
+     * reads a leaf's extensions (an application's per-leaf data) rather than
+     * only its identity or capabilities.
+     */
+    public fun leafNode(leafIndex: Int): LeafNode? = leafAt(leafIndex)
 }
 
 /**

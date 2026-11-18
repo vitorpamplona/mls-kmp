@@ -142,6 +142,8 @@ abstract interface com.vitorpamplona.mls.group/MlsGroupPolicy { // com.vitorpamp
     open fun validateCredential(com.vitorpamplona.mls.tree/Credential, kotlin/ByteArray) // com.vitorpamplona.mls.group/MlsGroupPolicy.validateCredential|validateCredential(com.vitorpamplona.mls.tree.Credential;kotlin.ByteArray){}[0]
     open fun validateCredentialSuccession(com.vitorpamplona.mls.tree/Credential, com.vitorpamplona.mls.tree/Credential) // com.vitorpamplona.mls.group/MlsGroupPolicy.validateCredentialSuccession|validateCredentialSuccession(com.vitorpamplona.mls.tree.Credential;com.vitorpamplona.mls.tree.Credential){}[0]
     open fun validateJoin(com.vitorpamplona.mls.group/GroupView) // com.vitorpamplona.mls.group/MlsGroupPolicy.validateJoin|validateJoin(com.vitorpamplona.mls.group.GroupView){}[0]
+    open fun validateJoin(com.vitorpamplona.mls.group/GroupView, kotlin/Int, kotlin.collections/List<com.vitorpamplona.mls.tree/Extension>) // com.vitorpamplona.mls.group/MlsGroupPolicy.validateJoin|validateJoin(com.vitorpamplona.mls.group.GroupView;kotlin.Int;kotlin.collections.List<com.vitorpamplona.mls.tree.Extension>){}[0]
+    open fun validateResultingState(kotlin.collections/List<com.vitorpamplona.mls.tree/Extension>, kotlin.collections/List<com.vitorpamplona.mls.group/PendingProposal>, com.vitorpamplona.mls.group/GroupView) // com.vitorpamplona.mls.group/MlsGroupPolicy.validateResultingState|validateResultingState(kotlin.collections.List<com.vitorpamplona.mls.tree.Extension>;kotlin.collections.List<com.vitorpamplona.mls.group.PendingProposal>;com.vitorpamplona.mls.group.GroupView){}[0]
 
     final object Companion { // com.vitorpamplona.mls.group/MlsGroupPolicy.Companion|null[0]
         final const val DEFAULT_MAX_MESSAGE_SIZE // com.vitorpamplona.mls.group/MlsGroupPolicy.Companion.DEFAULT_MAX_MESSAGE_SIZE|{}DEFAULT_MAX_MESSAGE_SIZE[0]
@@ -507,6 +509,7 @@ final class com.vitorpamplona.mls.group/DecryptedMessage { // com.vitorpamplona.
 
 final class com.vitorpamplona.mls.group/GroupView { // com.vitorpamplona.mls.group/GroupView|null[0]
     constructor <init>(kotlin.collections/List<com.vitorpamplona.mls.tree/Extension>, kotlin/Int, kotlin/Int, kotlin/Function1<kotlin/Int, kotlin/String?>, kotlin/Function1<kotlin/Int, com.vitorpamplona.mls.tree/Capabilities?>) // com.vitorpamplona.mls.group/GroupView.<init>|<init>(kotlin.collections.List<com.vitorpamplona.mls.tree.Extension>;kotlin.Int;kotlin.Int;kotlin.Function1<kotlin.Int,kotlin.String?>;kotlin.Function1<kotlin.Int,com.vitorpamplona.mls.tree.Capabilities?>){}[0]
+    constructor <init>(kotlin.collections/List<com.vitorpamplona.mls.tree/Extension>, kotlin/Int, kotlin/Int, kotlin/Function1<kotlin/Int, kotlin/String?>, kotlin/Function1<kotlin/Int, com.vitorpamplona.mls.tree/Capabilities?>, kotlin/Function1<kotlin/Int, com.vitorpamplona.mls.tree/LeafNode?>) // com.vitorpamplona.mls.group/GroupView.<init>|<init>(kotlin.collections.List<com.vitorpamplona.mls.tree.Extension>;kotlin.Int;kotlin.Int;kotlin.Function1<kotlin.Int,kotlin.String?>;kotlin.Function1<kotlin.Int,com.vitorpamplona.mls.tree.Capabilities?>;kotlin.Function1<kotlin.Int,com.vitorpamplona.mls.tree.LeafNode?>){}[0]
 
     final val extensions // com.vitorpamplona.mls.group/GroupView.extensions|{}extensions[0]
         final fun <get-extensions>(): kotlin.collections/List<com.vitorpamplona.mls.tree/Extension> // com.vitorpamplona.mls.group/GroupView.extensions.<get-extensions>|<get-extensions>(){}[0]
@@ -516,6 +519,7 @@ final class com.vitorpamplona.mls.group/GroupView { // com.vitorpamplona.mls.gro
         final fun <get-myLeafIndex>(): kotlin/Int // com.vitorpamplona.mls.group/GroupView.myLeafIndex.<get-myLeafIndex>|<get-myLeafIndex>(){}[0]
 
     final fun leafCapabilities(kotlin/Int): com.vitorpamplona.mls.tree/Capabilities? // com.vitorpamplona.mls.group/GroupView.leafCapabilities|leafCapabilities(kotlin.Int){}[0]
+    final fun leafNode(kotlin/Int): com.vitorpamplona.mls.tree/LeafNode? // com.vitorpamplona.mls.group/GroupView.leafNode|leafNode(kotlin.Int){}[0]
     final fun memberIdentityHex(kotlin/Int): kotlin/String? // com.vitorpamplona.mls.group/GroupView.memberIdentityHex|memberIdentityHex(kotlin.Int){}[0]
 }
 

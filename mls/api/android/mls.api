@@ -447,10 +447,12 @@ public final class com/vitorpamplona/mls/group/DecryptedMessage {
 
 public final class com/vitorpamplona/mls/group/GroupView {
 	public fun <init> (Ljava/util/List;IILkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;)V
+	public fun <init> (Ljava/util/List;IILkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;)V
 	public final fun getExtensions ()Ljava/util/List;
 	public final fun getLeafCount ()I
 	public final fun getMyLeafIndex ()I
 	public final fun leafCapabilities (I)Lcom/vitorpamplona/mls/tree/Capabilities;
+	public final fun leafNode (I)Lcom/vitorpamplona/mls/tree/LeafNode;
 	public final fun memberIdentityHex (I)Ljava/lang/String;
 }
 
@@ -627,6 +629,8 @@ public abstract interface class com/vitorpamplona/mls/group/MlsGroupPolicy {
 	public fun validateCredential (Lcom/vitorpamplona/mls/tree/Credential;[B)V
 	public fun validateCredentialSuccession (Lcom/vitorpamplona/mls/tree/Credential;Lcom/vitorpamplona/mls/tree/Credential;)V
 	public fun validateJoin (Lcom/vitorpamplona/mls/group/GroupView;)V
+	public fun validateJoin (Lcom/vitorpamplona/mls/group/GroupView;ILjava/util/List;)V
+	public fun validateResultingState (Ljava/util/List;Ljava/util/List;Lcom/vitorpamplona/mls/group/GroupView;)V
 }
 
 public final class com/vitorpamplona/mls/group/MlsGroupPolicy$Companion {
@@ -651,6 +655,8 @@ public final class com/vitorpamplona/mls/group/MlsGroupPolicy$DefaultImpls {
 	public static fun validateCredential (Lcom/vitorpamplona/mls/group/MlsGroupPolicy;Lcom/vitorpamplona/mls/tree/Credential;[B)V
 	public static fun validateCredentialSuccession (Lcom/vitorpamplona/mls/group/MlsGroupPolicy;Lcom/vitorpamplona/mls/tree/Credential;Lcom/vitorpamplona/mls/tree/Credential;)V
 	public static fun validateJoin (Lcom/vitorpamplona/mls/group/MlsGroupPolicy;Lcom/vitorpamplona/mls/group/GroupView;)V
+	public static fun validateJoin (Lcom/vitorpamplona/mls/group/MlsGroupPolicy;Lcom/vitorpamplona/mls/group/GroupView;ILjava/util/List;)V
+	public static fun validateResultingState (Lcom/vitorpamplona/mls/group/MlsGroupPolicy;Ljava/util/List;Ljava/util/List;Lcom/vitorpamplona/mls/group/GroupView;)V
 }
 
 public final class com/vitorpamplona/mls/group/MlsGroupState {

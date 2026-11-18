@@ -32,17 +32,19 @@ class OurRules(
 A hook rejects by throwing, and the group is left unchanged. The policy gets
 a `GroupView` (extensions, members' identities and capabilities), not the
 group itself, so it cannot change the group from inside a check.
-`memberIdentityHex` gives a member's BasicCredential identity as hex.
+`memberIdentityHex` gives a member's BasicCredential identity as hex, and
+`leafNode` the whole leaf, for a rule that reads a leaf's extensions.
 
 | Hook | Called for |
 | ---- | ---------- |
 | `validateCredential` | every LeafNode the engine validates: KeyPackages, Updates, UpdatePaths, a joined tree |
 | `validateCredentialSuccession` | a member replacing its leaf; by default it must keep its identity |
-| `authorizeCommit` | every commit, before building ours and before applying others' |
+| `authorizeCommit` | every commit, before building ours and before applying others', against the state before it |
+| `validateResultingState` | every commit, once its proposals and UpdatePath are applied: rules about the state it produces (a per-identity leaf cap, a setting that may never be turned off) |
 | `authorizeProposal` | every standalone proposal received |
 | `authorizeSelfRemove` | a member asking to leave |
 | `authorizeExternalCommit` | every external join or resync |
-| `validateJoin` | joining from a Welcome |
+| `validateJoin` | joining from a Welcome; the overload with `groupInfoSigner` also names who signed the GroupInfo (the inviter) and passes the GroupInfo's own extensions |
 | `defaultLeafCapabilities`, `defaultRequiredCapabilities` | the capabilities leaves and new groups get |
 | `wireFormatPolicy` | the wire format of proposals and commits |
 | `maxForwardRatchetDistance`, `outOfOrderTolerance` | how far one message may skip ahead, and how many skipped keys are kept |

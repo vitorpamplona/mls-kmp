@@ -230,6 +230,7 @@ public class MlsGroup private constructor(
             myLeafIndex = myLeafIndex,
             identityAt = { memberIdentityHex(it) },
             capabilitiesAt = { tree.getLeaf(it)?.capabilities },
+            leafAt = { tree.getLeaf(it) },
         )
 
     /**
@@ -1338,6 +1339,11 @@ public class MlsGroup private constructor(
             }
         prunePathKeys()
 
+        // The application's rules on the state this commit produces. Receivers
+        // run the same check, so refusing here keeps us from merging a commit
+        // every peer rejects.
+        policy.validateResultingState(preContext.extensions, proposals, view())
+
         val commitBytes = Commit(proposalOrRefs, updatePath).toTlsBytes()
         val content =
             FramedContent(
@@ -2284,6 +2290,7 @@ public class MlsGroup private constructor(
         // enforces locally: authorization has to run on both ends.
         if (committer != null) policy.authorizeCommit(view(), resolved, committer)
         lastAppliedProposals = resolved
+        val parentExtensions = groupContext.extensions
 
         val applied = applyProposalList(resolved, committer)
 
@@ -2356,6 +2363,11 @@ public class MlsGroup private constructor(
             }
         }
         prunePathKeys()
+
+        // The application's rules on the resulting state, once every proposal
+        // and the committer's new leaf are in. A commit that removes us is
+        // judged too: it still has to be one the others accept.
+        policy.validateResultingState(parentExtensions, resolved, view())
 
         val confirmedTranscriptHash =
             MlsCryptoProvider.hash(interimTranscriptHash + Framing.confirmedTranscriptHashInput(wireFormat, content, signature))
@@ -3475,7 +3487,10 @@ public class MlsGroup private constructor(
                     myLeafIndex = myLeafIndex,
                     identityAt = { leaf -> (tree.getLeaf(leaf)?.credential as? Credential.Basic)?.identity?.let { Hex.encode(it) } },
                     capabilitiesAt = { tree.getLeaf(it)?.capabilities },
+                    leafAt = { tree.getLeaf(it) },
                 ),
+                groupInfo.signer,
+                groupInfo.extensions,
             )
 
             // RFC 9420 §12.4.3.1: a group a resumption PSK of usage reinit or
@@ -3933,6 +3948,7 @@ public class MlsGroup private constructor(
         GroupValidation.validateLeafNode(leaf, LeafNodeSource.COMMIT, groupId, leafIndex, tree, leafIndex, groupContext.extensions, policy, now = null)
         applied.resyncedLeaf?.let { old -> policy.validateCredentialSuccession(old.credential, credential) }
         enforceRequiredAppComponents(requiredAppComponents(), emptySet(), mapOf(leafIndex to null))
+        policy.validateResultingState(preContext.extensions, proposals, view())
         encryptionPrivateKey = encKp.privateKey
         pathPrivateKeys.putAll(generated.privateKeysByNode())
 
