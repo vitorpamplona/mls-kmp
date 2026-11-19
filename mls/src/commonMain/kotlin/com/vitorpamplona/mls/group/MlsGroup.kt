@@ -1342,7 +1342,7 @@ public class MlsGroup private constructor(
         // The application's rules on the state this commit produces. Receivers
         // run the same check, so refusing here keeps us from merging a commit
         // every peer rejects.
-        policy.validateResultingState(preContext.extensions, proposals, view())
+        policy.validateResultingState(preContext.extensions, proposals, myLeafIndex, view())
 
         val commitBytes = Commit(proposalOrRefs, updatePath).toTlsBytes()
         val content =
@@ -2314,11 +2314,14 @@ public class MlsGroup private constructor(
         val newTreeHash by lazy { tree.treeHash() }
 
         var commitSecret = ByteArray(MlsCryptoProvider.HASH_OUTPUT_LENGTH)
+        // An external commit's committer is the leaf its path adds.
+        var joinerLeafIndex = -1
         if (updatePath != null) {
             val senderLeafIndex: Int
             if (committer == null) {
                 // The joiner takes the leftmost blank leaf, or extends the tree.
                 senderLeafIndex = (0 until tree.leafCount).firstOrNull { tree.getLeaf(it) == null } ?: tree.leafCount
+                joinerLeafIndex = senderLeafIndex
                 GroupValidation.validateLeafNode(updatePath.leafNode, LeafNodeSource.COMMIT, groupId, senderLeafIndex, tree, null, groupContext.extensions, policy, now = null)
                 // A resync replaces a member's earlier leaf, and must be the same member.
                 applied.resyncedLeaf?.let { old -> policy.validateCredentialSuccession(old.credential, updatePath.leafNode.credential) }
@@ -2367,7 +2370,7 @@ public class MlsGroup private constructor(
         // The application's rules on the resulting state, once every proposal
         // and the committer's new leaf are in. A commit that removes us is
         // judged too: it still has to be one the others accept.
-        policy.validateResultingState(parentExtensions, resolved, view())
+        policy.validateResultingState(parentExtensions, resolved, committer ?: joinerLeafIndex, view())
 
         val confirmedTranscriptHash =
             MlsCryptoProvider.hash(interimTranscriptHash + Framing.confirmedTranscriptHashInput(wireFormat, content, signature))
@@ -3948,7 +3951,7 @@ public class MlsGroup private constructor(
         GroupValidation.validateLeafNode(leaf, LeafNodeSource.COMMIT, groupId, leafIndex, tree, leafIndex, groupContext.extensions, policy, now = null)
         applied.resyncedLeaf?.let { old -> policy.validateCredentialSuccession(old.credential, credential) }
         enforceRequiredAppComponents(requiredAppComponents(), emptySet(), mapOf(leafIndex to null))
-        policy.validateResultingState(preContext.extensions, proposals, view())
+        policy.validateResultingState(preContext.extensions, proposals, leafIndex, view())
         encryptionPrivateKey = encKp.privateKey
         pathPrivateKeys.putAll(generated.privateKeysByNode())
 
@@ -4012,8 +4015,7 @@ public class MlsGroup private constructor(
      */
     public fun addMembers(keyPackagesBytes: List<ByteArray>): CommitResult {
         require(keyPackagesBytes.isNotEmpty()) { "addMembers needs at least one KeyPackage" }
-        keyPackagesBytes.forEach { proposeAdd(it) }
-        return commit()
+        return proposeAndCommit { keyPackagesBytes.forEach { proposeAdd(it) } }
     }
 
     /**
@@ -4021,9 +4023,26 @@ public class MlsGroup private constructor(
      * Creates and applies a Commit with a Remove proposal. See [addMember]
      * for the pre-commit exporter key contract on the returned [CommitResult].
      */
-    public fun removeMember(targetLeafIndex: Int): CommitResult {
-        proposeRemove(targetLeafIndex)
-        return commit()
+    public fun removeMember(targetLeafIndex: Int): CommitResult = proposeAndCommit { proposeRemove(targetLeafIndex) }
+
+    /**
+     * Queue what [propose] queues and commit the pool. A refused commit leaves
+     * the group as it was, pool included: the proposals queued here are taken
+     * back out rather than swept into every later commit, which the policy
+     * would keep refusing.
+     */
+    private inline fun proposeAndCommit(propose: () -> Unit): CommitResult {
+        // commit() already restores everything else when it refuses; only the
+        // pool holds what propose() added.
+        val pool = pendingProposals.toList()
+        try {
+            propose()
+            return commit()
+        } catch (t: Throwable) {
+            pendingProposals.clear()
+            pendingProposals.addAll(pool)
+            throw t
+        }
     }
 
     /**

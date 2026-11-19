@@ -630,7 +630,7 @@ public abstract interface class com/vitorpamplona/mls/group/MlsGroupPolicy {
 	public fun validateCredentialSuccession (Lcom/vitorpamplona/mls/tree/Credential;Lcom/vitorpamplona/mls/tree/Credential;)V
 	public fun validateJoin (Lcom/vitorpamplona/mls/group/GroupView;)V
 	public fun validateJoin (Lcom/vitorpamplona/mls/group/GroupView;ILjava/util/List;)V
-	public fun validateResultingState (Ljava/util/List;Ljava/util/List;Lcom/vitorpamplona/mls/group/GroupView;)V
+	public fun validateResultingState (Ljava/util/List;Ljava/util/List;ILcom/vitorpamplona/mls/group/GroupView;)V
 }
 
 public final class com/vitorpamplona/mls/group/MlsGroupPolicy$Companion {
@@ -656,7 +656,7 @@ public final class com/vitorpamplona/mls/group/MlsGroupPolicy$DefaultImpls {
 	public static fun validateCredentialSuccession (Lcom/vitorpamplona/mls/group/MlsGroupPolicy;Lcom/vitorpamplona/mls/tree/Credential;Lcom/vitorpamplona/mls/tree/Credential;)V
 	public static fun validateJoin (Lcom/vitorpamplona/mls/group/MlsGroupPolicy;Lcom/vitorpamplona/mls/group/GroupView;)V
 	public static fun validateJoin (Lcom/vitorpamplona/mls/group/MlsGroupPolicy;Lcom/vitorpamplona/mls/group/GroupView;ILjava/util/List;)V
-	public static fun validateResultingState (Lcom/vitorpamplona/mls/group/MlsGroupPolicy;Ljava/util/List;Ljava/util/List;Lcom/vitorpamplona/mls/group/GroupView;)V
+	public static fun validateResultingState (Lcom/vitorpamplona/mls/group/MlsGroupPolicy;Ljava/util/List;Ljava/util/List;ILcom/vitorpamplona/mls/group/GroupView;)V
 }
 
 public final class com/vitorpamplona/mls/group/MlsGroupState {

@@ -20,6 +20,7 @@
  */
 package com.vitorpamplona.mls.group
 
+import com.vitorpamplona.mls.codec.TlsReader
 import com.vitorpamplona.mls.messages.CommitResult
 import com.vitorpamplona.mls.schedule.SecretTree
 import com.vitorpamplona.mls.tree.Capabilities
@@ -121,12 +122,23 @@ public interface MlsGroupPolicy {
      * extensions the commit produces (its epoch number not yet advanced), and
      * [parentExtensions] are the GroupContext extensions it started from.
      * [proposals] are the commit's proposals as [authorizeCommit] saw them.
-     * Throwing leaves the group exactly as it was, for an inbound commit and a
-     * local one alike, so a committer refuses what its peers would refuse.
+     * [committerLeafIndex] is the committer's leaf in [resulting]: the leaf its
+     * UpdatePath replaced, when it sent one, or for an external commit the
+     * joiner's new leaf — so a rule about leaves a commit introduces can read
+     * that one too, besides the KeyPackages of its Adds.
+     *
+     * Throwing refuses the commit: the tree, the epoch and the keys stay as
+     * they were, for an inbound commit and a local one alike, so a committer
+     * refuses what its peers would refuse. For a local commit the pending
+     * proposal pool is restored too, except what the caller queued with the
+     * `propose*` calls before [MlsGroup.commit]: those stay pooled until the
+     * caller commits them in a form the policy accepts or the epoch moves on.
+     * [MlsGroup.addMembers] and [MlsGroup.removeMember] take theirs back out.
      */
     public fun validateResultingState(
         parentExtensions: List<Extension>,
         proposals: List<PendingProposal>,
+        committerLeafIndex: Int,
         resulting: GroupView,
     ): Unit = Unit
 
@@ -323,8 +335,13 @@ public class GroupView(
      * The whole LeafNode at [leafIndex], or null if blank — for a rule that
      * reads a leaf's extensions (an application's per-leaf data) rather than
      * only its identity or capabilities.
+     *
+     * A detached copy, decoded afresh from the leaf's encoding: a LeafNode
+     * holds ByteArrays, and handing out the tree's own would let a policy
+     * change the group, and the tree hash cached over it, from inside a check.
+     * Each call pays one encode and decode, so read a leaf once per decision.
      */
-    public fun leafNode(leafIndex: Int): LeafNode? = leafAt(leafIndex)
+    public fun leafNode(leafIndex: Int): LeafNode? = leafAt(leafIndex)?.let { LeafNode.decodeTls(TlsReader(it.toTlsBytes())) }
 }
 
 /**

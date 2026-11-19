@@ -27,8 +27,10 @@ import com.vitorpamplona.mls.messages.KeyPackageBundle
 import com.vitorpamplona.mls.tree.Capabilities
 import com.vitorpamplona.mls.tree.Extension
 import kotlin.test.Test
+import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
@@ -58,6 +60,7 @@ class ApplicationRuleHooksTest {
         override fun validateResultingState(
             parentExtensions: List<Extension>,
             proposals: List<PendingProposal>,
+            committerLeafIndex: Int,
             resulting: GroupView,
         ) {
             val occupied = (0 until resulting.leafCount).count { resulting.leafNode(it) != null }
@@ -91,16 +94,19 @@ class ApplicationRuleHooksTest {
         var parent: List<Extension>? = null
         var leaves = -1
         var proposalCount = -1
+        var committer = -1
         val watching =
             object : MlsGroupPolicy {
                 override fun validateResultingState(
                     parentExtensions: List<Extension>,
                     proposals: List<PendingProposal>,
+                    committerLeafIndex: Int,
                     resulting: GroupView,
                 ) {
                     parent = parentExtensions
                     leaves = (0 until resulting.leafCount).count { resulting.leafNode(it) != null }
                     proposalCount = proposals.size
+                    committer = committerLeafIndex
                 }
             }
         val alice = MlsGroup.create("alice".encodeToByteArray())
@@ -112,6 +118,32 @@ class ApplicationRuleHooksTest {
         assertEquals(before, parent)
         assertEquals(3, leaves)
         assertEquals(1, proposalCount)
+        assertEquals(0, committer)
+
+        // Bob's own commit names his leaf.
+        bob.commit()
+        assertEquals(1, committer)
+    }
+
+    @Test
+    fun aRefusedAddMembersTakesItsProposalsBackOutOfThePool() {
+        val alice = MlsGroup.create("alice".encodeToByteArray(), policy = LeafCap(2))
+        alice.addMember(keyPackage("bob").keyPackage.toTlsBytes())
+        assertFailsWith<IllegalStateException> { alice.addMember(keyPackage("carol").keyPackage.toTlsBytes()) }
+        assertFalse(alice.hasPendingProposals())
+        // The next commit is not dragged down by the refused Add.
+        alice.commit()
+        assertEquals(2L, alice.epoch)
+        assertEquals(2, alice.memberCount)
+    }
+
+    @Test
+    fun aViewHandsOutACopyOfTheLeafNotTheTreesOwn() {
+        val alice = MlsGroup.create("alice".encodeToByteArray())
+        val leaf = assertNotNull(alice.view().leafNode(0))
+        val original = leaf.signatureKey.copyOf()
+        leaf.signatureKey.fill(0)
+        assertContentEquals(original, assertNotNull(alice.view().leafNode(0)).signatureKey)
     }
 
     @Test
@@ -151,13 +183,13 @@ class ApplicationRuleHooksTest {
 
     /**
      * A leaf, and a KeyPackage, may carry dictionary entries for components
-     * nobody in the group knows — Marmot's `0x800f` device tag is one that
-     * linked devices put in every leaf. The engine carries them: an Add, a
-     * join and later commits all go through.
+     * nobody in the group knows: an application's unknown component, which
+     * some of its devices put in every leaf. The engine carries them: an Add,
+     * a join and later commits all go through.
      */
     @Test
     fun unknownDictionaryEntriesInALeafAndAKeyPackageAreCarriedNotJudged() {
-        val deviceTag = 0x800f
+        val deviceTag = 0x800f // an application-range component the engine does not know
         val caps = Capabilities(extensions = listOf(AppDataDictionary.EXTENSION_TYPE))
         val leafDictionary =
             AppDataDictionary(
