@@ -80,4 +80,8 @@ asks, and before opening, revising or merging one by either path, use the `ngit-
 ## Releasing
 
 Push a `v<version>` tag: `.github/workflows/create-release.yml` runs the tests and publishes to
-Maven Central with the version taken from the tag.
+Maven Central with the version taken from the tag. The workflow's `nostr` job publishes the same files to Nostr + Blossom with Magpie's
+`publishToNostr`, independently of Maven Central, so either can be re-run alone. It needs the
+signing secrets and `MAGPIE_BUNKER`, a NIP-46 `bunker://` URI for the release key that
+`vitorpamplona.com/.well-known/nostr.json` names as `releases`; the signer approves each release,
+and a version already on Nostr fails the job.
