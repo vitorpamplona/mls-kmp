@@ -2,7 +2,6 @@
 
 [![GitHub downloads](https://img.shields.io/github/downloads/vitorpamplona/mls-kmp/total?label=Downloads&labelColor=27303D&color=0D1117&logo=github&logoColor=FFFFFF&style=flat)](https://github.com/vitorpamplona/mls-kmp/releases)
 [![Last Version](https://img.shields.io/github/release/vitorpamplona/mls-kmp.svg?maxAge=3600&label=Stable&labelColor=06599d&color=043b69)](https://github.com/vitorpamplona/mls-kmp/releases/latest)
-[![Maven Central](https://img.shields.io/maven-central/v/com.vitorpamplona.mls/mls?label=Maven%20Central&labelColor=27303D&color=0877d2)](https://central.sonatype.com/artifact/com.vitorpamplona.mls/mls)
 [![JitPack snapshots](https://img.shields.io/badge/snapshots-JitPack-27303D?labelColor=27303D&color=0877d2)](https://jitpack.io/#vitorpamplona/mls-kmp)
 [![CI](https://img.shields.io/github/actions/workflow/status/vitorpamplona/mls-kmp/build.yml?labelColor=27303D)](https://github.com/vitorpamplona/mls-kmp/actions/workflows/build.yml)
 [![License: MIT](https://img.shields.io/github/license/vitorpamplona/mls-kmp?labelColor=27303D&color=0877d2)](LICENSE)
@@ -27,15 +26,15 @@ The library depends on no Nostr code, so a binding cannot leak into it.
 
 ```kotlin
 dependencies {
-    implementation("com.vitorpamplona.mls:mls:1.2.0")
+    implementation("com.vitorpamplona.mls:mls:1.4.0")
 }
 ```
 
-Releases are on Maven Central.
-Releases also go to Nostr + Blossom through [Magpie](https://github.com/vitorpamplona/magpie). To
-take them from there (signed by the key `vitorpamplona.com/.well-known/nostr.json` names as
-`releases`), add Magpie's settings plugin in `settings.gradle.kts` and commit the
-`gradle/magpie.lock` it writes; Gradle has to run on Java 21 or newer:
+Releases are on Nostr + Blossom, through [Magpie](https://github.com/vitorpamplona/magpie)
+(Maven Central up to 1.3.0), and so is crypto-kmp, which this library depends on. Add Magpie's
+settings plugin in `settings.gradle.kts`: it serves these groups, trusting only the key
+`vitorpamplona.com/.well-known/nostr.json` names as `releases`. Commit the `gradle/magpie.lock`
+it writes; Gradle has to run on Java 21 or newer:
 
 ```kotlin
 plugins {
@@ -48,9 +47,9 @@ magpie {
 }
 ```
 
-From 1.3.1 on, its dependency [crypto-kmp](https://github.com/vitorpamplona/crypto-kmp) is released on
-Nostr + Blossom only, so a build needs the `com.vitorpamplona.crypto` group above wherever it
-takes this library from, Maven Central included.
+Its dependency [crypto-kmp](https://github.com/vitorpamplona/crypto-kmp) is released on Nostr +
+Blossom only from 2.1.1 on, so a build needs the `com.vitorpamplona.crypto` group above even with
+mls-kmp 1.3.0 from Maven Central.
 
 ## Using it
 
@@ -287,7 +286,8 @@ never change.
 ## Releasing
 
 Push a `v*` tag. `.github/workflows/create-release.yml` runs the tests and
-publishes to Maven Central with the version taken from the tag.
+publishes to Nostr + Blossom with the version taken from the tag, once the release key's signer
+approves.
 `publishToMavenLocal` works without signing keys for local testing.
 
 ## License

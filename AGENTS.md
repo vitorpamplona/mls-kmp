@@ -1,8 +1,9 @@
 # mls-kmp
 
 An RFC 9420 Messaging Layer Security engine in pure Kotlin Multiplatform (JVM, Android, iOS, macOS,
-Linux), published to Maven Central as `com.vitorpamplona.mls:mls`. It is the engine under the two
-MLS bindings [Amethyst](https://github.com/vitorpamplona/amethyst) uses, each in its own repo:
+Linux), published as `com.vitorpamplona.mls:mls` on Nostr + Blossom through Magpie (Maven Central up
+to 1.3.0). It is the engine under the two MLS bindings
+[Amethyst](https://github.com/vitorpamplona/amethyst) uses, each in its own repo:
 [marmot-kmp](https://github.com/vitorpamplona/marmot-kmp) (MLS over Nostr) and
 [cordn-kmp](https://github.com/vitorpamplona/cordn-kmp) (MLS over an MCP coordinator). It started in
 Quartz's `mls` package and moved here so the engine has no Nostr in it.
@@ -79,9 +80,8 @@ asks, and before opening, revising or merging one by either path, use the `ngit-
 
 ## Releasing
 
-Push a `v<version>` tag: `.github/workflows/create-release.yml` runs the tests and publishes to
-Maven Central with the version taken from the tag. The workflow's `nostr` job publishes the same files to Nostr + Blossom with Magpie's
-`publishToNostr`, independently of Maven Central, so either can be re-run alone. It needs the
-signing secrets and `MAGPIE_BUNKER`, a NIP-46 `bunker://` URI for the release key that
-`vitorpamplona.com/.well-known/nostr.json` names as `releases`; the signer approves each release,
-and a version already on Nostr fails the job.
+Push a `v<version>` tag: `.github/workflows/create-release.yml` runs the checks on macOS, publishes to
+Nostr + Blossom with Magpie's `publishToNostr` (the version comes from the tag) and opens the GitHub
+release. Releases are on Nostr + Blossom only. It needs the signing secrets and `MAGPIE_BUNKER`, a
+NIP-46 `bunker://` URI for the release key that `vitorpamplona.com/.well-known/nostr.json` names as
+`releases`; the signer approves each release, and a version already on Nostr fails the job.
