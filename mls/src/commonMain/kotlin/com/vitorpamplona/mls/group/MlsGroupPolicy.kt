@@ -20,6 +20,7 @@
  */
 package com.vitorpamplona.mls.group
 
+import com.vitorpamplona.mls.codec.TlsReader
 import com.vitorpamplona.mls.messages.CommitResult
 import com.vitorpamplona.mls.schedule.SecretTree
 import com.vitorpamplona.mls.tree.Capabilities
@@ -86,6 +87,60 @@ public interface MlsGroupPolicy {
      * whose every commit peers would reject.
      */
     public fun validateJoin(group: GroupView): Unit = Unit
+
+    /**
+     * Rejects, by throwing, a group this client should not finish joining,
+     * with the facts of the Welcome that only the joiner sees.
+     *
+     * [groupInfoSigner] is the leaf index that signed the Welcome's GroupInfo
+     * — the member that committed the Add — so a binding can require that
+     * whoever invited it had the authority to. [groupInfoExtensions] are the
+     * GroupInfo's own extensions, which never reach the GroupContext.
+     *
+     * The default runs [validateJoin], so a policy written against the older
+     * hook keeps its behaviour. A policy that overrides this one decides for
+     * itself whether to call [validateJoin] too.
+     */
+    public fun validateJoin(
+        group: GroupView,
+        groupInfoSigner: Int,
+        groupInfoExtensions: List<Extension>,
+    ): Unit = validateJoin(group)
+
+    /**
+     * Rejects, by throwing, a commit whose RESULT the application does not
+     * allow.
+     *
+     * [authorizeCommit] judges who may make a change against the state before
+     * it; some rules can only be judged on the state after it — a cap on how
+     * many leaves one identity may hold, a requirement every leaf must meet,
+     * a setting that may be turned on but never off. Those go here.
+     *
+     * Called for both directions, after every proposal in the commit has been
+     * applied and the committer's UpdatePath leaf merged, and before the new
+     * epoch's key schedule: [resulting] is the tree and GroupContext
+     * extensions the commit produces (its epoch number not yet advanced), and
+     * [parentExtensions] are the GroupContext extensions it started from.
+     * [proposals] are the commit's proposals as [authorizeCommit] saw them.
+     * [committerLeafIndex] is the committer's leaf in [resulting]: the leaf its
+     * UpdatePath replaced, when it sent one, or for an external commit the
+     * joiner's new leaf — so a rule about leaves a commit introduces can read
+     * that one too, besides the KeyPackages of its Adds.
+     *
+     * Throwing refuses the commit: the tree, the epoch and the keys stay as
+     * they were, for an inbound commit and a local one alike, so a committer
+     * refuses what its peers would refuse. For a local commit the pending
+     * proposal pool is restored too, except what the caller queued with the
+     * `propose*` calls before [MlsGroup.commit]: those stay pooled until the
+     * caller commits them in a form the policy accepts or the epoch moves on.
+     * [MlsGroup.addMembers] and [MlsGroup.removeMember] take theirs back out.
+     */
+    public fun validateResultingState(
+        parentExtensions: List<Extension>,
+        proposals: List<PendingProposal>,
+        committerLeafIndex: Int,
+        resulting: GroupView,
+    ): Unit = Unit
 
     /**
      * Rejects, by throwing, a standalone proposal this member should not hold.
@@ -259,12 +314,34 @@ public class GroupView(
     public val myLeafIndex: Int,
     private val identityAt: (Int) -> String?,
     private val capabilitiesAt: (Int) -> Capabilities?,
+    private val leafAt: (Int) -> LeafNode?,
 ) {
+    /** A view whose [leafNode] is always null, for callers built before it existed. */
+    public constructor(
+        extensions: List<Extension>,
+        leafCount: Int,
+        myLeafIndex: Int,
+        identityAt: (Int) -> String?,
+        capabilitiesAt: (Int) -> Capabilities?,
+    ) : this(extensions, leafCount, myLeafIndex, identityAt, capabilitiesAt, { null })
+
     /** Lowercase hex of the BasicCredential identity at [leafIndex], or null if blank. */
     public fun memberIdentityHex(leafIndex: Int): String? = identityAt(leafIndex)
 
     /** Capabilities advertised by the leaf at [leafIndex], or null if blank. */
     public fun leafCapabilities(leafIndex: Int): Capabilities? = capabilitiesAt(leafIndex)
+
+    /**
+     * The whole LeafNode at [leafIndex], or null if blank — for a rule that
+     * reads a leaf's extensions (an application's per-leaf data) rather than
+     * only its identity or capabilities.
+     *
+     * A detached copy, decoded afresh from the leaf's encoding: a LeafNode
+     * holds ByteArrays, and handing out the tree's own would let a policy
+     * change the group, and the tree hash cached over it, from inside a check.
+     * Each call pays one encode and decode, so read a leaf once per decision.
+     */
+    public fun leafNode(leafIndex: Int): LeafNode? = leafAt(leafIndex)?.let { LeafNode.decodeTls(TlsReader(it.toTlsBytes())) }
 }
 
 /**
