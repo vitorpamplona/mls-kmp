@@ -79,9 +79,11 @@ asks, and before opening, revising or merging one by either path, use the `ngit-
 
 ## Releasing
 
-Push a `v<version>` tag: `.github/workflows/create-release.yml` runs the tests and publishes to
-Maven Central with the version taken from the tag. The workflow's `nostr` job publishes the same files to Nostr + Blossom with Magpie's
-`publishToNostr`, independently of Maven Central, so either can be re-run alone. It needs the
-signing secrets and `MAGPIE_BUNKER`, a NIP-46 `bunker://` URI for the release key that
+Push a `v<version>` tag: `.github/workflows/create-release.yml` takes the version from the tag and
+runs two jobs that don't wait for each other, each running the tests first. `central` publishes to
+Maven Central (`SONATYPE_*`, `SIGNING_*`). `nostr` publishes the same files to Nostr + Blossom
+with Magpie's `publishToNostr`, then opens the GitHub release. When one channel fails (Central's
+monthly upload limit, an unanswered signer), re-run only that job. `nostr` needs the signing
+secrets and `MAGPIE_BUNKER`, a NIP-46 `bunker://` URI for the release key that
 `vitorpamplona.com/.well-known/nostr.json` names as `releases`; the signer approves each release,
 and a version already on Nostr fails the job.

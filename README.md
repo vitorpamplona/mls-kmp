@@ -287,7 +287,8 @@ never change.
 ## Releasing
 
 Push a `v*` tag. `.github/workflows/create-release.yml` runs the tests and
-publishes to Maven Central with the version taken from the tag.
+publishes to Maven Central and to Nostr + Blossom, with the version taken from the tag, then
+opens the GitHub release.
 `publishToMavenLocal` works without signing keys for local testing.
 
 ## License
