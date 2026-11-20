@@ -27,11 +27,11 @@ The library depends on no Nostr code, so a binding cannot leak into it.
 
 ```kotlin
 dependencies {
-    implementation("com.vitorpamplona.mls:mls:1.2.0")
+    implementation("com.vitorpamplona.mls:mls:1.4.1")
 }
 ```
 
-Releases are on Maven Central.
+Releases are on Maven Central (1.3.1 and 1.4.0 are on Nostr only; they are built on a crypto-kmp that Central doesn't have).
 Releases also go to Nostr + Blossom through [Magpie](https://github.com/vitorpamplona/magpie). To
 take them from there (signed by the key `vitorpamplona.com/.well-known/nostr.json` names as
 `releases`), add Magpie's settings plugin in `settings.gradle.kts` and commit the

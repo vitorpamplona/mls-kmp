@@ -2,7 +2,7 @@
 
 ```kotlin
 dependencies {
-    implementation("com.vitorpamplona.mls:mls:1.2.0")
+    implementation("com.vitorpamplona.mls:mls:1.4.1")
 }
 ```
 
