@@ -6,7 +6,12 @@ on:
     - 'v*' # Push events to matching v*, i.e. v1.0, v20.15.10
 
 jobs:
-  deploy:
+  # Every release goes to Maven Central and to Nostr + Blossom, in two jobs that don't wait for
+  # each other: Central's monthly upload limit, or a signer nobody answered, fails one channel
+  # without holding back the other, and "Re-run failed jobs" retries only the one that failed.
+  # Both run the same checks on the same sources first. The GitHub release comes from the nostr
+  # job, so it doesn't wait on Central either.
+  central:
     runs-on: macOS-latest
 
     steps:
@@ -40,15 +45,14 @@ jobs:
       - name: Check
         run: ./gradlew allTests
 
-      - name: Build (gradle)
-        run: ./gradlew assemble --no-daemon
-
+      # Tag v1.2.3 publishes version 1.2.3.
       - name: Set version for tag
         run: |
-          # Tag v1.2.3 publishes version 1.2.3.
           echo "ORG_GRADLE_PROJECT_VERSION_NAME=${GITHUB_REF_NAME#v}" >> $GITHUB_ENV
 
-      - name: Publish
+      # vanniktech's plugin signs every file and uploads one bundle to the Central Portal, which
+      # releases it automatically once it validates. A version already on Central fails here.
+      - name: Publish to Maven Central
         run: ./gradlew publishAllPublicationsToMavenCentral --no-configuration-cache
         env:
           ORG_GRADLE_PROJECT_mavenCentralUsername: ${{ secrets.SONATYPE_USERNAME }}
@@ -56,24 +60,17 @@ jobs:
           ORG_GRADLE_PROJECT_signingInMemoryKey: ${{ secrets.SIGNING_PRIVATE_KEY }}
           ORG_GRADLE_PROJECT_signingInMemoryKeyPassword: ${{ secrets.SIGNING_PASSWORD }}
 
-      - name: Create Release
-        uses: softprops/action-gh-release@v2
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          body: ${{ env.RELEASE_NOTES }}
-        if: ${{ env.RELEASE_NOTES != '' }}
-
-  # The same publications on Nostr + Blossom, through Magpie's publishToNostr (the plugin version
-  # is in settings.gradle.kts, the relays in gradle.properties), beside the Maven Central job and
-  # independent of it: Central's upload limit can fail one without holding back the other. It runs
-  # the same checks first, uploads every file to the release key's Blossom servers (kind 10063)
-  # and signs one release event (kind 3071) per published module, sent to the key's own relays
-  # (its kind 10002 and nostr.json). The key never reaches CI: MAGPIE_BUNKER is a NIP-46 bunker
-  # URI, so the signer approves each release (the job waits for it), and
+  # Magpie's publishToNostr (the plugin version is in settings.gradle.kts, the relays in
+  # gradle.properties) uploads every file to the release key's Blossom servers (kind 10063) and
+  # signs one release event (kind 3071) per published module, sent to the key's own relays (its
+  # kind 10002 and nostr.json). The key never reaches CI: MAGPIE_BUNKER is a NIP-46 bunker URI, so
+  # the signer approves each release (the job waits for it), and
   # vitorpamplona.com/.well-known/nostr.json must name the key as "releases" or Magpie refuses to
   # sign. A version already on Nostr fails the job: releases are immutable.
   nostr:
     runs-on: macOS-latest
+    permissions:
+      contents: write
 
     steps:
       - name: Checkout code
@@ -92,9 +89,21 @@ jobs:
           key: ${{ runner.os }}-konan-${{ hashFiles('**/*.gradle*') }}-${{ hashFiles('**/gradle/wrapper/gradle-wrapper.properties') }}
           restore-keys: ${{ runner.os }}-konan-
 
+      - name: Cache gradle
+        uses: actions/cache@v6
+        with:
+          path: ~/.gradle/caches
+          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*') }}
+          restore-keys: |
+            ${{ runner.os }}-gradle-
+
+      - name: Linter (gradle)
+        run: ./gradlew spotlessCheck
+
       - name: Check
         run: ./gradlew allTests
 
+      # Tag v1.2.3 publishes version 1.2.3.
       - name: Set version for tag
         run: |
           echo "ORG_GRADLE_PROJECT_VERSION_NAME=${GITHUB_REF_NAME#v}" >> $GITHUB_ENV
@@ -105,3 +114,9 @@ jobs:
           ORG_GRADLE_PROJECT_signingInMemoryKey: ${{ secrets.SIGNING_PRIVATE_KEY }}
           ORG_GRADLE_PROJECT_signingInMemoryKeyPassword: ${{ secrets.SIGNING_PASSWORD }}
           MAGPIE_BUNKER: ${{ secrets.MAGPIE_BUNKER }}
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          generate_release_notes: true
