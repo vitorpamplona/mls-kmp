@@ -43,6 +43,7 @@ group itself, so it cannot change the group from inside a check.
 | `validateCredentialSuccession` | a member replacing its leaf; by default it must keep its identity |
 | `authorizeCommit` | every commit, before building ours and before applying others', against the state before it |
 | `validateResultingState` | every commit, once its proposals and UpdatePath are applied: rules about the state it produces (a per-identity leaf cap, a setting that may never be turned off), with the committer's leaf in that state |
+| `resolveAppDataUpdate` | every AppDataUpdate that sets a component, on the committer and every receiver: turns the payload into the component's new GroupContext value. The default keeps the payload (full replacement); a component whose update is a diff applies it to the parent's value here |
 | `authorizeProposal` | every standalone proposal received |
 | `authorizeSelfRemove` | a member asking to leave |
 | `authorizeExternalCommit` | every external join or resync |

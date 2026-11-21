@@ -864,8 +864,10 @@ public class MlsGroup private constructor(
     /**
      * Propose setting one GroupContext app component to [data].
      *
-     * Marmot components define their update payload as a full replacement
-     * state, so [data] is the component's new value, not a diff.
+     * [data] is the update payload. For most components (and by default) it
+     * is the component's new value; a component whose update is a diff is
+     * resolved against the current value by the group's
+     * [MlsGroupPolicy.resolveAppDataUpdate], here and on every receiver.
      *
      * This is the MLS mechanism only. Marmot's own authorization — most
      * component changes are admin-gated, and the resulting state still has to
@@ -1527,6 +1529,7 @@ public class MlsGroup private constructor(
         validateProposalList(proposals, committer)
 
         val requiredComponentsBefore = requiredAppComponents()
+        val parentExtensions = groupContext.extensions
         val replacedLeaves = mutableMapOf<Int, LeafNode?>()
 
         // §12.3 order: GroupContextExtensions, Update, Remove, Add. App-data
@@ -1536,7 +1539,7 @@ public class MlsGroup private constructor(
             GroupValidation.validateExtensions(it.extensions, GroupValidation.ExtensionContext.GROUP_CONTEXT)
             groupContext = groupContext.copy(extensions = it.extensions)
         }
-        applyAppDataUpdateProposals(proposals.mapNotNull { it.proposal as? Proposal.AppDataUpdate })
+        applyAppDataUpdateProposals(proposals.mapNotNull { it.proposal as? Proposal.AppDataUpdate }, parentExtensions)
 
         for (p in proposals) {
             val update = p.proposal as? Proposal.Update ?: continue
@@ -2923,20 +2926,31 @@ public class MlsGroup private constructor(
      *
      * MLS deliberately leaves the meaning of an update payload to the
      * application — openmls hands the proposals back for the app to resolve —
-     * because a component's payload can be an arbitrary diff. Every Marmot
-     * component document defines its update as a full replacement state, so
-     * here resolution is the identity function. A future component that wanted
-     * true diff semantics would have to resolve them before this point.
+     * because a component's payload can be an arbitrary diff. The policy's
+     * [MlsGroupPolicy.resolveAppDataUpdate] turns each payload into the new
+     * value: the identity by default (full replacement), a diff applied to the
+     * parent's value for a component that defines one (Marmot's device
+     * roster). The parent value is the one in [parentExtensions], the
+     * GroupContext the commit starts from, as OpenMLS's `old_value` is; a
+     * policy that throws refuses the commit, and the caller's [atomically]
+     * leaves the group as it was.
      */
-    private fun applyAppDataUpdateProposals(updates: List<Proposal.AppDataUpdate>) {
+    private fun applyAppDataUpdateProposals(
+        updates: List<Proposal.AppDataUpdate>,
+        parentExtensions: List<Extension>,
+    ) {
         if (updates.isEmpty()) return
 
+        val parentDictionary = AppDataDictionary.fromExtensionsOrEmpty(parentExtensions)
         var dictionary = AppDataDictionary.fromExtensionsOrEmpty(groupContext.extensions)
         for (update in updates) {
             dictionary =
                 when (val operation = update.operation) {
                     is Proposal.AppDataUpdate.Operation.Update ->
-                        dictionary.with(update.componentId, operation.data)
+                        dictionary.with(
+                            update.componentId,
+                            policy.resolveAppDataUpdate(parentExtensions, update.componentId, parentDictionary[update.componentId], operation.data),
+                        )
 
                     Proposal.AppDataUpdate.Operation.Remove ->
                         dictionary.without(update.componentId)
