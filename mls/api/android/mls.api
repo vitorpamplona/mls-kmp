@@ -626,6 +626,7 @@ public abstract interface class com/vitorpamplona/mls/group/MlsGroupPolicy {
 	public fun getMaxMessageSize ()I
 	public fun getOutOfOrderTolerance ()I
 	public fun getWireFormatPolicy ()Lcom/vitorpamplona/mls/group/WireFormatPolicy;
+	public fun resolveAppDataUpdate (Ljava/util/List;I[B[B)[B
 	public fun validateCredential (Lcom/vitorpamplona/mls/tree/Credential;[B)V
 	public fun validateCredentialSuccession (Lcom/vitorpamplona/mls/tree/Credential;Lcom/vitorpamplona/mls/tree/Credential;)V
 	public fun validateJoin (Lcom/vitorpamplona/mls/group/GroupView;)V
@@ -652,6 +653,7 @@ public final class com/vitorpamplona/mls/group/MlsGroupPolicy$DefaultImpls {
 	public static fun getMaxMessageSize (Lcom/vitorpamplona/mls/group/MlsGroupPolicy;)I
 	public static fun getOutOfOrderTolerance (Lcom/vitorpamplona/mls/group/MlsGroupPolicy;)I
 	public static fun getWireFormatPolicy (Lcom/vitorpamplona/mls/group/MlsGroupPolicy;)Lcom/vitorpamplona/mls/group/WireFormatPolicy;
+	public static fun resolveAppDataUpdate (Lcom/vitorpamplona/mls/group/MlsGroupPolicy;Ljava/util/List;I[B[B)[B
 	public static fun validateCredential (Lcom/vitorpamplona/mls/group/MlsGroupPolicy;Lcom/vitorpamplona/mls/tree/Credential;[B)V
 	public static fun validateCredentialSuccession (Lcom/vitorpamplona/mls/group/MlsGroupPolicy;Lcom/vitorpamplona/mls/tree/Credential;Lcom/vitorpamplona/mls/tree/Credential;)V
 	public static fun validateJoin (Lcom/vitorpamplona/mls/group/MlsGroupPolicy;Lcom/vitorpamplona/mls/group/GroupView;)V

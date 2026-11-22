@@ -143,6 +143,28 @@ public interface MlsGroupPolicy {
     ): Unit = Unit
 
     /**
+     * The new GroupContext value of [componentId] after an `AppDataUpdate` whose payload is [update].
+     *
+     * An AppDataUpdate's payload is defined by its component, not by MLS (draft-ietf-mls-extensions
+     * leaves it to the application; OpenMLS returns such a commit as `UnresolvedAppDataCommit` for the
+     * application to resolve against the old dictionary). The default keeps [update] as the new value,
+     * the replacement semantics most components define. A binding with a component whose update is a
+     * diff applies it to [parentData] here: the component's value in the GroupContext this commit
+     * starts from (null when it has none), whose extensions are [parentExtensions].
+     *
+     * Called for every update operation (never a removal) in both directions, on the committer while
+     * it builds the commit and on every receiver, so a binding's members must resolve identically or
+     * the group forks. Throwing refuses the commit: an inbound commit changes nothing, and a local one
+     * is never built.
+     */
+    public fun resolveAppDataUpdate(
+        parentExtensions: List<Extension>,
+        componentId: Int,
+        parentData: ByteArray?,
+        update: ByteArray,
+    ): ByteArray = update
+
+    /**
      * Rejects, by throwing, a standalone proposal this member should not hold.
      *
      * Called when a proposal arrives on its own (by reference, RFC 9420
