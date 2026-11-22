@@ -27,7 +27,7 @@ The library depends on no Nostr code, so a binding cannot leak into it.
 
 ```kotlin
 dependencies {
-    implementation("com.vitorpamplona.mls:mls:1.4.1")
+    implementation("com.vitorpamplona.mls:mls:1.5.0")
 }
 ```
 
