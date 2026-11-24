@@ -8,7 +8,7 @@ elsewhere can undo that:
 - **Old saved states.** Each `saveState()` holds that moment's secrets.
   Overwrite the previous copy rather than keeping versions, and keep
   backups only if you accept what they expose.
-- **Former epochs.** mls-kmp keeps the decryption keys of the last 4 epochs
+- **Former epochs.** mls-kmp keeps the decryption keys of the last 5 epochs
   so [late messages](messages.md#late-messages) still open, and resumption
   secrets of the last 64 for ReInit and branches. That is a window an
   attacker who takes a device also gets.

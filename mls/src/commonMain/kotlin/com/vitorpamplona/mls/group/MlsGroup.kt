@@ -3094,9 +3094,12 @@ public class MlsGroup private constructor(
         /**
          * How many former epochs [decryptFormerEpoch] can still read. Each one
          * keeps that epoch's decryption secrets, so this is a forward-secrecy
-         * trade (RFC 9420 §15.2); 4 matches ts-mls's `retainKeysForEpochs`.
+         * trade (RFC 9420 §15.2). 5 matches OpenMLS's default lookback, which
+         * MDK and White Noise use: with fewer, a late message they still open
+         * would be unreadable here. An epoch that leaves the window is dropped
+         * from the group and from the next [saveState].
          */
-        public const val RETAIN_EPOCHS: Int = 4
+        public const val RETAIN_EPOCHS: Int = 5
 
         /** How far back a fresh KeyPackage LeafNode's `not_before` is set. */
         private const val LIFETIME_SKEW_SECONDS = 3_600L
