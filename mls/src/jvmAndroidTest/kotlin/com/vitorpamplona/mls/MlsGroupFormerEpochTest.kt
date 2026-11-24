@@ -123,6 +123,56 @@ class MlsGroupFormerEpochTest {
         assertTrue(e.message!!.contains("no longer retained"))
     }
 
+    /**
+     * OpenMLS (MDK, White Noise) looks back five epochs, and marmot-kmp's outer
+     * layer peels five. A message from exactly five epochs back must open here
+     * too, or a Marmot group shows it in White Noise and not in Amethyst.
+     */
+    @Test
+    fun aMessageFromFiveEpochsBackOpens() {
+        val (alice, bob) = twoMembers()
+        val late = bob.encrypt("five back".encodeToByteArray())
+        val epochOfLate = alice.epoch
+        repeat(5) { alice.commit() }
+
+        assertEquals(epochOfLate + 5, alice.epoch)
+        assertContentEquals("five back".encodeToByteArray(), alice.decryptFormerEpoch(late).content)
+    }
+
+    @Test
+    fun aMessageFromSixEpochsBackDoesNotOpen() {
+        val (alice, bob) = twoMembers()
+        val tooLate = bob.encrypt("six back".encodeToByteArray())
+        val epochOfTooLate = alice.epoch
+        repeat(6) { alice.commit() }
+
+        assertEquals(5, alice.retainedEpochs().size)
+        assertEquals(epochOfTooLate + 1, alice.retainedEpochs().first().epoch)
+        assertTrue(alice.formerExporterSecrets().keys.none { it == epochOfTooLate })
+        val e = assertFailsWith<IllegalArgumentException> { alice.decryptFormerEpoch(tooLate) }
+        assertTrue(e.message!!.contains("no longer retained"))
+        // nor does a saved state carry the dropped epoch
+        assertTrue(alice.saveAndRestore().retainedEpochs().none { it.epoch == epochOfTooLate })
+    }
+
+    /** A state saved by the four-epoch engine loads as it was, and its window then grows to five. */
+    @Test
+    fun aStateSavedWithFourRetainedEpochsGrowsToFive() {
+        val (alice, bob) = twoMembers() // adding bob was alice's first commit
+        val late = bob.encrypt("kept across the restore".encodeToByteArray())
+        val epochOfLate = alice.epoch
+        repeat(3) { alice.commit() }
+        val saved = MlsGroupState.decodeTls(alice.saveState().encodeTls())
+        assertEquals(4, saved.retainedEpochs.size)
+
+        val restored = MlsGroup.restore(saved)
+        assertEquals(4, restored.retainedEpochs().size)
+        repeat(2) { restored.commit() }
+        assertEquals(5, restored.retainedEpochs().size)
+        assertEquals(epochOfLate + 5, restored.epoch)
+        assertContentEquals("kept across the restore".encodeToByteArray(), restored.decryptFormerEpoch(late).content)
+    }
+
     @Test
     fun aCurrentEpochMessageIsNotAFormerOne() {
         val (alice, bob) = twoMembers()

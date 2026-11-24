@@ -48,9 +48,9 @@ previous epoch. Members that already moved on can still open it:
 val late = bob.decryptFormerEpoch(lateBytes)
 ```
 
-mls-kmp keeps the decryption keys of the last 4 epochs for this, and each
-message opens only once. Keeping old keys is a forward-secrecy trade-off;
-see [Security considerations](security.md).
+mls-kmp keeps the decryption keys of the last 5 epochs for this, as OpenMLS
+does, and each message opens only once. Keeping old keys is a forward-secrecy
+trade-off; see [Security considerations](security.md).
 
 ## Deriving keys for your application
 

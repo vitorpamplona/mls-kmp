@@ -476,16 +476,25 @@ class GroupSimulationTest {
         ) {
             if (m.removed) return
             val behind = m.group.epoch - msg.epoch
+            if (behind > LATE_MESSAGE_WINDOW) {
+                // out of the retention window: must be refused, not misread
+                val refused = runCatching { m.group.decryptFormerEpoch(msg.bytes) }.exceptionOrNull()
+                if (refused?.message?.contains("no longer retained") != true) {
+                    fail("${m.name} at epoch ${m.group.epoch} did not refuse \"${msg.text}\" from $behind epochs back: $refused")
+                }
+                return
+            }
             val text =
                 try {
                     when {
                         behind == 0L -> (m.group.processMessage(msg.bytes) as ProcessedMessage.Application).message.content.decodeToString()
-                        behind in 1..MlsGroup.RETAIN_EPOCHS.toLong() ->
+                        // OpenMLS (MDK, White Noise) reads five epochs back; so must we.
+                        behind in 1..LATE_MESSAGE_WINDOW ->
                             m.group
                                 .decryptFormerEpoch(msg.bytes)
                                 .content
                                 .decodeToString()
-                        else -> return // out of the retention window: expected to be unreadable
+                        else -> return
                     }
                 } catch (t: Throwable) {
                     fail("${m.name} at epoch ${m.group.epoch} could not read \"${msg.text}\": $t")
@@ -517,5 +526,10 @@ class GroupSimulationTest {
                 if (!v.exportTreeBytes().contentEquals(first.group.exportTreeBytes())) fail("the PublicGroup's tree differs from the members'")
             }
         }
+    }
+
+    private companion object {
+        /** How many epochs back a late message still opens: OpenMLS's default, and marmot-kmp's outer layer. */
+        const val LATE_MESSAGE_WINDOW = 5L
     }
 }
